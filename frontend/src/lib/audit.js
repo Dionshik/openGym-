@@ -29,6 +29,13 @@ const LABELS = {
   'admin.user.disable': 'Disabled an account',
   'admin.user.enable': 'Re-enabled an account',
   'admin.user.delete': 'Deleted an account',
+  'admin.user.role': 'Changed a role',
+  // The shared exercise pool (api/pool.js) — done by an admin or a moderator.
+  'admin.pool.approve': 'Approved a suggested exercise',
+  'admin.pool.reject': 'Declined a suggested exercise',
+  'admin.pool.edit': 'Edited a shared exercise',
+  'admin.pool.retire': 'Retired a shared exercise',
+  'admin.pool.restore': 'Restored a shared exercise',
   'admin.invite.create': 'Created an invite code',
   'admin.invite.revoke': 'Revoked an invite code',
   'admin.audit.clear': 'Cleared the activity log',

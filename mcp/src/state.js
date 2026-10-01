@@ -84,6 +84,23 @@ export function init() {
   } catch { /* fs.watch unsupported on this platform; tools will re-read on mtime change */ }
 }
 
+// The instance's shared exercise pool (api/pool.js → pool.json): exercises a moderator approved
+// for everyone. A routine or a workout names one by id only, and every tool here resolves ids
+// against the built-in catalogue and the profile's own `customEx` — so the pool's rows are filed
+// there too, or a shared exercise would read back as "Unknown exercise". Retired rows included:
+// history that names one still has to resolve.
+function withPool(state) {
+  const raw = readJsonOrNull(path.join(DATA_DIR, 'pool.json'))
+  const rows = (Array.isArray(raw && raw.items) ? raw.items : []).filter(r => r && typeof r.id === 'string' && (r.status === 'approved' || r.status === 'retired'))
+  if (!rows.length) return state
+  const own = new Set((state.customEx || []).map(c => c && c.id))
+  const shared = rows.filter(r => !own.has(r.id)).map(r => ({
+    id: r.id, n: r.n, bp: r.bp, eq: r.eq, tg: r.tg, primaries: r.primaries, secondaries: r.secondaries,
+    muscleGroups: r.muscleGroups, sm: r.sm, desc: r.desc, pool: true
+  }))
+  return shared.length ? { ...state, customEx: [...(state.customEx || []), ...shared] } : state
+}
+
 // Returns the state object, or null for a fresh account that never signed in on a device.
 export function getState() {
   init()
@@ -99,7 +116,7 @@ export function getState() {
     if (fresh) {
       // Same shape the frontend builds on pullState — defaults merged with stored state so any
       // field the app added since the snapshot was last saved shows up undefined-safe.
-      _state = Object.assign({}, defaultsShape(), fresh)
+      _state = withPool(Object.assign({}, defaultsShape(), fresh))
       _loadedMtime = mtime
     } else if (_state === undefined) {
       _state = null  // no state file at all — never signed in on a device

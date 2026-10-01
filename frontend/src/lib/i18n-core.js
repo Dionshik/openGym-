@@ -10,7 +10,10 @@ export const LANGS = {
   ko: '한국어', hi: 'हिन्दी', th: 'ไทย', hu: 'Magyar'
 }
 export const INSTR_LANGS = ['en', 'es', 'fr', 'it', 'tr', 'ru', 'zh', 'hi', 'pl', 'ko', 'pt-BR', 'hu']
-export const EXERCISE_NAME_LANGS = ['pt-BR', 'hu']
+// hu and pt-BR name every upstream row. ru is a partial pack: Russian names (and search
+// aliases) exist only for the rows added from free-exercise-db, and every other row keeps its
+// English name — exerciseNameFor falls back per exercise, so a partial pack is legal.
+export const EXERCISE_NAME_LANGS = ['pt-BR', 'hu', 'ru']
 export const DATE_LOCALES = {
   en: 'en-GB', de: 'de-DE', 'de-CH': 'de-CH', es: 'es-ES', fr: 'fr-FR', it: 'it-IT',
   pt: 'pt-PT', 'pt-BR': 'pt-BR',
@@ -57,6 +60,7 @@ let lang = 'en'                 // set only by _setLangState, called from i18n.j
 let dict = {}                   // current locale pack (empty = English fallback)
 let instr = null                // { exId: [steps] } for the current language, null = English
 let exerciseNames = null        // { exId: translated name }, null = original catalogue name
+let exerciseAliases = null      // { exId: "other names, space separated" } — search only, never shown
 let version = 0                 // bumped on every setLang; drives the React subscription selector
 
 export const getLang = () => lang
@@ -91,19 +95,22 @@ export const exerciseNameFor = ex => {
 // Search both the localized and canonical English title without changing persisted data.
 export const exerciseNameSearchText = ex => {
   const translated = exerciseNames && ex && exerciseNames[ex.id]
-  return translated ? `${translated} ${ex.n}` : (ex?.n || '')
+  const aliases = exerciseAliases && ex && exerciseAliases[ex.id]
+  const text = translated ? `${translated} ${ex.n}` : (ex?.n || '')
+  return aliases ? `${text} ${aliases}` : text
 }
 
 // Called by i18n.js's setLang once the locale pack has been loaded — kept here rather than
 // exported as setLang because loading packs requires import.meta.glob, which is Vite-only.
 // `dict`, `instr` and `exerciseNames` may be null to reset to their English fallbacks.
-export function _setLangState(newLang, newDict, newInstr, newExerciseNames) {
+export function _setLangState(newLang, newDict, newInstr, newExerciseNames, newExerciseAliases) {
   lang = LANGS[newLang] ? newLang : 'en'
   dict = lang === 'en' ? {} : (newDict || {})
   instr = lang === 'en' || !INSTR_LANGS.includes(baseLang(lang)) ? null : (newInstr || null)
   exerciseNames = lang === 'en' || !EXERCISE_NAME_LANGS.includes(baseLang(lang))
     ? null
     : (newExerciseNames || null)
+  exerciseAliases = exerciseNames ? (newExerciseAliases || null) : null
   version++
   return version
 }

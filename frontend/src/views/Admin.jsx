@@ -61,10 +61,18 @@ function UserDetail({ id, onChanged, close }) {
       .then(() => { toast(disabled ? 'User disabled' : 'User enabled'); onChanged(); close() })
       .catch(e => toast(e.message))
   }
+  // A moderator approves the exercises people suggest for everyone and hands out invite codes of
+  // their own. That is all the role opens: none of what this sheet shows, and no other card here.
+  const setModerator = moderator => {
+    api('/api/admin/user/role', { method: 'POST', body: JSON.stringify({ id: u.id, role: moderator ? 'moderator' : null }) })
+      .then(() => { toast(moderator ? u.name + ' is now a moderator' : u.name + ' is no longer a moderator'); onChanged(); close() })
+      .catch(e => toast(e.message))
+  }
   return <>
     <h3 className="capitalize">{u.name}</h3>
     <div className="row" style={{ gap: 6, flexWrap: 'wrap', margin: '8px 0 12px' }}>
       {u.admin && <span className="adm-pill acc">admin</span>}
+      {u.moderator && !u.admin && <span className="adm-pill acc">moderator</span>}
       {u.disabled && <span className="adm-pill bad">disabled</span>}
       {u.invitedBy && <span className="adm-pill">invite {u.invitedBy}</span>}
       <span className="adm-pill">joined {u.created ? fmtDate(u.created.slice(0, 10)) : '—'}</span>
@@ -76,6 +84,11 @@ function UserDetail({ id, onChanged, close }) {
       <div className="tile"><div className="l">Last sync</div><div className="v" style={{ fontSize: '.95rem' }}>{rel(d.lastSync)}</div></div>
     </div>
     {!u.admin && <>
+      <button className="btn" style={{ margin: '12px 0 4px' }} onClick={() => setModerator(!u.moderator)}>
+        {u.moderator ? 'Remove moderator role' : 'Make moderator'}</button>
+      <div className="adm-hint">{u.moderator
+        ? 'They go back to being an ordinary member. Exercises they approved stay shared.'
+        : 'A moderator approves the exercises people suggest for everyone, and can create invite codes of their own. They see no user list, no training data and nothing else on this page.'}</div>
       <button className={'btn ' + (u.disabled ? 'primary' : 'danger')} style={{ margin: '12px 0 4px' }}
         onClick={() => u.disabled ? setDisabled(false)
           : confirmSheet({ title: 'Disable ' + u.name + '?', message: 'They are signed out everywhere and can no longer sync or log in until re-enabled. Their data stays.', confirmText: 'Disable', danger: true, onConfirm: () => setDisabled(true) })}>
@@ -112,7 +125,9 @@ function UserDetail({ id, onChanged, close }) {
   </>
 }
 
-function InvitesCard({ invites, reload, inviteOnly }) {
+// Exported for the moderation screen: a moderator gets this card and no other from this page,
+// showing only the codes they made themselves (the server filters, not this component).
+export function InvitesCard({ invites, reload, inviteOnly }) {
   const toast = useUI(s => s.toast)
   const gen = () => api('/api/admin/invites/new', { method: 'POST', body: '{}' })
     .then(({ invite }) => { navigator.clipboard?.writeText(invite.code).catch(() => {}); toast('Code ' + invite.code + ' created & copied'); reload() })
@@ -268,12 +283,20 @@ export default function Admin() {
 
     <InvitesCard invites={invites} reload={loadInvites} inviteOnly={inviteOnly} />
 
+    {/* The shared exercise pool has a screen of its own — it is the one part of running the
+        instance that moderators share with admins, so it cannot live on an admin-only page. */}
+    <div className="card">
+      <div className="row between"><h2 style={{ margin: 0 }}>Shared exercises</h2>
+        <Button size="sm" onClick={() => nav('/moderation')} trailingIcon="chevronRight">Open</Button></div>
+      <div className="adm-lead">Exercises members suggested for everyone: the queue waiting for a decision, and what is already shared. Admins and moderators decide; make someone a moderator from their row below.</div>
+    </div>
+
     <div className="card">
       <h2 style={{ margin: 0 }}>Users</h2>
       <div className="adm-lead">Everyone with a profile on this instance. Tap one to see their activity or to disable the account — their data is never deleted from here.</div>
       <div className="list">
         {(users || []).map(u => <div key={u.id} className="item" onClick={() => openUser(u.id)} style={u.disabled ? { opacity: .55 } : null}>
-          <div className="grow"><div className="tt">{u.live && <Icon name="dot" style={{ fontSize: 9, color: 'var(--green)', display: 'inline-block', marginRight: 5 }} />}{u.name} {u.admin && <span className="adm-pill acc" style={{ marginLeft: 4 }}>admin</span>}{u.disabled && <span className="adm-pill bad" style={{ marginLeft: 4 }}>disabled</span>}</div>
+          <div className="grow"><div className="tt">{u.live && <Icon name="dot" style={{ fontSize: 9, color: 'var(--green)', display: 'inline-block', marginRight: 5 }} />}{u.name} {u.admin && <span className="adm-pill acc" style={{ marginLeft: 4 }}>admin</span>}{u.moderator && !u.admin && <span className="adm-pill acc" style={{ marginLeft: 4 }}>moderator</span>}{u.disabled && <span className="adm-pill bad" style={{ marginLeft: 4 }}>disabled</span>}</div>
             <div className="ss">{u.live ? 'training now · ' + u.live.name : u.workouts + ' workouts' + (u.lastWorkout ? ' · last ' + fmtDate(u.lastWorkout) : '') + ' · last sync ' + rel(u.lastSync)}</div></div>
           {u.hasPush && <Icon name="bell" title="push notifications on" style={{ fontSize: 15, color: 'var(--label-3)' }} />}<Icon name="chevronRight" className="chev" />
         </div>)}

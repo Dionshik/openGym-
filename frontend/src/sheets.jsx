@@ -19,6 +19,10 @@ import { Button, Slider, Switch, Segmented, SelectRow, Row, TextField, NumberFie
 import { glyphOf, GLYPH_GROUPS, DEFAULT_GLYPH } from './lib/glyphs.js'
 import BodyMap from './components/BodyMap.jsx'
 import MuscleExplorer from './components/MuscleExplorer.jsx'
+import DescribeExercise from './components/DescribeExercise.jsx'
+import { coachAvailable } from './lib/coach.js'
+import { poolAvailable, suggestBlocker, suggestionOf, suggestExercise, withdrawSuggestion, poolErrorText, POOL_ERRORS } from './lib/pool.js'
+import { DEMO } from './lib/demo.js'
 import { exerciseMuscleSnapshot, loadOfWorkouts, MUSCLES, MUSCLE_NAME, normalizeMuscleGroups, hasExplicitMuscleMetadata, inMuscleOrder } from './lib/muscles.js'
 import { parseImport, mergeImport } from './lib/import-csv.js'
 import { importHevyData, HevyApiError, HEVY_DEV_SETTINGS, mergeHevyRoutines } from './lib/import-hevy.js'
@@ -37,6 +41,7 @@ import { isFav, toggleFav, sortFavouritesFirst } from './lib/favourites.js'
 import { buildSessionEntries } from './lib/session-start.js'
 import { buildCombinedEntries, deriveSessionName } from './lib/session-merge.js'
 import { workoutsOn, backfillStart, backfillEnd, completeBackfill } from './lib/backfill.js'
+import { editSessionFor, isEditSession, editedEnd, editedPrs, editHasWork } from './lib/workout-edit.js'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -655,6 +660,57 @@ function OneRM({ ex }) {
   </>
 }
 
+/* "Suggest for everyone" on one of your own exercises, and how that suggestion stands.
+ *
+ * Only where there is a pool to suggest to (signed in, on a server that has one). The exercise
+ * stays yours either way: suggesting copies it to a moderator's queue, approval gives everybody
+ * a copy under the same id, and a decline comes back with the moderator's note. */
+function SuggestToPool({ ex }) {
+  const user = useStore(s => s.user)
+  const config = useStore(s => s.config)
+  const pool = useStore(s => s.pool)
+  const [busy, setBusy] = useState(false)
+  const on = poolAvailable(config, user)
+  // A decline does not move the pool's revision (nothing anybody else sees changed), so the
+  // status shown here is refreshed when the sheet opens rather than waited for.
+  useEffect(() => { if (on) useStore.getState().pullPool?.() }, [on])
+  if (!on) return null
+  const mine = suggestionOf(pool, ex.id)
+  const run = async (call, done) => {
+    if (busy) return
+    setBusy(true)
+    try { const r = await call(); useStore.getState().setPoolMine(r.mine); toast(done) }
+    catch (e) { toast(t(poolErrorText(e))) }
+    finally { setBusy(false) }
+  }
+  const suggest = () => {
+    const why = suggestBlocker(ex)
+    if (why) { toast(t(POOL_ERRORS[why] || POOL_ERRORS.eq)); return }
+    run(() => suggestExercise(ex), t('Suggested — a moderator will take a look.'))
+  }
+  const withdraw = done => run(() => withdrawSuggestion(ex.id), done)
+  return <div className="card" style={{ marginTop: 10, padding: 12 }}>
+    {!mine && <>
+      <Button icon="upload" disabled={busy} onClick={suggest}>{t('Suggest for everyone')}</Button>
+      <div className="small dim" style={{ marginTop: 6 }}>{t('A moderator looks at it first. Once approved, everyone on this server can use it — your own copy stays yours.')}</div>
+    </>}
+    {mine?.status === 'pending' && <>
+      <div className="row" style={{ gap: 6 }}><span className="tag"><Icon name="clock" />{t('Waiting for a moderator')}</span></div>
+      <Button size="sm" variant="ghost" style={{ marginTop: 8 }} disabled={busy} onClick={() => withdraw(t('Suggestion taken back'))}>{t('Take the suggestion back')}</Button>
+    </>}
+    {mine?.status === 'approved' && <div className="row" style={{ gap: 6 }}><span className="tag acc"><Icon name="check" />{t('Shared with everyone')}</span></div>}
+    {mine?.status === 'retired' && <div className="row" style={{ gap: 6 }}><span className="tag">{t('No longer offered to others')}</span></div>}
+    {mine?.status === 'rejected' && <>
+      <div className="row" style={{ gap: 6 }}><span className="tag"><Icon name="xmark" />{t('Not approved')}</span></div>
+      {mine.note && <div className="exnote" style={{ marginTop: 8 }}>{mine.note}</div>}
+      <div className="row" style={{ gap: 8, marginTop: 8 }}>
+        <Button size="sm" style={{ flex: 1 }} disabled={busy} onClick={suggest}>{t('Suggest again')}</Button>
+        <Button size="sm" variant="ghost" style={{ flex: 1 }} disabled={busy} onClick={() => withdraw(t('Dismissed'))}>{t('Dismiss')}</Button>
+      </div>
+    </>}
+  </div>
+}
+
 function ExerciseDetail({ ex, close }) {
   const st = useStore(s => s.S)
   const last = lastEntryFor(st, ex.id)
@@ -676,6 +732,7 @@ function ExerciseDetail({ ex, close }) {
     <Media ex={ex} />
     <div className="row" style={{ gap: 6, flexWrap: 'wrap', margin: '10px 0' }}>
       <span className="tag acc">{t(ex.bp)}</span>
+      {ex.pool && <span className="tag"><Icon name="globe" />{t('shared')}</span>}
       {ex.bp === 'cardio' ? <span className="tag"><Icon name="target" />{t(MUSCLE_NAME['cardiovascular system'])}</span> : (ex.primaries?.length ? ex.primaries : (ex.tg ? [ex.tg] : [])).map((s, i) => <span key={i} className="tag"><Icon name="target" />{t(MUSCLE_NAME[s]  || s)}</span>)}
       <span className="tag"><Icon name="dumbbell" />{t(ex.eq)}</span>
       {(ex.secondaries?.length ? ex.secondaries : smOf(ex)).slice(0, 3).map((s, i) => <span key={i} className="tag">{t(MUSCLE_NAME[s] || s)}</span>)}
@@ -688,6 +745,7 @@ function ExerciseDetail({ ex, close }) {
       <Button icon="pencil" style={{ flex: 1 }} onClick={() => { close(); customExSheet(ex) }}>{t('Edit')}</Button>
       <Button variant="danger" icon="trash" style={{ flex: 1 }} onClick={() => deleteCustomEx(ex, close)}>{t('Delete')}</Button>
     </div>}
+    {ex.custom && <SuggestToPool ex={ex} />}
     {usesBar(ex) && <>
       <h4 className="sec">{t('Bar weight')}</h4>
       <BarWeightEditor ex={ex} extra={t('You still log the total weight — the bar only feeds the per-side plate math.')} />
@@ -787,20 +845,31 @@ export const addToRoutineSheet = ex => ui().openSheet(close => <AddToRoutine ex=
 /* ============================ custom exercises (issue #11) ============================ */
 // Name + body part is all it takes — the exercise then behaves like any built-in one
 // (planning, logging, PRs, stats), just without an animation.
-function CustomExForm({ existing, prefill, onDone, close }) {
+// `prefill` is what a new exercise starts from: the name typed into the picker's search, or a
+// whole draft — { n, bp, eq, desc, primaries, secondaries } — from "describe it in your own
+// words" (lib/exercise-match.js draftFor, which has already checked every value against the
+// lists this form offers). Either way nothing is saved until the user presses the button.
+//
+// `onSubmit` turns the form into an editor for somebody else's exercise — a moderator correcting
+// a suggestion or a shared row. It then validates as usual but touches nothing in this profile's
+// own state: the edited exercise is handed back, and the caller sends it to the server.
+function CustomExForm({ existing, prefill, onDone, onSubmit, title, close }) {
   const nameRef = useRef(null)
   const onNameFocus = useSheetKeyboard(nameRef)
-  const [n, setN] = useState(existing ? existing.n : (prefill || ''))
-  const [bp, setBp] = useState(existing ? existing.bp : '')
-  const [eq, setEq] = useState(existing ? (existing.eq || '') : '')
-  const [desc, setDesc] = useState(existing ? (existing.desc || '') : '')
+  const draft = prefill && typeof prefill === 'object' ? prefill : { n: prefill || '' }
+  const [n, setN] = useState(existing ? existing.n : (draft.n || ''))
+  const [bp, setBp] = useState(existing ? existing.bp : (draft.bp || ''))
+  const [eq, setEq] = useState(existing ? (existing.eq || '') : (draft.eq || ''))
+  const [desc, setDesc] = useState(existing ? (existing.desc || '') : (draft.desc || ''))
   const [primaries, setPrimaries] = useState(() => {
+    if (!existing) return [...(draft.primaries || [])]
     if (existing && Array.isArray(existing.primaries) && existing.primaries.length) return [...existing.primaries]
     if (existing?.bp === 'cardio') return ['cardiovascular system']
     const norm = hasExplicitMuscleMetadata(existing || {}) ? normalizeMuscleGroups(existing || {}) : []
     return norm.length ? [norm[0]] : []
   })
   const [secondaries, setSecondaries] = useState(() => {
+    if (!existing) return [...(draft.secondaries || [])]
     if (existing && Array.isArray(existing.primaries) && existing.primaries.length) return [...(existing.secondaries || [])]
     const norm = hasExplicitMuscleMetadata(existing || {}) ? normalizeMuscleGroups(existing || {}) : []
     return norm.slice(1)
@@ -835,6 +904,11 @@ function CustomExForm({ existing, prefill, onDone, close }) {
     // only turned a chip off says nothing and is skipped with it. The sorted list is the last resort,
     // for the user who drops the target and adds nothing in its place.
     const tg = (existing && prim.includes(existing.tg)) ? existing.tg : (primaryTaps.find(m => prim.includes(m)) || prim[0] || '')
+    if (onSubmit) {
+      close()
+      onSubmit({ id: existing.id, n: name, bp, desc: d, tg, sm, muscleGroups: groups, primaries: prim, secondaries: sm, eq })
+      return
+    }
     let id = existing && existing.id
     if (existing) update(s => { const c = (s.customEx || []).find(x => x.id === id); if (c) {
       c.n = name; c.bp = bp; c.desc = d; c.tg = tg; c.sm = sm; c.muscleGroups = groups; c.primaries = prim; c.secondaries = sm; c.eq = eq
@@ -848,7 +922,7 @@ function CustomExForm({ existing, prefill, onDone, close }) {
     onDone && onDone(EXIDX[id])
   }
   return <>
-    <h3>{existing ? t('Edit custom exercise') : t('Create your own exercise')}</h3>
+    <h3>{title || (existing ? t('Edit custom exercise') : t('Create your own exercise'))}</h3>
     <div className="muted small" style={{ marginBottom: 12 }}>{t('Name it and pick a body part — it behaves like any other exercise, just without an animation.')}</div>
     <input ref={nameRef} className="input" placeholder={t('Exercise name')} value={n} onFocus={onNameFocus} onChange={e => setN(e.target.value)} />
     <div className="chips" style={{ margin: '12px 0' }}>
@@ -873,10 +947,12 @@ function CustomExForm({ existing, prefill, onDone, close }) {
       value={desc} onChange={e => setDesc(e.target.value)} />
     <div style={{ height: 14 }} />
     <Button variant="primary" onClick={save}>{existing ? t('Save') : t('Create exercise')}</Button>
-    {existing && <><div style={{ height: 8 }} /><Button variant="danger" icon="trash" onClick={() => { close(); deleteCustomEx(existing) }}>{t('Delete exercise')}</Button></>}
+    {existing && !onSubmit && <><div style={{ height: 8 }} /><Button variant="danger" icon="trash" onClick={() => { close(); deleteCustomEx(existing) }}>{t('Delete exercise')}</Button></>}
   </>
 }
 export const customExSheet = (existing, onDone, prefill) => ui().openSheet(close => <CustomExForm existing={existing} prefill={prefill} onDone={onDone} close={close} />)
+/** The same form over a pool row: nothing is saved here, `onSubmit(exercise)` gets the result. */
+export const poolExSheet = (row, onSubmit, title) => ui().openSheet(close => <CustomExForm existing={row} onSubmit={onSubmit} title={title} close={close} />)
 
 export function deleteCustomEx(ex, afterDelete) {
   if (S().active?.entries.some(e => e.id === ex.id)) { toast(t('Finish your current workout first')); return }
@@ -921,6 +997,14 @@ function ExercisePicker({ onPick, close }) {
   const [showAll, setShowAll] = useState(false)
   const [shown, setShown] = useState(50)
   const [byMuscle, setByMuscle] = useState(false)
+  // "Describe it in your own words" asks the Coach's provider, so it is offered exactly where
+  // the Coach is: same predicate, and an instance without one sees the picker it always had.
+  const [describe, setDescribe] = useState(false)
+  const config = useStore(s => s.config)
+  const user = useStore(s => s.user)
+  const coachMode = useStore(s => s.coachLocal?.mode)
+  useStore(s => s.pool)   // the shared pool is read through allExercises; re-render when it changes
+  const canDescribe = coachAvailable(config, user, { demo: DEMO, mobile: MOBILE, coachMode })
   const searchRef = useRef(null)
   const bpStrip = useRef(null), eqStrip = useRef(null)
   const onSearchFocus = useSheetKeyboard(searchRef)
@@ -946,6 +1030,8 @@ function ExercisePicker({ onPick, close }) {
     </div>
     <MuscleExplorer onPick={onPick} />
   </>
+  if (describe) return <DescribeExercise initial={q.trim()} onPick={onPick} onBack={() => setDescribe(false)}
+    onCreate={draft => customExSheet(null, ex => onPick(ex), draft)} />
 
   return <>
     <div className="row between" style={{ marginBottom: 10 }}><h3>{t('Add exercise')}</h3>
@@ -977,6 +1063,10 @@ function ExercisePicker({ onPick, close }) {
       {eqOpts.map(x => <button key={x} className={'chip' + (eqOn === x ? ' on' : '')} onClick={() => { setEq(x); setShown(50) }}>{t(x)}</button>)}
     </div>}
     <div className="list">
+      {!special && canDescribe && <div className="item" {...tappable(() => setDescribe(true))}>
+        <div className="thumb thumb-x"><Icon name="lightbulb" /></div>
+        <div className="grow"><div className="tt">{t('Describe it in your own words')}</div><div className="ss">{t('the AI finds it in the library, or drafts a new one')}</div></div><Icon name="chevronRight" className="chev" />
+      </div>}
       {!special && <div className="item" {...tappable(() => customExSheet(null, ex => onPick(ex), q.trim()))}>
         <div className="thumb thumb-x"><Icon name="sparkles" /></div>
         <div className="grow"><div className="tt">{t('Create your own exercise')}</div><div className="ss">{t('name + body part, no animation')}</div></div><Icon name="plus" className="chev" />
@@ -984,6 +1074,7 @@ function ExercisePicker({ onPick, close }) {
       {f.slice(0, shown).map(e => <div key={e.id} className="item" {...tappable(() => onPick(e))}>
         <Thumb ex={e} /><div className="grow"><div className="tt capitalize">{isFav(st, e.id) && <Icon name="starFill" className="fav-star" />}{exerciseNameFor(e)}</div><div className="ss capitalize">{t(MUSCLE_NAME[e.tg] || e.tg || e.bp)} · {t(e.eq)}</div></div>
         {/* Accent tag = already in a routine/log ("Chosen"); the yellow star by the name = favourite. */}
+        {e.pool && <span className="tag">{t('shared')}</span>}
         {usage[e.id] && <span className="tag acc"><Icon name="starFill" /></span>}
         {/* A "+" glyph reads as "add this now" — it used to just open the same detail sheet as
             tapping the row, so it added nothing until you'd scrolled past the sets/reps config
@@ -1736,6 +1827,21 @@ function WorkoutDetail({ w, close }) {
       placeholder={t('How the session went as a whole.')}
       onFocus={onNoteFocus} onChange={e => setNote(e.target.value)} onBlur={saveNote} />
     <div style={{ height: 14 }} />
+    {/* Forgot an exercise, a set, or typed 60 for 80: the workout reopens on the ordinary
+        workout screen (lib/workout-edit.js) and is saved back over itself. The note is flushed
+        first, so what was just typed above is part of what gets edited. */}
+    <Button icon="pencil" onClick={() => {
+      if (S().active) { toast(t('Finish the current workout first.')); return }
+      saveNote()
+      const rec = S().workouts.find(x => x.id === w.id)
+      if (!rec) return
+      initial.current = latest.current.trim().slice(0, NOTE_MAX)   // already saved: the unmount flush has nothing to add
+      close()
+      update(s => { s.active = editSessionFor(rec, { workoutView: s.workoutView || 'cards' }) })
+      useUI.getState().stopRest()
+      nav('/workout')
+    }}>{t('Edit workout')}</Button>
+    <div style={{ height: 8 }} />
     <Button variant="danger" onClick={() => confirmSheet({ title: t('Delete workout?'), message: t('This removes it from your history for good.'), confirmText: t('Delete'), danger: true, onConfirm: () => { update(s => { s.workouts = s.workouts.filter(x => x.id !== w.id) }); close(); toast(t('Workout deleted')) } })}>{t('Delete workout')}</Button>
   </>
 }
@@ -2181,6 +2287,13 @@ export function finishWorkout() {
   if (!A) return
   const done = setsDoneActive(A)
   const total = setUnitsTotal(A.entries)
+  // Saving an edit is not "finishing early": the sets left unchecked were unchecked on the day.
+  // The one thing it cannot be is empty — that is deleting the workout, which History does.
+  if (isEditSession(A)) {
+    if (!editHasWork(A)) { toast(t('A workout needs at least one completed set. To remove it, delete it from History.')); return }
+    doFinishWorkout()
+    return
+  }
   if (!done) { confirmSheet({ title: t('Nothing logged yet'), message: t('You haven’t checked off any sets. Finish the workout anyway?'), confirmText: t('Finish anyway'), onConfirm: doFinishWorkout }); return }
   if (done < total) { confirmSheet({ title: t('Finish early?'), message: t(total - done === 1 ? '{0} set still unchecked. Finish the workout now?' : '{0} sets still unchecked. Finish the workout now?', total - done), confirmText: t('Finish workout'), onConfirm: doFinishWorkout }); return }
   doFinishWorkout()
@@ -2190,7 +2303,8 @@ function doFinishWorkout() {
   const A = st.active
   if (!A) return
   const past = !!A.backfill
-  const prs = []
+  const editing = isEditSession(A)
+  const prs = editing ? editedPrs(A) : []
   const e1prs = []
   // A workout logged into the past cannot claim records against the history that came after
   // it, so a backfilled session reports none and leaves the confirmed weights alone.
@@ -2204,9 +2318,12 @@ function doFinishWorkout() {
     if (rec && !prs.includes(e.id)) e1prs.push({ id: e.id, ...rec })
   })
   const w = buildCompletedWorkout(A, {
-    end: past ? backfillEnd(A) : Date.now(),
+    end: editing ? editedEnd(A) : past ? backfillEnd(A) : Date.now(),
     prs,
-    snapshotFor: e => EXIDX[e.id]?.custom ? exerciseMuscleSnapshot(EXIDX[e.id]) : null,
+    // A built-in exercise is in every build of the app, so the id alone is enough for ever. A
+    // custom one can be deleted and a shared one lives on a server, so the log keeps its own
+    // copy of the name and the muscles.
+    snapshotFor: e => (EXIDX[e.id]?.custom || EXIDX[e.id]?.pool) ? exerciseMuscleSnapshot(EXIDX[e.id]) : null,
   })
   w.vol = workoutVolume(w)
   update(s => {
@@ -2223,6 +2340,8 @@ function doFinishWorkout() {
   })
   useStore.getState().autoBackupNow()
   useUI.getState().stopRest()
+  // A corrected workout is not a finished one: no fanfare and no summary, back to where it lives.
+  if (editing) { toast(t('Workout updated')); nav('/history'); return }
   beep(snd(), 880, 0.15); beep(snd(), 1100, 0.15, 0.18); beep(snd(), 1320, 0.3, 0.36)
   ui().openSheet(close => <FinishSummary w={w} prs={prs} e1prs={e1prs} close={close} />, { kind: 'center', locked: true })
 }

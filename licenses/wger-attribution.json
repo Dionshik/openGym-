@@ -1,0 +1,681 @@
+{
+ "source": "https://wger.de",
+ "read": "2026-10-01",
+ "note": "Exercise rows in frontend/src/lib/exercises-extra-wger.js, adapted from the wger exercise database. Each is licensed as stated here.",
+ "exercises": [
+  {
+   "id": "wg_aa5aadda",
+   "name": "body-ups",
+   "wger": 112,
+   "url": "https://wger.de/en/exercise/112/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "cal.zabel"
+   ]
+  },
+  {
+   "id": "wg_62f9ade6",
+   "name": "hollow hold",
+   "wger": 297,
+   "url": "https://wger.de/en/exercise/297/view/",
+   "licence": "CC0",
+   "authors": [
+    "Behrooz"
+   ]
+  },
+  {
+   "id": "wg_b2ed5cfb",
+   "name": "pause bench",
+   "wger": 445,
+   "url": "https://wger.de/en/exercise/445/view/",
+   "licence": "CC0",
+   "authors": [
+    "Mens Fitness"
+   ]
+  },
+  {
+   "id": "wg_929c6692",
+   "name": "renegade row",
+   "wger": 490,
+   "url": "https://wger.de/en/exercise/490/view/",
+   "licence": "CC0",
+   "authors": [
+    "fletchgraham"
+   ]
+  },
+  {
+   "id": "wg_67024b03",
+   "name": "wall squat",
+   "wger": 718,
+   "url": "https://wger.de/en/exercise/718/view/",
+   "licence": "CC0",
+   "authors": [
+    "Blablabla"
+   ]
+  },
+  {
+   "id": "wg_41280c2b",
+   "name": "commando pull-ups",
+   "wger": 980,
+   "url": "https://wger.de/en/exercise/980/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "clafal"
+   ]
+  },
+  {
+   "id": "wg_9f081188",
+   "name": "kettlebell deadlifts",
+   "wger": 1003,
+   "url": "https://wger.de/en/exercise/1003/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Miroslav Mazel (imported from Feeel)"
+   ]
+  },
+  {
+   "id": "wg_18476392",
+   "name": "dumbbell hang power cleans",
+   "wger": 1087,
+   "url": "https://wger.de/en/exercise/1087/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "philip"
+   ]
+  },
+  {
+   "id": "wg_87635d18",
+   "name": "dumbbell sumo deadlift",
+   "wger": 1088,
+   "url": "https://wger.de/en/exercise/1088/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "philip"
+   ]
+  },
+  {
+   "id": "wg_65c29ced",
+   "name": "wall balls",
+   "wger": 1100,
+   "url": "https://wger.de/en/exercise/1100/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "philip"
+   ]
+  },
+  {
+   "id": "wg_b7f8589c",
+   "name": "dragon squat",
+   "wger": 1201,
+   "url": "https://wger.de/en/exercise/1201/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "cynomops"
+   ]
+  },
+  {
+   "id": "wg_843c1809",
+   "name": "front lever tuck",
+   "wger": 1214,
+   "url": "https://wger.de/en/exercise/1214/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "clafal"
+   ]
+  },
+  {
+   "id": "wg_92470778",
+   "name": "reverse snow angel",
+   "wger": 1215,
+   "url": "https://wger.de/en/exercise/1215/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "mike6426"
+   ]
+  },
+  {
+   "id": "wg_20ff24a4",
+   "name": "finger pushup",
+   "wger": 1217,
+   "url": "https://wger.de/en/exercise/1217/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": []
+  },
+  {
+   "id": "wg_9b184068",
+   "name": "dumbbell drag curls",
+   "wger": 1224,
+   "url": "https://wger.de/en/exercise/1224/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Lynn_McIntyre"
+   ]
+  },
+  {
+   "id": "wg_176974e1",
+   "name": "dumbbell single-leg hip thrust",
+   "wger": 1234,
+   "url": "https://wger.de/en/exercise/1234/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "carlos3c"
+   ]
+  },
+  {
+   "id": "wg_363cbed6",
+   "name": "frog stand",
+   "wger": 1238,
+   "url": "https://wger.de/en/exercise/1238/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "clafal"
+   ]
+  },
+  {
+   "id": "wg_aac2f536",
+   "name": "exercise band dorsiflexion",
+   "wger": 1241,
+   "url": "https://wger.de/en/exercise/1241/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "erikocobra"
+   ]
+  },
+  {
+   "id": "wg_80e2c4af",
+   "name": "exercise band plantarflexion",
+   "wger": 1242,
+   "url": "https://wger.de/en/exercise/1242/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "erikocobra"
+   ]
+  },
+  {
+   "id": "wg_460d5e99",
+   "name": "ice cream maker",
+   "wger": 1248,
+   "url": "https://wger.de/en/exercise/1248/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "clafal"
+   ]
+  },
+  {
+   "id": "wg_9d63c735",
+   "name": "front lever pull-up",
+   "wger": 1252,
+   "url": "https://wger.de/en/exercise/1252/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "clafal"
+   ]
+  },
+  {
+   "id": "wg_b8b27c7d",
+   "name": "helms row",
+   "wger": 1303,
+   "url": "https://wger.de/en/exercise/1303/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "carlos3c"
+   ]
+  },
+  {
+   "id": "wg_369e55d9",
+   "name": "dumbbell hex press",
+   "wger": 1353,
+   "url": "https://wger.de/en/exercise/1353/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Anastasious"
+   ]
+  },
+  {
+   "id": "wg_63bf63dd",
+   "name": "elephant walks",
+   "wger": 1391,
+   "url": "https://wger.de/en/exercise/1391/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "captive0592"
+   ]
+  },
+  {
+   "id": "wg_01220c7d",
+   "name": "standing pancake",
+   "wger": 1396,
+   "url": "https://wger.de/en/exercise/1396/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "captive0592"
+   ]
+  },
+  {
+   "id": "wg_35fb5a55",
+   "name": "scapula pulls",
+   "wger": 1435,
+   "url": "https://wger.de/en/exercise/1435/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "M9"
+   ]
+  },
+  {
+   "id": "wg_7ddd3bf7",
+   "name": "pin squat",
+   "wger": 1437,
+   "url": "https://wger.de/en/exercise/1437/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "M9"
+   ]
+  },
+  {
+   "id": "wg_921415dd",
+   "name": "cable press around",
+   "wger": 1457,
+   "url": "https://wger.de/en/exercise/1457/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Expenses7000"
+   ]
+  },
+  {
+   "id": "wg_518a6936",
+   "name": "cross-body cable y-raise",
+   "wger": 1458,
+   "url": "https://wger.de/en/exercise/1458/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Expenses7000"
+   ]
+  },
+  {
+   "id": "wg_cc3fbf35",
+   "name": "spider curl",
+   "wger": 1465,
+   "url": "https://wger.de/en/exercise/1465/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Moffi"
+   ]
+  },
+  {
+   "id": "wg_9d382827",
+   "name": "floor skull crusher",
+   "wger": 1468,
+   "url": "https://wger.de/en/exercise/1468/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Expenses7000"
+   ]
+  },
+  {
+   "id": "wg_822e408d",
+   "name": "1-arm half-kneeling lat pulldown",
+   "wger": 1470,
+   "url": "https://wger.de/en/exercise/1470/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Expenses7000"
+   ]
+  },
+  {
+   "id": "wg_d33dc168",
+   "name": "butterfly sit up",
+   "wger": 1476,
+   "url": "https://wger.de/en/exercise/1476/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Moffi"
+   ]
+  },
+  {
+   "id": "wg_0b54471b",
+   "name": "levitation crunch",
+   "wger": 1478,
+   "url": "https://wger.de/en/exercise/1478/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Moffi"
+   ]
+  },
+  {
+   "id": "wg_22195222",
+   "name": "drag pushdown",
+   "wger": 1481,
+   "url": "https://wger.de/en/exercise/1481/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Moffi"
+   ]
+  },
+  {
+   "id": "wg_1b3dc2aa",
+   "name": "dumbbell cheat curl",
+   "wger": 1482,
+   "url": "https://wger.de/en/exercise/1482/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Moffi"
+   ]
+  },
+  {
+   "id": "wg_03a2e7d5",
+   "name": "alternative db gorilla rows",
+   "wger": 1501,
+   "url": "https://wger.de/en/exercise/1501/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "JohnPreston"
+   ]
+  },
+  {
+   "id": "wg_f8874313",
+   "name": "dumbbell frog press",
+   "wger": 1503,
+   "url": "https://wger.de/en/exercise/1503/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "JohnPreston"
+   ]
+  },
+  {
+   "id": "wg_34ab4169",
+   "name": "dumbbell bradford press",
+   "wger": 1504,
+   "url": "https://wger.de/en/exercise/1504/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "JohnPreston"
+   ]
+  },
+  {
+   "id": "wg_33d4048e",
+   "name": "pendulum squat",
+   "wger": 1527,
+   "url": "https://wger.de/en/exercise/1527/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "schweezer"
+   ]
+  },
+  {
+   "id": "wg_2d15d144",
+   "name": "toes to bar",
+   "wger": 1529,
+   "url": "https://wger.de/en/exercise/1529/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "florian.bussmann"
+   ]
+  },
+  {
+   "id": "wg_69923e1d",
+   "name": "bird dog",
+   "wger": 1572,
+   "url": "https://wger.de/en/exercise/1572/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Settebello"
+   ]
+  },
+  {
+   "id": "wg_71f3c486",
+   "name": "copenhagen adduction exercise",
+   "wger": 1605,
+   "url": "https://wger.de/en/exercise/1605/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "RiccaBaro"
+   ]
+  },
+  {
+   "id": "wg_1bcee122",
+   "name": "typewriter pull-ups",
+   "wger": 1607,
+   "url": "https://wger.de/en/exercise/1607/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "tenebrizz"
+   ]
+  },
+  {
+   "id": "wg_cb770f23",
+   "name": "kettlebell sumo deadlift",
+   "wger": 1612,
+   "url": "https://wger.de/en/exercise/1612/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Tierrasverdes"
+   ]
+  },
+  {
+   "id": "wg_59975397",
+   "name": "dumbbell bent over face pull",
+   "wger": 1639,
+   "url": "https://wger.de/en/exercise/1639/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "AlucardEvil40"
+   ]
+  },
+  {
+   "id": "wg_babb6c2d",
+   "name": "dumbbell hip thrust",
+   "wger": 1642,
+   "url": "https://wger.de/en/exercise/1642/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "AlucardEvil40"
+   ]
+  },
+  {
+   "id": "wg_ffea60a5",
+   "name": "seated figure four",
+   "wger": 1680,
+   "url": "https://wger.de/en/exercise/1680/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "ricardodavidrd"
+   ]
+  },
+  {
+   "id": "wg_63e04a06",
+   "name": "dumbbell thruster",
+   "wger": 1684,
+   "url": "https://wger.de/en/exercise/1684/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "meldun"
+   ]
+  },
+  {
+   "id": "wg_7e7d8a35",
+   "name": "tuck l-sit",
+   "wger": 1704,
+   "url": "https://wger.de/en/exercise/1704/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "clafal"
+   ]
+  },
+  {
+   "id": "wg_fa10e66a",
+   "name": "sleeper stretch",
+   "wger": 1711,
+   "url": "https://wger.de/en/exercise/1711/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Croak6728"
+   ]
+  },
+  {
+   "id": "wg_960f9089",
+   "name": "suitcase carry",
+   "wger": 1776,
+   "url": "https://wger.de/en/exercise/1776/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "aboksz"
+   ]
+  },
+  {
+   "id": "wg_453bb2d3",
+   "name": "trap bar squat",
+   "wger": 1803,
+   "url": "https://wger.de/en/exercise/1803/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "kmcalderwood"
+   ]
+  },
+  {
+   "id": "wg_d4f411cb",
+   "name": "ankle dorsiflexion rocks",
+   "wger": 1804,
+   "url": "https://wger.de/en/exercise/1804/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Davidgj32"
+   ]
+  },
+  {
+   "id": "wg_91781045",
+   "name": "behind the back cable lateral raise",
+   "wger": 1807,
+   "url": "https://wger.de/en/exercise/1807/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "LEBRERO"
+   ]
+  },
+  {
+   "id": "wg_931203bd",
+   "name": "trap-3 raise",
+   "wger": 1834,
+   "url": "https://wger.de/en/exercise/1834/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Croak6728"
+   ]
+  },
+  {
+   "id": "wg_e5c12297",
+   "name": "horse stance (side splits)",
+   "wger": 1846,
+   "url": "https://wger.de/en/exercise/1846/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Croak6728"
+   ]
+  },
+  {
+   "id": "wg_8359c822",
+   "name": "straddle l-sit",
+   "wger": 1847,
+   "url": "https://wger.de/en/exercise/1847/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Croak6728"
+   ]
+  },
+  {
+   "id": "wg_368a513d",
+   "name": "barbell silverback shrug",
+   "wger": 1925,
+   "url": "https://wger.de/en/exercise/1925/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": []
+  },
+  {
+   "id": "wg_fe0bf582",
+   "name": "hip airplane",
+   "wger": 2447,
+   "url": "https://wger.de/en/exercise/2447/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "TobiasFalk"
+   ]
+  },
+  {
+   "id": "wg_f80566b5",
+   "name": "reverse clamshell",
+   "wger": 2448,
+   "url": "https://wger.de/en/exercise/2448/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "TobiasFalk"
+   ]
+  },
+  {
+   "id": "wg_e533baea",
+   "name": "ytw raises",
+   "wger": 2454,
+   "url": "https://wger.de/en/exercise/2454/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "probablyforging"
+   ]
+  },
+  {
+   "id": "wg_0d80a438",
+   "name": "band terminal knee extension",
+   "wger": 2494,
+   "url": "https://wger.de/en/exercise/2494/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Rehab Hero"
+   ]
+  },
+  {
+   "id": "wg_63ae3d59",
+   "name": "front split stretch",
+   "wger": 2527,
+   "url": "https://wger.de/en/exercise/2527/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Croak6728"
+   ]
+  },
+  {
+   "id": "wg_86f0000d",
+   "name": "elbow lever",
+   "wger": 2531,
+   "url": "https://wger.de/en/exercise/2531/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "ege"
+   ]
+  },
+  {
+   "id": "wg_758afda0",
+   "name": "90/90 hip switches",
+   "wger": 2613,
+   "url": "https://wger.de/en/exercise/2613/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": []
+  },
+  {
+   "id": "wg_62ded35b",
+   "name": "lean-away cable lateral raise",
+   "wger": 2624,
+   "url": "https://wger.de/en/exercise/2624/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "trs1800"
+   ]
+  },
+  {
+   "id": "wg_afe56ec7",
+   "name": "kelso shrugs",
+   "wger": 2672,
+   "url": "https://wger.de/en/exercise/2672/view/",
+   "licence": "CC-BY-SA 4",
+   "authors": [
+    "Friend7857"
+   ]
+  }
+ ]
+}

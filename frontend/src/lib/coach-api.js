@@ -33,6 +33,7 @@ const LOCAL = () => MOBILE && useStore.getState().coachLocal?.mode === 'byok'
 const local = async () => {
   if (!localMod) {
     localMod = await import('./coach-local.js')
+    localMod.setPoolSource(() => useStore.getState().pool?.items || [])
     // There is no admin card on a phone: the user is the operator, so failures go to them.
     localMod.setNotifier(ev => {
       const toast = useUI.getState().toast
@@ -48,6 +49,20 @@ export const requestReview = async note => DEMO ? (await demo()).demoReview(S())
 export const requestPlan = async intake => DEMO ? (await demo()).demoPlan(S(), intake) : LOCAL() ? (await local()).localPlan(S(), intake) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ intake }) })
 export const refinePlan = async text => DEMO ? (await demo()).demoRefine(S()) : LOCAL() ? (await local()).localRefine(S(), text) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ refine: text }) })
 export const requestDebrief = async workoutId => DEMO ? (await demo()).demoDebrief(S(), workoutId) : LOCAL() ? (await local()).localDebrief(S(), workoutId) : api('/api/coach/debrief', { method: 'POST', body: JSON.stringify({ workoutId: workoutId || null }) })
+// "Describe it in your own words": the text goes to the provider and comes back as catalogue
+// rows plus the draft of a new exercise (lib/exercise-match.js turns that into what the picker
+// shows). Awaited, not polled — it is a sentence, and the picker is open waiting for it. A
+// refusal or a failed call rejects with `code` set to the server's class for it.
+export const matchExercises = async text => {
+  if (DEMO) return (await demo()).demoMatch(text)
+  if (LOCAL()) return (await local()).localMatch(S(), text)
+  try {
+    return await api('/api/coach/match', { method: 'POST', body: JSON.stringify({ text: String(text || '') }) })
+  } catch (e) {
+    e.code = e.data?.code || (e.status ? 'internal' : 'network')
+    throw e
+  }
+}
 // The room: anonymous medians across the profiles on this instance that opted in. Only a
 // server has a room; a phone with its own key and the demo both answer locally.
 export const cohortStats = async () => DEMO ? (await demo()).demoCohort(S()) : LOCAL() ? { ok: false, enabled: false } : api('/api/coach/cohort')
@@ -129,7 +144,28 @@ export const JOB_ERRORS = {
   restart: 'The server restarted while the Coach was thinking.',
   nostate: 'The Coach couldn’t read your training data.',
   noworkout: 'There is no workout to look at yet — log one first.',
-  internal: 'Something went wrong on the server.'
+  internal: 'Something went wrong on the server.',
+  // An exercise lookup only: the request never reached the server, or there was nothing in it.
+  network: 'No connection — describing an exercise needs the server.',
+  empty: 'Describe the exercise first.',
+  shared: 'The Coach on this instance is set up for one profile only — ask the instance owner.',
+  unprivileged: 'The Coach is switched off on this instance for safety reasons.'
+}
+
+// The same classes when the thing that failed was an exercise lookup rather than a job: the
+// wait is seconds, not minutes, and "thinking about your training" is not what it was doing.
+const LOOKUP_ERRORS = {
+  busy: 'Still looking up the last one — give it a moment.',
+  cap: 'That is enough lookups for today — the search above still works.'
+}
+
+/** The line for a failed exercise lookup, in the app's language; a provider's own words (a
+ *  phone with its own key) stay as the provider wrote them, on the line below. */
+export function lookupErrorText(e) {
+  const cls = e?.code || 'internal'
+  if (LOOKUP_ERRORS[cls]) return t(LOOKUP_ERRORS[cls])
+  const [base, ...why] = jobErrorText(cls, e?.detail).split('\n')
+  return [t(base), ...why].join('\n')
 }
 
 // The same failures on a phone that brought its own key: there is no instance owner to

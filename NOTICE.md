@@ -124,6 +124,58 @@ language-model assistance. They are not copied from a separate Portuguese
 dataset. Their review status and translation policy are documented alongside
 the source files.
 
+### Additional exercises — three more open sources
+
+The dataset above lacks whole families of exercises (Olympic lifts, strongman, newer accessory
+variants, mobility work). 535 further catalogue rows come from three other open sources, built
+by `scripts/build-extra-exercises.mjs` into files of their own — the upstream file is untouched.
+Only text is in this repository: names, muscles, equipment and step-by-step instructions, mapped
+onto the vocabulary the catalogue already uses. None of these exercises has an animation, and
+**no image from any of these sources is committed here**. What was kept, what was dropped as a
+duplicate and every decision made by hand are in `scripts/exercise-extra-sources/`.
+
+**Photographs fetched at run time — rights not established.** 294 of the free-exercise-db rows
+name two photographs each (start and end position), which the app flips between in place of an
+animation. Like the upstream images and animations above, the files are **downloaded by each
+instance** — the `media` service in `docker-compose.yml`, or `scripts/fetch-media.sh` — from
+[yuhonas/free-exercise-db](https://github.com/yuhonas/free-exercise-db) at a pinned commit, into
+`media/img/fedb/`, which is not tracked by git. openGym does not redistribute them.
+
+That project licenses its *data* under The Unlicense, but it does not own these photographs and
+says so: its maintainers state that the images were gathered from other websites and that they
+do not know who holds the rights. openGym therefore makes no claim that they may be used, and
+anyone running an instance decides for themselves. **To run without them**, create the empty
+file `media/img/fedb/.complete` before the first start (or delete `media/img/fedb/*` and leave
+that file): the download is skipped and those exercises show the same placeholder a custom
+exercise does. The standalone mobile build and the demo build never fetch them.
+
+**`frontend/src/lib/exercises-extra.js`** — two sources:
+
+- [**yuhonas/free-exercise-db**](https://github.com/yuhonas/free-exercise-db), released into the
+  public domain under **The Unlicense**. Its photographs are *not* used: by its own maintainers'
+  account they were collected from other websites and are not theirs to license. The repository
+  does not document where its instruction text came from.
+- [**longhaul-fitness/exercises**](https://github.com/longhaul-fitness/exercises), under the
+  **MIT License**, Copyright (c) 2023 Longhaul Fitness — the same permission and warranty text
+  as the MIT notice reproduced above.
+
+**`frontend/src/exercise-names/ru.js`, `frontend/src/instr-extra/ru.js`** — Russian names, search
+aliases and instructions for the free-exercise-db rows, from
+[**leadpioneer/RU-free-exercise-db**](https://github.com/leadpioneer/RU-free-exercise-db)
+(**The Unlicense**). That overlay describes itself as a machine draft — names from a glossary
+engine, instructions machine-translated and post-edited — and is used as such.
+
+**`frontend/src/lib/exercises-extra-wger.js`** — 68 rows adapted from the
+[**wger**](https://wger.de) exercise database. **These rows are not under openGym's AGPL**: each
+is licensed by its authors under **Creative Commons Attribution-ShareAlike 4.0**
+(<https://creativecommons.org/licenses/by-sa/4.0/>), four of them under **CC0**. The authors, the
+licence and the source page of every row are listed in `licenses/wger-attribution.json`. Changes
+made: the description was split into steps, and muscles and equipment were mapped onto the
+catalogue's vocabulary. Anyone redistributing this file must keep that attribution and license
+their adaptation of these rows the same way. wger is taken selectively — a vetted list, in
+`scripts/exercise-extra-sources/overrides.json` — because its entries vary too much in quality
+to import wholesale.
+
 ## Gym check-in QR codes
 
 The gym check-in feature (a saved membership code shown as a QR code on the phone, added by

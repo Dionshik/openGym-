@@ -1,0 +1,1493 @@
+# Extra exercises — what was kept and what was dropped
+
+Generated 2026-10-01. Catalogue: 1324 upstream + 535 extra = 1859.
+
+| | total | by source |
+|---|---|---|
+| read | 2193 | fedb 876, longhaul 404, wger 913 |
+| **kept** | 535 | fedb 297, longhaul 170, wger 68 |
+| duplicate | 458 | fedb 341, longhaul 116, wger 1 |
+| near-duplicate (dropped) | 271 | fedb 180, longhaul 91, wger 0 |
+| kept by override | 8 | fedb 4, longhaul 3, wger 1 |
+| no primary muscle | 0 | fedb 0, longhaul 0, wger 0 |
+| dropped by hand (overrides.json) | 85 | fedb 58, longhaul 27, wger 0 |
+| wger: failed the quality filter | 353 | |
+| wger: not on the vetted list | 491 | |
+
+## Near-duplicates — dropped unless listed in overrides.json `forceKeep`
+
+- `fedb:Close-Grip_EZ-Bar_Press` **close-grip ez-bar press** [ez barbell] ≈ 2432 *ez-bar close-grip bench press* (0.83)
+- `fedb:Lying_One-Arm_Lateral_Raise` **lying one-arm lateral raise** [dumbbell] ≈ 0345 *dumbbell lying one arm rear lateral raise* (0.83)
+- `fedb:One_Arm_Pronated_Dumbbell_Triceps_Extension` **one arm pronated dumbbell triceps extension** [dumbbell] ≈ 0344 *dumbbell lying one arm pronated triceps extension* (0.83)
+- `fedb:One_Arm_Supinated_Dumbbell_Triceps_Extension` **one arm supinated dumbbell triceps extension** [dumbbell] ≈ 0346 *dumbbell lying one arm supinated triceps extension* (0.83)
+- `fedb:Seated_Bent-Over_Two-Arm_Dumbbell_Triceps_Extension` **seated bent-over two-arm dumbbell triceps extension** [dumbbell] ≈ 1737 *dumbbell seated bent over triceps extension* (0.83)
+- `fedb:Wide-Grip_Pulldown_Behind_The_Neck` **wide-grip pulldown behind the neck** [cable] ≈ 1325 *cable wide grip rear pulldown behind neck* (0.83)
+- `fedb:Bent_Over_Two-Dumbbell_Row_With_Palms_In` **bent over two-dumbbell row with palms in** [dumbbell] ≈ 1329 *dumbbell palm rotational bent over row* (0.80)
+- `fedb:Cable_One_Arm_Tricep_Extension` **cable one arm tricep extension** [cable] ≈ 0231 *cable standing one arm triceps extension* (0.80)
+- `fedb:Cable_Rope_Overhead_Triceps_Extension` **cable rope overhead triceps extension** [cable] ≈ 0194 *cable overhead triceps extension (rope attachment)* (0.80)
+- `fedb:Close-Grip_EZ-Bar_Curl_with_Band` **close-grip ez-bar curl with band** [ez barbell] ≈ 0446 *ez barbell close-grip curl* (0.80)
+- `fedb:Close-Grip_EZ_Bar_Curl` **close-grip ez bar curl** [barbell] ≈ 0446 *ez barbell close-grip curl* (0.80)
+- `fedb:Decline_EZ_Bar_Triceps_Extension` **decline ez bar triceps extension** [barbell] ≈ 2186 *ez barbell decline triceps extension* (0.80)
+- `fedb:Dumbbell_One-Arm_Triceps_Extension` **dumbbell one-arm triceps extension** [dumbbell] ≈ 0362 *dumbbell one arm triceps extension (on bench)* (0.80)
+- `fedb:Lying_Rear_Delt_Raise` **lying rear delt raise** [dumbbell] ≈ 2470 *dumbbell lying on floor rear delt raise* (0.80)
+- `fedb:One-Arm_Flat_Bench_Dumbbell_Flye` **one-arm flat bench dumbbell flye** [dumbbell] ≈ 1285 *dumbbell one arm bench fly* (0.80)
+- `fedb:One_Arm_Dumbbell_Preacher_Curl` **one arm dumbbell preacher curl** [dumbbell] ≈ 1663 *dumbbell one arm hammer preacher curl* (0.80)
+- `fedb:Rocking_Standing_Calf_Raise` **rocking standing calf raise** [barbell] ≈ 0111 *barbell standing rocking leg calf raise* (0.80)
+- `fedb:Seated_Flat_Bench_Leg_Pull-In` **seated flat bench leg pull-in** [body weight] ≈ 0570 *leg pull in flat bench* (0.80)
+- `fedb:Seated_One-arm_Cable_Pulley_Rows` **seated one-arm cable pulley rows** [cable] ≈ 0214 *cable seated one arm alternate row* (0.80)
+- `fedb:Smith_Machine_One-Arm_Upright_Row` **smith machine one-arm upright row** [smith machine] ≈ 1360 *smith one arm row* (0.80)
+- `fedb:Standing_Inner-Biceps_Curl` **standing inner-biceps curl** [dumbbell] ≈ 2321 *dumbbell standing inner biceps curl v. 2* (0.80)
+- `fedb:Standing_One-Arm_Dumbbell_Triceps_Extension` **standing one-arm dumbbell triceps extension** [dumbbell] ≈ 0423 *dumbbell standing one arm extension* (0.80)
+- `fedb:Standing_Towel_Triceps_Extension` **standing towel triceps extension** [body weight] ≈ 0018 *assisted standing triceps extension (with towel)* (0.80)
+- `fedb:Supine_Two-Arm_Overhead_Throw` **supine two-arm overhead throw** [medicine ball] ≈ fe_25fe4647 *supine one-arm overhead throw* (0.80)
+- `fedb:Triceps_Overhead_Extension_with_Rope` **triceps overhead extension with rope** [cable] ≈ 0194 *cable overhead triceps extension (rope attachment)* (0.80)
+- `fedb:Wide-Grip_Barbell_Bench_Press` **wide-grip barbell bench press** [barbell] ≈ 1258 *barbell wide reverse grip bench press* (0.80)
+- `fedb:Wide-Grip_Decline_Barbell_Bench_Press` **wide-grip decline barbell bench press** [barbell] ≈ 0036 *barbell decline wide-grip press* (0.80)
+- `lh:overhead-tricep-extension-cable-with-rope` **cable rope overhead tricep extension** [cable] ≈ 0194 *cable overhead triceps extension (rope attachment)* (0.80)
+- `fedb:Lying_Close-Grip_Barbell_Triceps_Extension_Behind_The_Head` **lying close-grip barbell triceps extension behind the head** [barbell] ≈ 1748 *ez bar lying close grip triceps extension behind head* (0.78)
+- `fedb:Anti-Gravity_Press` **anti-gravity press** [barbell] ≈ 0445 *ez barbell anti gravity press* (0.75)
+- `fedb:Bradford_Rocky_Presses` **bradford/rocky presses** [barbell] ≈ 0087 *barbell seated bradford rocky press* (0.75)
+- `fedb:Cable_Hammer_Curls_-_Rope_Attachment` **cable hammer curls - rope attachment** [cable] ≈ 0165 *cable hammer curl (with rope)* (0.75)
+- `fedb:Cable_Lying_Triceps_Extension` **cable lying triceps extension** [cable] ≈ 0186 *cable lying triceps extension v. 2* (0.75)
+- `fedb:Cable_Seated_Lateral_Raise` **cable seated lateral raise** [cable] ≈ 0215 *cable seated rear lateral raise* (0.75)
+- `fedb:Calf_Press_On_The_Leg_Press_Machine` **calf press on the leg press machine** [sled machine] ≈ 1391 *sled calf press on leg press* (0.75)
+- `fedb:Chest_Push_from_3_point_stance` **chest push from 3 point stance** [medicine ball] ≈ 1303 *medicine ball chest push from 3 point stance* (0.75)
+- `fedb:Chest_Stretch_on_Stability_Ball` **chest stretch on stability ball** [stability ball] ≈ 1272 *chest stretch with exercise ball* (0.75)
+- `fedb:Decline_Smith_Press` **decline smith press** [smith machine] ≈ 0753 *smith decline bench press* (0.75)
+- `fedb:Floor_Glute-Ham_Raise` **floor glute-ham raise** [body weight] ≈ 3193 *glute-ham raise* (0.75)
+- `fedb:Incline_Barbell_Triceps_Extension` **incline barbell triceps extension** [barbell] ≈ 0449 *ez barbell incline triceps extension* (0.75)
+- `fedb:Kneeling_High_Pulley_Row` **kneeling high pulley row** [cable] ≈ 0167 *cable high row (kneeling)* (0.75)
+- `fedb:Lying_Cambered_Barbell_Row` **lying cambered barbell row** [barbell] ≈ 0248 *cambered bar lying row* (0.75)
+- `fedb:Natural_Glute_Ham_Raise` **natural glute ham raise** [body weight] ≈ 3193 *glute-ham raise* (0.75)
+- `fedb:On_Your_Side_Quad_Stretch` **on your side quad stretch** [body weight] ≈ fe_ca195b1e *on-your-back quad stretch* (0.75)
+- `fedb:One-Arm_Dumbbell_Row` **one-arm dumbbell row** [dumbbell] ≈ 0363 *dumbbell one arm upright row* (0.75)
+- `fedb:One-Arm_Kettlebell_Split_Jerk` **one-arm kettlebell split jerk** [kettlebell] ≈ 0538 *kettlebell one arm jerk* (0.75)
+- `fedb:One-Arm_Kettlebell_Split_Snatch` **one-arm kettlebell split snatch** [kettlebell] ≈ 0542 *kettlebell one arm snatch* (0.75)
+- `fedb:One-Arm_Side_Laterals` **one-arm side laterals** [dumbbell] ≈ 0355 *dumbbell one arm lateral raise* (0.75)
+- `fedb:One_Arm_Lat_Pulldown` **one arm lat pulldown** [cable] ≈ 3563 *cable one arm pulldown* (0.75)
+- `fedb:Reverse_Flyes_With_External_Rotation` **reverse flyes with external rotation** [dumbbell] ≈ 0386 *dumbbell rotation reverse fly* (0.75)
+- `fedb:Reverse_Grip_Triceps_Pushdown` **reverse grip triceps pushdown** [cable] ≈ 0207 *cable reverse-grip pushdown* (0.75)
+- `fedb:Seated_Bent-Over_One-Arm_Dumbbell_Triceps_Extension` **seated bent-over one-arm dumbbell triceps extension** [dumbbell] ≈ 1740 *dumbbell standing bent over one arm triceps extension* (0.75)
+- `fedb:Seated_Hamstring_and_Calf_Stretch` **seated hamstring and calf stretch** [body weight] ≈ 1390 *seated calf stretch (male)* (0.75)
+- `fedb:Single_Leg_Butt_Kick` **single leg butt kick** [body weight] ≈ fe_41f00fac *double leg butt kick* (0.75)
+- `fedb:Smith_Machine_Behind_the_Back_Shrug` **smith machine behind the back shrug** [smith machine] ≈ 0746 *smith back shrug* (0.75)
+- `fedb:Smith_Machine_Calf_Raise` **smith machine calf raise** [smith machine] ≈ 0763 *smith reverse calf raises* (0.75)
+- `fedb:Smith_Machine_Decline_Press` **smith machine decline press** [smith machine] ≈ 0753 *smith decline bench press* (0.75)
+- `fedb:Smith_Machine_Overhead_Shoulder_Press` **smith machine overhead shoulder press** [smith machine] ≈ 0766 *smith shoulder press* (0.75)
+- `fedb:Standing_Gastrocnemius_Calf_Stretch` **standing gastrocnemius calf stretch** [body weight] ≈ 1398 *standing calves calf stretch* (0.75)
+- `fedb:Standing_Hamstring_and_Calf_Stretch` **standing hamstring and calf stretch** [body weight] ≈ 1398 *standing calves calf stretch* (0.75)
+- `fedb:Standing_Military_Press` **standing military press** [barbell] ≈ 1457 *barbell standing wide military press* (0.75)
+- `fedb:Standing_One-Arm_Cable_Curl` **standing one-arm cable curl** [cable] ≈ 0190 *cable one arm curl* (0.75)
+- `fedb:Standing_Rope_Crunch` **standing rope crunch** [cable] ≈ 0874 *cable standing crunch (with rope attachment)* (0.75)
+- `fedb:Triceps_Pushdown_-_Rope_Attachment` **triceps pushdown - rope attachment** [cable] ≈ 0200 *cable pushdown (with rope attachment)* (0.75)
+- `fedb:Triceps_Pushdown_-_V-Bar_Attachment` **triceps pushdown - v-bar attachment** [cable] ≈ 0241 *cable triceps pushdown (v-bar)* (0.75)
+- `fedb:Worlds_Greatest_Stretch` **world's greatest stretch** [body weight] ≈ 1604 *world greatest stretch* (0.75)
+- `lh:single-leg-romanian-deadlift-dumbbell` **dumbbell single-leg romanian deadlift** [dumbbell] ≈ 1757 *dumbbell single leg deadlift* (0.75)
+- `lh:row-t-bar` **t-bar row** [barbell] ≈ fe_2bfb85d5 *t-bar row with handle* (0.75)
+- `lh:rear-delt-row-dumbbell` **dumbbell rear delt row** [dumbbell] ≈ 1328 *dumbbell lying rear delt row* (0.75)
+- `lh:straight-arm-lat-pulldown` **straight arm lat pulldown** [cable] ≈ 0238 *cable straight arm pulldown* (0.75)
+- `lh:rear-delt-row-cable` **cable rear delt row** [cable] ≈ 0202 *cable rear delt row (stirrups)* (0.75)
+- `lh:overhead-tricep-extension-bodyweight` **overhead tricep extension** [body weight] ≈ fe_b329a309 *sled overhead triceps extension* (0.75)
+- `lh:behind-the-neck-press-barbell` **barbell behind the neck press** [barbell] ≈ 0788 *standing behind neck press* (0.75)
+- `lh:overhead-tricep-extension-barbell` **barbell overhead tricep extension** [barbell] ≈ 0092 *barbell seated overhead triceps extension* (0.75)
+- `lh:lying-leg-raise` **lying leg raise** [body weight] ≈ 0865 *lying leg-hip raise* (0.75)
+- `lh:seated-incline-front-raise-dumbbell` **dumbbell seated incline front raise** [dumbbell] ≈ 0387 *dumbbell seated alternate front raise* (0.75)
+- `lh:external-shoulder-rotation-cable` **cable external shoulder rotation** [cable] ≈ 0235 *cable standing shoulder external rotation* (0.75)
+- `lh:internal-shoulder-rotation-cable` **cable internal shoulder rotation** [cable] ≈ 0216 *cable seated shoulder internal rotation* (0.75)
+- `lh:slam-medicine-ball` **medicine ball slam** [medicine ball] ≈ 1354 *medicine ball overhead slam* (0.75)
+- `lh:rolling-push-up-medicine-ball` **medicine ball rolling push-up** [medicine ball] ≈ 0663 *push-up medicine ball* (0.75)
+- `lh:single-leg-tuck-up` **single-leg tuck-up** [body weight] ≈ lh_e9ef04ae *single-leg v-up* (0.75)
+- `lh:single-arm-hang-rings` **ring single-arm hang** [body weight] ≈ (dropped by hand) *single-arm hang* (0.75)
+- `lh:incline-bench-press-machine` **machine incline bench press** [leverage machine] ≈ 0757 *smith incline bench press* (0.75)
+- `lh:decline-bench-press-machine` **machine decline bench press** [leverage machine] ≈ 0753 *smith decline bench press* (0.75)
+- `lh:hang-power-clean-and-jerk` **hang power clean and jerk** [barbell] ≈ lh_ff5877ba *hang power clean* (0.75)
+- `fedb:Bent_Over_One-Arm_Long_Bar_Row` **bent over one-arm long bar row** [barbell] ≈ 0064 *barbell one arm bent over row* (0.71)
+- `fedb:Seated_One-Arm_Dumbbell_Palms-Up_Wrist_Curl` **seated one-arm dumbbell palms-up wrist curl** [dumbbell] ≈ 0401 *dumbbell seated palms up wrist curl* (0.71)
+- `fedb:Standing_Low-Pulley_One-Arm_Triceps_Extension` **standing low-pulley one-arm triceps extension** [cable] ≈ 0231 *cable standing one arm triceps extension* (0.71)
+- `lh:standing-snatch-grip-behind-the-neck-press` **standing snatch grip behind the neck press** [barbell] ≈ lh_6c3474cb *seated snatch grip behind the neck press* (0.71)
+- `lh:single-arm-half-kneeling-high-row-cable` **cable single arm half kneeling high row** [cable] ≈ fe_22aff575 *kneeling single-arm high pulley row* (0.71)
+- `lh:one-leg-incline-pigeon-stretch-bench` **bench one-leg incline pigeon stretch** [body weight] ≈ lh_3438f4cc *bench one-leg incline reverse pigeon* (0.71)
+- `fedb:Around_The_Worlds` **around the worlds** [dumbbell] ≈ 2143 *dumbbell standing around world* (0.67)
+- `fedb:Barbell_Ab_Rollout_-_On_Knees` **barbell ab rollout - on knees** [barbell] ≈ fe_2253e51d *barbell ab rollout* (0.67)
+- `fedb:Barbell_Incline_Bench_Press_-_Medium_Grip` **barbell incline bench press - medium grip** [barbell] ≈ 1719 *barbell incline close grip bench press* (0.67)
+- `fedb:Bench_Dips` **bench dips** [body weight] ≈ 1399 *bench dip on floor* (0.67)
+- `fedb:Bench_Press_-_Powerlifting` **bench press - powerlifting** [barbell] ≈ 0025 *barbell bench press* (0.67)
+- `fedb:Bench_Press_with_Chains` **bench press with chains** [barbell] ≈ 0025 *barbell bench press* (0.67)
+- `fedb:Box_Squat_with_Chains` **box squat with chains** [barbell] ≈ fe_39d29d43 *box squat* (0.67)
+- `fedb:Cable_Chest_Press` **cable chest press** [cable] ≈ 2144 *cable seated chest press* (0.67)
+- `fedb:Calf_Raise_On_A_Dumbbell` **calf raise on a dumbbell** [dumbbell] ≈ 1379 *dumbbell seated calf raise* (0.67)
+- `fedb:Calf_Stretch_Elbows_Against_Wall` **calf stretch elbows against wall** [body weight] ≈ 1377 *calf stretch with hands against wall* (0.67)
+- `fedb:Chair_Squat` **chair squat** [leverage machine] ≈ 0750 *smith chair squat* (0.67)
+- `fedb:Chest_Push_multiple_response` **chest push (multiple response)** [medicine ball] ≈ 1304 *medicine ball chest push multiple response* (0.67)
+- `fedb:Chest_Push_single_response` **chest push (single response)** [medicine ball] ≈ 1305 *medicine ball chest push single response* (0.67)
+- `fedb:Chest_Push_with_Run_Release` **chest push with run release** [medicine ball] ≈ 1312 *medicine ball chest push with run release* (0.67)
+- `fedb:Decline_Oblique_Crunch` **decline oblique crunch** [body weight] ≈ 0277 *decline crunch* (0.67)
+- `fedb:Decline_Reverse_Crunch` **decline reverse crunch** [body weight] ≈ 0277 *decline crunch* (0.67)
+- `fedb:Dumbbell_Shoulder_Press` **dumbbell shoulder press** [dumbbell] ≈ 0405 *dumbbell seated shoulder press* (0.67)
+- `fedb:EZ-Bar_Curl` **ez-bar curl** [ez barbell] ≈ 0447 *ez barbell curl* (0.67)
+- `fedb:Exercise_Ball_Crunch` **exercise ball crunch** [stability ball] ≈ 0271 *crunch (on stability ball)* (0.67)
+- `fedb:Exercise_Ball_Pull-In` **exercise ball pull-in** [stability ball] ≈ 0650 *pull-in (on stability ball)* (0.67)
+- `fedb:Flexor_Incline_Dumbbell_Curls` **flexor incline dumbbell curls** [dumbbell] ≈ 0318 *dumbbell incline curl* (0.67)
+- `fedb:Floor_Press_with_Chains` **floor press with chains** [barbell] ≈ fe_81eff975 *floor press* (0.67)
+- `fedb:Freehand_Jump_Squat` **freehand jump squat** [body weight] ≈ 0514 *jump squat* (0.67)
+- `fedb:Front_Incline_Dumbbell_Raise` **front incline dumbbell raise** [dumbbell] ≈ 0310 *dumbbell front raise* (0.67)
+- `fedb:Gorilla_Chin_Crunch` **gorilla chin/crunch** [body weight] ≈ 0467 *gorilla chin* (0.67)
+- `fedb:Hack_Squat` **hack squat** [sled machine] ≈ 0743 *sled hack squat* (0.67)
+- `fedb:Hyperextensions_With_No_Hyperextension_Bench` **hyperextensions with no hyperextension bench** [body weight] ≈ 0488 *hyperextension (on bench)* (0.67)
+- `fedb:Incline_Dumbbell_Flyes_-_With_A_Twist` **incline dumbbell flyes - with a twist** [dumbbell] ≈ 0319 *dumbbell incline fly* (0.67)
+- `fedb:Incline_Push-Up_Medium` **incline push-up medium** [body weight] ≈ 0493 *incline push-up* (0.67)
+- `fedb:Incline_Push-Up_Wide` **incline push-up wide** [body weight] ≈ 0493 *incline push-up* (0.67)
+- `fedb:JM_Press` **jm press** [barbell] ≈ 0052 *barbell jm bench press* (0.67)
+- `fedb:Jerk_Dip_Squat` **jerk dip squat** [barbell] ≈ 0786 *squat jerk* (0.67)
+- `fedb:Knee_Circles` **knee circles** [body weight] ≈ 0257 *circles knee stretch* (0.67)
+- `fedb:Kneeling_Squat` **kneeling squat** [barbell] ≈ 1420 *kneeling jump squat* (0.67)
+- `fedb:Landmine_180s` **landmine 180's** [barbell] ≈ 0562 *landmine 180* (0.67)
+- `fedb:Lateral_Raise_-_With_Bands` **lateral raise - with bands** [band] ≈ 0977 *band front lateral raise* (0.67)
+- `fedb:Low_Cable_Triceps_Extension` **low cable triceps extension** [cable] ≈ 0149 *cable alternate triceps extension* (0.67)
+- `fedb:Lunge_Sprint` **lunge sprint** [leverage machine] ≈ 0769 *smith sprint lunge* (0.67)
+- `fedb:Lying_Cable_Curl` **lying cable curl** [cable] ≈ 1634 *cable lying bicep curl* (0.67)
+- `fedb:Lying_Close-Grip_Barbell_Triceps_Press_To_Chin` **lying close-grip barbell triceps press to chin** [ez barbell] ≈ 0055 *barbell lying close-grip press* (0.67)
+- `fedb:Lying_Face_Up_Plate_Neck_Resistance` **lying face up plate neck resistance** [weighted] ≈ fe_4dd9522f *lying face down plate neck resistance* (0.67)
+- `fedb:Lying_Machine_Squat` **lying machine squat** [leverage machine] ≈ 0744 *sled lying squat* (0.67)
+- `fedb:Machine_Bench_Press` **machine bench press** [leverage machine] ≈ 0748 *smith bench press* (0.67)
+- `fedb:Machine_Shoulder_Military_Press` **machine shoulder (military) press** [leverage machine] ≈ 0587 *lever military press* (0.67)
+- `fedb:Oblique_Crunches` **oblique crunches** [body weight] ≈ 1495 *oblique crunch v. 2* (0.67)
+- `fedb:Overhead_Stretch` **overhead stretch** [body weight] ≈ 0643 *overhead triceps stretch* (0.67)
+- `fedb:Overhead_Triceps` **overhead triceps** [body weight] ≈ 0643 *overhead triceps stretch* (0.67)
+- `fedb:Pallof_Press_With_Rotation` **pallof press with rotation** [cable] ≈ fe_beb68c59 *pallof press* (0.67)
+- `fedb:Palms-Down_Dumbbell_Wrist_Curl_Over_A_Bench` **palms-down dumbbell wrist curl over a bench** [dumbbell] ≈ 0369 *dumbbell over bench wrist curl* (0.67)
+- `fedb:Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench` **palms-up dumbbell wrist curl over a bench** [dumbbell] ≈ 0369 *dumbbell over bench wrist curl* (0.67)
+- `fedb:Pull_Through` **pull through** [cable] ≈ 0196 *cable pull through (with rope)* (0.67)
+- `fedb:Push-Up_Wide` **push-up wide** [body weight] ≈ 1311 *wide hand push up* (0.67)
+- `fedb:Quad_Stretch` **quad stretch** [body weight] ≈ 0613 *lying (side) quads stretch* (0.67)
+- `fedb:Reverse_Band_Bench_Press` **reverse band bench press** [barbell] ≈ 0025 *barbell bench press* (0.67)
+- `fedb:Reverse_Band_Box_Squat` **reverse band box squat** [barbell] ≈ fe_39d29d43 *box squat* (0.67)
+- `fedb:Reverse_Band_Sumo_Deadlift` **reverse band sumo deadlift** [barbell] ≈ 0117 *barbell sumo deadlift* (0.67)
+- `fedb:Reverse_Machine_Flyes` **reverse machine flyes** [leverage machine] ≈ 0602 *lever seated reverse fly* (0.67)
+- `fedb:Runners_Stretch` **runner's stretch** [body weight] ≈ 1585 *runners stretch* (0.67)
+- `fedb:Seated_Cable_Shoulder_Press` **seated cable shoulder press** [cable] ≈ 0148 *cable alternate shoulder press* (0.67)
+- `fedb:Seated_Dumbbell_Palms-Down_Wrist_Curl` **seated dumbbell palms-down wrist curl** [dumbbell] ≈ 0401 *dumbbell seated palms up wrist curl* (0.67)
+- `fedb:Seated_Glute` **seated glute** [body weight] ≈ 1424 *seated glute stretch* (0.67)
+- `fedb:Seated_Palms-Down_Barbell_Wrist_Curl` **seated palms-down barbell wrist curl** [barbell] ≈ fe_c2eeb1a6 *seated palm-up barbell wrist curl* (0.67)
+- `fedb:Seated_Triceps_Press` **seated triceps press** [dumbbell] ≈ 0388 *dumbbell seated alternate press* (0.67)
+- `fedb:Side_Leg_Raises` **side leg raises** [body weight] ≈ 0472 *hanging leg raise* (0.67)
+- `fedb:Side_Wrist_Pull` **side wrist pull** [body weight] ≈ 0721 *side wrist pull stretch* (0.67)
+- `fedb:Single-Leg_Leg_Extension` **single-leg leg extension** [leverage machine] ≈ 0585 *lever leg extension* (0.67)
+- `fedb:Smith_Machine_Pistol_Squat` **smith machine pistol squat** [smith machine] ≈ 3281 *smith full squat* (0.67)
+- `fedb:Speed_Box_Squat` **speed box squat** [barbell] ≈ 0101 *barbell speed squat* (0.67)
+- `fedb:Spider_Crawl` **spider crawl** [body weight] ≈ 0778 *spider crawl push up* (0.67)
+- `fedb:Spider_Curl` **spider curl** [ez barbell] ≈ 0454 *ez barbell spider curl* (0.67)
+- `fedb:Split_Squat_with_Dumbbells` **split squat with dumbbells** [dumbbell] ≈ 2812 *dumbbell step-up split squat* (0.67)
+- `fedb:Standing_Alternating_Dumbbell_Press` **standing alternating dumbbell press** [dumbbell] ≈ 0414 *dumbbell standing alternate overhead press* (0.67)
+- `fedb:Standing_Dumbbell_Press` **standing dumbbell press** [dumbbell] ≈ 0414 *dumbbell standing alternate overhead press* (0.67)
+- `fedb:Standing_Dumbbell_Upright_Row` **standing dumbbell upright row** [dumbbell] ≈ 0437 *dumbbell upright row* (0.67)
+- `fedb:Standing_Toe_Touches` **standing toe touches** [body weight] ≈ 3212 *basic toe touch (male)* (0.67)
+- `fedb:Sumo_Deadlift_with_Chains` **sumo deadlift with chains** [barbell] ≈ 0117 *barbell sumo deadlift* (0.67)
+- `fedb:Suspended_Fallout` **suspended fallout** [body weight] ≈ 0805 *suspended abdominal fallout* (0.67)
+- `fedb:Svend_Press` **svend press** [weighted] ≈ 0856 *weighted svend press* (0.67)
+- `fedb:Tricep_Dumbbell_Kickback` **tricep dumbbell kickback** [dumbbell] ≈ 1739 *dumbbell standing alternating tricep kickback* (0.67)
+- `fedb:Triceps_Pushdown` **triceps pushdown** [cable] ≈ 0241 *cable triceps pushdown (v-bar)* (0.67)
+- `fedb:Two-Arm_Dumbbell_Preacher_Curl` **two-arm dumbbell preacher curl** [dumbbell] ≈ 1647 *dumbbell alternate preacher curl* (0.67)
+- `fedb:Two-Arm_Kettlebell_Jerk` **two-arm kettlebell jerk** [kettlebell] ≈ 0538 *kettlebell one arm jerk* (0.67)
+- `fedb:V-Bar_Pulldown` **v-bar pulldown** [cable] ≈ 0150 *cable bar lateral pulldown* (0.67)
+- `fedb:Walking_Treadmill` **walking, treadmill** [leverage machine] ≈ 3666 *walking on incline treadmill* (0.67)
+- `fedb:Weighted_Jump_Squat` **weighted jump squat** [barbell] ≈ 0053 *barbell jump squat* (0.67)
+- `fedb:Wide_Stance_Barbell_Squat` **wide stance barbell squat** [barbell] ≈ 0124 *barbell wide squat* (0.67)
+- `lh:back-extension` **back extension** [body weight] ≈ (dropped by hand) *hyperextensions (back extensions)* (0.67)
+- `lh:close-grip-feet-up-bench-press-barbell` **barbell close-grip feet-up bench press** [barbell] ≈ 0030 *barbell close-grip bench press* (0.67)
+- `lh:hip-abduction-machine` **machine hip abduction** [leverage machine] ≈ 0597 *lever seated hip abduction* (0.67)
+- `lh:cable-curl-rope` **rope cable curl** [cable] ≈ 0165 *cable hammer curl (with rope)* (0.67)
+- `lh:standing-shoulder-press-dumbbell` **dumbbell shoulder press** [dumbbell] ≈ 0405 *dumbbell seated shoulder press* (0.67)
+- `lh:block-snatch` **block snatch** [barbell] ≈ fe_2b8bb082 *snatch from blocks* (0.67)
+- `lh:chest-press-cable` **cable chest press** [cable] ≈ 2144 *cable seated chest press* (0.67)
+- `lh:hip-thrust-band` **band hip thrust** [band] ≈ 3236 *resistance band hip thrusts on knees (female)* (0.67)
+- `lh:calf-raise-machine` **machine calf raise** [leverage machine] ≈ 1383 *hack calf raise* (0.67)
+- `lh:glute-bridge` **glute bridge** [body weight] ≈ 3561 *glute bridge march* (0.67)
+- `lh:external-shoulder-rotation-band` **band external shoulder rotation** [band] ≈ fe_cbe20356 *external rotation with band* (0.67)
+- `lh:internal-shoulder-rotation-band` **band internal shoulder rotation** [band] ≈ fe_3e63999f *internal rotation with band* (0.67)
+- `lh:standing-glute-kickback-machine` **machine standing glute kickback** [leverage machine] ≈ lh_fb5b02eb *machine glute kickback* (0.67)
+- `lh:dip-bench` **bench dip** [body weight] ≈ 1399 *bench dip on floor* (0.67)
+- `lh:snatch-grip-deadlift` **snatch grip deadlift** [barbell] ≈ fe_e9e581b0 *snatch deadlift* (0.67)
+- `lh:oblique-crunch` **oblique crunch** [body weight] ≈ 1495 *oblique crunch v. 2* (0.67)
+- `lh:push-up-hands-in-rings` **ring push-up** [body weight] ≈ lh_bd79b5b6 *ring (feet) push-up* (0.67)
+- `lh:power-clean-and-press` **power clean and press** [barbell] ≈ 0028 *barbell clean and press* (0.67)
+- `lh:hip-abduction-band` **band hip abduction** [band] ≈ 3006 *resistance band seated hip abduction* (0.67)
+- `lh:hack-squat-landmine` **landmine hack squat** [barbell] ≈ 0046 *barbell hack squat* (0.67)
+- `lh:standing-chest-fly-cable` **cable standing chest fly** [cable] ≈ 0227 *cable standing fly* (0.67)
+- `lh:cable-pull-through` **cable pull through** [cable] ≈ 0196 *cable pull through (with rope)* (0.67)
+- `lh:reverse-fly-machine` **machine reverse fly** [leverage machine] ≈ 0602 *lever seated reverse fly* (0.67)
+- `lh:hang-power-snatch` **hang power snatch** [barbell] ≈ fe_27a79037 *hang snatch* (0.67)
+- `lh:hack-squat-machine` **machine hack squat** [leverage machine] ≈ 0743 *sled hack squat* (0.67)
+- `lh:seated-overhead-press-barbell` **barbell seated shoulder press** [barbell] ≈ (dropped by hand) *barbell shoulder press* (0.67)
+- `lh:kneeling-incline-push-up` **kneeling incline push-up** [body weight] ≈ 0493 *incline push-up* (0.67)
+- `lh:push-up-against-wall` **push-up against wall** [body weight] ≈ 0659 *push-up (wall)* (0.67)
+- `lh:hip-adduction-machine` **machine hip adduction** [leverage machine] ≈ 0598 *lever seated hip adduction* (0.67)
+- `lh:calf-raise-barbell` **barbell calf raise** [barbell] ≈ 1370 *barbell floor calf raise* (0.67)
+- `lh:bicycle-crunch` **bicycle crunch** [body weight] ≈ lh_d41605a6 *standing bicycle crunch* (0.67)
+- `lh:eccentric-chest-press` **eccentric chest press** [leverage machine] ≈ 0577 *lever chest press* (0.67)
+- `lh:eccentric-leg-extension` **eccentric leg extension** [leverage machine] ≈ 0585 *lever leg extension* (0.67)
+- `lh:squat-bosu` **bosu squat** [bosu ball] ≈ 1705 *squat on bosu ball* (0.67)
+- `lh:eccentric-bicep-curl-machine` **machine eccentric bicep curl** [leverage machine] ≈ 0575 *lever bicep curl* (0.67)
+- `lh:incline-hex-press-dumbbell` **dumbbell incline hex press** [dumbbell] ≈ 3545 *dumbbell incline alternate press* (0.67)
+- `lh:overhead-tricep-extension-machine` **machine overhead tricep extension** [leverage machine] ≈ 0607 *lever triceps extension* (0.67)
+- `lh:in-out-rope-wave` **in-out rope wave** [rope] ≈ lh_a5525833 *rope wave* (0.67)
+- `lh:low-chest-fly-cable` **cable low chest fly** [cable] ≈ 0179 *cable low fly* (0.67)
+- `lh:bench-press-machine` **machine bench press** [leverage machine] ≈ 0748 *smith bench press* (0.67)
+- `lh:kneeling-pallof-press` **kneeling pallof press** [cable] ≈ fe_beb68c59 *pallof press* (0.67)
+- `lh:stability-ball-pullover-dumbbell` **dumbbell stability ball pullover** [dumbbell] ≈ 1295 *dumbbell pullover on exercise ball* (0.67)
+- `lh:archer-push-up-rings` **ring archer push up** [body weight] ≈ 3294 *archer push up* (0.67)
+- `lh:rebound-external-rotation-band` **band rebound external rotation** [band] ≈ fe_cbe20356 *external rotation with band* (0.67)
+- `lh:lying-hamstring-bridge` **lying hamstring bridge** [body weight] ≈ fe_a91f74c4 *lying hamstring* (0.67)
+- `lh:one-leg-lying-pretzel-stretch` **one-leg lying pretzel stretch** [body weight] ≈ lh_7bdfedb6 *one-leg seated pretzel stretch* (0.67)
+- `lh:one-arm-kneeling-spine-twist` **one-arm kneeling spine twist** [body weight] ≈ lh_d6dedfc6 *one-arm tabletop spine twist* (0.67)
+- `fedb:Seated_Bent-Over_Rear_Delt_Raise` **seated bent-over rear delt raise** [dumbbell] ≈ fe_6a512480 *bent over dumbbell rear delt raise with head on bench* (0.63)
+- `fedb:Seated_One-Arm_Dumbbell_Palms-Down_Wrist_Curl` **seated one-arm dumbbell palms-down wrist curl** [dumbbell] ≈ 1415 *dumbbell one arm seated neutral wrist curl* (0.63)
+- `fedb:Standing_Dumbbell_Straight-Arm_Front_Delt_Raise_Above_Head` **standing dumbbell straight-arm front delt raise above head** [dumbbell] ≈ 0419 *dumbbell standing front raise above head* (0.63)
+- `fedb:All_Fours_Quad_Stretch` **all fours quad stretch** [body weight] ≈ 1512 *all fours squad stretch* (0.60)
+- `fedb:Barbell_Bench_Press_-_Medium_Grip` **barbell bench press - medium grip** [barbell] ≈ 0030 *barbell close-grip bench press* (0.60)
+- `fedb:Catch_and_Overhead_Throw` **catch and overhead throw** [medicine ball] ≈ 1353 *medicine ball catch and overhead throw* (0.60)
+- `fedb:Chair_Lower_Back_Stretch` **chair lower back stretch** [body weight] ≈ 0690 *seated lower back stretch* (0.60)
+- `fedb:Dumbbell_Tricep_Extension_-Pronated_Grip` **dumbbell tricep extension -pronated grip** [dumbbell] ≈ 0373 *dumbbell pronate-grip triceps extension* (0.60)
+- `fedb:Hammer_Grip_Incline_DB_Bench_Press` **hammer grip incline db bench press** [dumbbell] ≈ 0314 *dumbbell incline bench press* (0.60)
+- `fedb:Hang_Snatch_-_Below_Knees` **hang snatch - below knees** [barbell] ≈ fe_8aeb1069 *hang clean - below the knees* (0.60)
+- `fedb:Incline_Dumbbell_Bench_With_Palms_Facing_In` **incline dumbbell bench with palms facing in** [dumbbell] ≈ 1623 *dumbbell palms in incline bench press* (0.60)
+- `fedb:Kettlebell_Turkish_Get-Up_Lunge_style` **kettlebell turkish get-up (lunge style)** [kettlebell] ≈ 0551 *kettlebell turkish get up (squat style)* (0.60)
+- `fedb:Knee_Hip_Raise_On_Parallel_Bars` **knee/hip raise on parallel bars** [body weight] ≈ 0709 *side hip (on parallel bars)* (0.60)
+- `fedb:Lying_T-Bar_Row` **lying t-bar row** [barbell] ≈ 0248 *cambered bar lying row* (0.60)
+- `fedb:Medicine_Ball_Scoop_Throw` **medicine ball scoop throw** [medicine ball] ≈ fe_600d2dda *backward medicine ball throw* (0.60)
+- `fedb:One-Arm_Kettlebell_Para_Press` **one-arm kettlebell para press** [kettlebell] ≈ 1298 *kettlebell one arm floor press* (0.60)
+- `fedb:One-Arm_Open_Palm_Kettlebell_Clean` **one-arm open palm kettlebell clean** [kettlebell] ≈ fe_1f8e8468 *one-arm kettlebell clean* (0.60)
+- `fedb:One_Arm_Dumbbell_Bench_Press` **one arm dumbbell bench press** [dumbbell] ≈ 1281 *dumbbell incline one arm press* (0.60)
+- `fedb:Power_Snatch_from_Blocks` **power snatch from blocks** [barbell] ≈ fe_6ee93643 *power clean from blocks* (0.60)
+- `fedb:Push_Press_-_Behind_the_Neck` **push press - behind the neck** [barbell] ≈ 0788 *standing behind neck press* (0.60)
+- `fedb:Pushups_Close_and_Wide_Hand_Positions` **pushups (close and wide hand positions)** [body weight] ≈ 1311 *wide hand push up* (0.60)
+- `fedb:Seated_Barbell_Military_Press` **seated barbell military press** [barbell] ≈ 0086 *barbell seated behind head military press* (0.60)
+- `fedb:Single-Leg_Lateral_Hop` **single-leg lateral hop** [body weight] ≈ fe_6b0b21e0 *single-leg hop progression* (0.60)
+- `fedb:Single_Leg_Glute_Bridge` **single leg glute bridge** [body weight] ≈ 3523 *glute bridge two legs on bench (male)* (0.60)
+- `fedb:Standing_Olympic_Plate_Hand_Squeeze` **standing olympic plate hand squeeze** [weighted] ≈ 0854 *weighted standing hand squeeze* (0.60)
+- `fedb:Supine_Chest_Throw` **supine chest throw** [medicine ball] ≈ 1750 *medicine ball supine chest throw* (0.60)
+- `lh:rotational-throw-medicine-ball` **medicine ball rotational throw** [medicine ball] ≈ fe_600d2dda *backward medicine ball throw* (0.60)
+- `lh:lying-internal-shoulder-rotation-dumbbell` **dumbbell lying internal shoulder rotation** [dumbbell] ≈ 0863 *dumbbell lying external shoulder rotation* (0.60)
+- `lh:horizontal-external-shoulder-rotation-dumbbell` **dumbbell horizontal external shoulder rotation** [dumbbell] ≈ 0863 *dumbbell lying external shoulder rotation* (0.60)
+- `lh:supinated-grip-lat-pulldown` **supinated grip lat pulldown** [cable] ≈ (dropped by hand) *wide-grip lat pulldown* (0.60)
+- `lh:wrist-curl-behind-the-back-barbell` **barbell wrist curl behind the back** [barbell] ≈ 0104 *barbell standing back wrist curl* (0.60)
+- `lh:deadlift-trap-bar-high-handles` **trap bar (high handles) deadlift** [trap bar] ≈ 0811 *trap bar deadlift* (0.60)
+- `lh:lying-windshield-wiper-with-bent-knees` **lying windshield wiper with bent knees** [body weight] ≈ lh_53a44f77 *lying windshield wiper* (0.60)
+- `lh:close-grip-seated-row` **close grip seated row** [cable] ≈ 0218 *cable seated wide-grip row* (0.60)
+- `lh:seated-one-handed-row-cable` **cable seated one-handed row** [cable] ≈ 0214 *cable seated one arm alternate row* (0.60)
+- `lh:one-handed-tricep-pushdown-cable` **cable one-handed tricep pushdown** [cable] ≈ 1723 *cable one arm tricep pushdown* (0.60)
+- `lh:one-handed-wrist-curl-dumbbell` **dumbbell one-handed wrist curl** [dumbbell] ≈ 0364 *dumbbell one arm wrist curl* (0.60)
+- `lh:pronated-grip-lat-pulldown` **pronated grip lat pulldown** [cable] ≈ (dropped by hand) *wide-grip lat pulldown* (0.60)
+- `lh:deadlift-trap-bar-low-handles` **trap bar (low handles) deadlift** [trap bar] ≈ 0811 *trap bar deadlift* (0.60)
+- `lh:one-handed-lateral-raise-cable` **cable one-handed lateral raise** [cable] ≈ 0192 *cable one arm lateral raise* (0.60)
+- `lh:rotational-slam-medicine-ball` **medicine ball rotational slam** [medicine ball] ≈ 1354 *medicine ball overhead slam* (0.60)
+- `lh:calf-raise-leg-press-machine` **sled calf raise** [sled machine] ≈ 0742 *sled forward angled calf raise* (0.60)
+- `lh:standing-external-shoulder-rotation-dumbbell` **dumbbell standing external shoulder rotation** [dumbbell] ≈ 0863 *dumbbell lying external shoulder rotation* (0.60)
+- `lh:one-handed-hammer-curl-dumbbell` **dumbbell one-handed hammer curl** [dumbbell] ≈ lh_e80062ec *one-handed cross-body curl* (0.60)
+- `lh:close-grip-incline-bench-press-dumbbell` **dumbbell close-grip incline bench press** [dumbbell] ≈ 1731 *dumbbell close grip press* (0.60)
+- `lh:copenhagen-plank-with-leg-lift` **copenhagen plank with leg lift** [body weight] ≈ 3663 *reverse plank with leg lift* (0.60)
+- `lh:single-leg-romanian-deadlift-landmine` **landmine single-leg romanian deadlift** [barbell] ≈ 1756 *barbell single leg deadlift* (0.60)
+
+## Kept by override
+
+- `fedb:Atlas_Stones` **atlas stones** [weighted] ≈ fe_96c2542c *atlas stone trainer* (0.67)
+- `fedb:One-Arm_Kettlebell_Clean` **one-arm kettlebell clean** [kettlebell] ≈ 0537 *kettlebell one arm clean and jerk* (0.75)
+- `fedb:Power_Clean_from_Blocks` **power clean from blocks** [barbell] ≈ fe_d36894f8 *clean from blocks* (0.75)
+- `fedb:Snatch_Balance` **snatch balance** [barbell] ≈ fe_6fe10ba8 *heaving snatch balance* (0.67)
+- `lh:hang-power-clean` **hang power clean** [barbell] ≈ 0648 *power clean* (0.67)
+- `lh:hanging-knee-raise` **hanging knee raise** [body weight] ≈ 0011 *assisted hanging knee raise* (0.75)
+- `lh:bulgarian-split-squat` **bulgarian split squat** [body weight] ≈ 2368 *split squats* (0.67)
+- `wg:b3049397-a1d1-4442-9113-3532bcd1f278` **spider curl** [dumbbell] ≈ 1675 *dumbbell reverse spider curl* (0.67)
+
+## Dropped by hand (overrides.json `forceDrop`)
+
+- `fedb:Ab_Crunch_Machine` **ab crunch machine** [leverage machine]
+- `fedb:Ab_Roller` **ab roller** [wheel roller]
+- `fedb:Barbell_Shoulder_Press` **barbell shoulder press** [barbell]
+- `fedb:Bent-Arm_Dumbbell_Pullover` **bent-arm dumbbell pullover** [dumbbell]
+- `fedb:Bicycling_Stationary` **bicycling, stationary** [stationary bike]
+- `fedb:Bodyweight_Mid_Row` **bodyweight mid row** [body weight]
+- `fedb:Butt_Lift_Bridge` **butt lift (bridge)** [body weight]
+- `fedb:Butterfly` **butterfly** [leverage machine]
+- `fedb:Cable_Crossover` **cable crossover** [cable]
+- `fedb:Cable_Internal_Rotation` **cable internal rotation** [cable]
+- `fedb:Cable_Rear_Delt_Fly` **cable rear delt fly** [cable]
+- `fedb:Cable_Russian_Twists` **cable russian twists** [cable]
+- `fedb:Close-Grip_Front_Lat_Pulldown` **close-grip front lat pulldown** [cable]
+- `fedb:Crunches` **crunches** [body weight]
+- `fedb:Dip_Machine` **dip machine** [leverage machine]
+- `fedb:Elliptical_Trainer` **elliptical trainer** [elliptical machine]
+- `fedb:External_Rotation_with_Cable` **external rotation with cable** [cable]
+- `fedb:Farmers_Walk` **farmer's walk** [weighted]
+- `fedb:Flat_Bench_Cable_Flyes` **flat bench cable flyes** [cable]
+- `fedb:Front_Plate_Raise` **front plate raise** [weighted]
+- `fedb:Glute_Ham_Raise` **glute ham raise** [leverage machine]
+- `fedb:High_Cable_Curls` **high cable curls** [cable]
+- `fedb:Hyperextensions_Back_Extensions` **hyperextensions (back extensions)** [body weight]
+- `fedb:Incline_Cable_Chest_Press` **incline cable chest press** [cable]
+- `fedb:Iron_Cross` **iron cross** [dumbbell] — no instructions
+- `fedb:Jogging_Treadmill` **jogging, treadmill** [leverage machine]
+- `fedb:Kneeling_Arm_Drill` **kneeling arm drill** [body weight]
+- `fedb:Linear_3-Part_Start_Technique` **linear 3-part start technique** [body weight]
+- `fedb:Linear_Acceleration_Wall_Drill` **linear acceleration wall drill** [body weight]
+- `fedb:London_Bridges` **london bridges** [body weight]
+- `fedb:Low_Cable_Crossover` **low cable crossover** [cable]
+- `fedb:Lying_Triceps_Press` **lying triceps press** [ez barbell]
+- `fedb:Monster_Walk` **monster walk** [band]
+- `fedb:Moving_Claw_Series` **moving claw series** [body weight]
+- `fedb:One-Arm_Kettlebell_Swings` **one-arm kettlebell swings** [kettlebell] — no instructions
+- `fedb:Parallel_Bar_Dip` **parallel bar dip** [body weight]
+- `fedb:Push-Ups_-_Close_Triceps_Position` **push-ups - close triceps position** [body weight]
+- `fedb:Push-Ups_With_Feet_Elevated` **push-ups with feet elevated** [body weight]
+- `fedb:Push_Press` **push press** [barbell] — no instructions
+- `fedb:Rope_Crunch` **rope crunch** [cable]
+- `fedb:Rope_Jumping` **rope jumping** [rope]
+- `fedb:Running_Treadmill` **running, treadmill** [leverage machine]
+- `fedb:Side_Bridge` **side bridge** [body weight] — no instructions
+- `fedb:Side_Jackknife` **side jackknife** [body weight] — no instructions
+- `fedb:Single-Cone_Sprint_Drill` **single-cone sprint drill** [body weight]
+- `fedb:Sit-Up` **sit-up** [body weight]
+- `fedb:Stairmaster` **stairmaster** [stepmill machine]
+- `fedb:Standing_Biceps_Cable_Curl` **standing biceps cable curl** [cable]
+- `fedb:Step_Mill` **step mill** [stepmill machine]
+- `fedb:Stiff-Legged_Barbell_Deadlift` **stiff-legged barbell deadlift** [barbell]
+- `fedb:Stiff-Legged_Dumbbell_Deadlift` **stiff-legged dumbbell deadlift** [dumbbell]
+- `fedb:Thigh_Abductor` **thigh abductor** [leverage machine]
+- `fedb:Thigh_Adductor` **thigh adductor** [leverage machine]
+- `fedb:Trail_Running_Walking` **trail running/walking** [body weight]
+- `fedb:Weighted_Crunches` **weighted crunches** [medicine ball]
+- `fedb:Weighted_Sissy_Squat` **weighted sissy squat** [barbell]
+- `fedb:Wide-Grip_Lat_Pulldown` **wide-grip lat pulldown** [cable]
+- `fedb:Wrist_Roller` **wrist roller** [body weight]
+- `lh:plank` **plank** [body weight] — no instructions
+- `lh:dip-bar` **dip** [body weight]
+- `lh:curl-bodyweight` **curl** [body weight]
+- `lh:chest-fly-dumbbell` **dumbbell chest fly** [dumbbell]
+- `lh:high-to-low-wood-chop-cable` **cable high to low wood chop** [cable]
+- `lh:chest-fly-machine` **machine chest fly** [leverage machine]
+- `lh:row-dumbbell` **dumbbell row** [dumbbell]
+- `lh:kneeling-ab-wheel-roll-out` **kneeling ab wheel roll-out** [wheel roller]
+- `lh:curl-dumbbell` **dumbbell curl** [dumbbell]
+- `lh:one-handed-row-dumbbell` **dumbbell one-handed row** [dumbbell]
+- `lh:one-handed-overhead-tricep-extension-dumbbell` **dumbbell one-handed overhead tricep extension** [dumbbell]
+- `lh:single-arm-hang-bar` **single-arm hang** [body weight]
+- `lh:pec-deck` **pec deck** [leverage machine]
+- `lh:crunch-machine` **machine crunch** [leverage machine]
+- `lh:curl-machine` **machine curl** [leverage machine]
+- `lh:row-barbell` **barbell row** [barbell]
+- `lh:tricep-pushdown-cable-with-rope` **cable rope tricep pushdown** [cable]
+- `lh:perfect-hang` **perfect hang** [body weight]
+- `lh:box-step-up` **box step-up** [body weight]
+- `lh:skull-crusher-barbell` **barbell skull crusher** [barbell]
+- `lh:skull-crusher-dumbbell` **dumbbell skull crusher** [dumbbell]
+- `lh:sumo-squat-barbell` **barbell sumo squat** [barbell]
+- `lh:cardio-bike` **bike** [stationary bike]
+- `lh:cardio-elliptical` **elliptical** [elliptical machine]
+- `lh:cardio-stair-climb` **stair climb** [stepmill machine]
+- `lh:cardio-aerobics-class` **aerobics class** [body weight]
+- `lh:cardio-high-intensity-interval-training` **high-intensity interval training (hiit)** [body weight]
+
+## Equipment guessed (source named none)
+
+- `fedb:Adductor_Groin` adductor/groin → body weight
+- `fedb:Alternate_Leg_Diagonal_Bound` alternate leg diagonal bound → body weight
+- `fedb:Ankle_On_The_Knee` ankle on the knee → body weight
+- `fedb:Arm_Circles` arm circles → body weight
+- `fedb:Atlas_Stone_Trainer` atlas stone trainer → weighted
+- `fedb:Atlas_Stones` atlas stones → weighted
+- `fedb:Backward_Drag` backward drag → weighted
+- `fedb:Bear_Crawl_Sled_Drags` bear crawl sled drags → weighted
+- `fedb:Bench_Sprint` bench sprint → body weight
+- `fedb:Box_Jump_Multiple_Response` box jump (multiple response) → body weight
+- `fedb:Box_Skip` box skip → body weight
+- `fedb:Car_Deadlift` car deadlift → weighted
+- `fedb:Carioca_Quick_Step` carioca quick step → body weight
+- `fedb:Cat_Stretch` cat stretch → body weight
+- `fedb:Chain_Handle_Extension` chain handle extension → weighted
+- `fedb:Chain_Press` chain press → weighted
+- `fedb:Chair_Upper_Body_Stretch` chair upper body stretch → body weight
+- `fedb:Childs_Pose` child's pose → body weight
+- `fedb:Chin_To_Chest_Stretch` chin to chest stretch → body weight
+- `fedb:Circus_Bell` circus bell → weighted
+- `fedb:Conans_Wheel` conan's wheel → weighted
+- `fedb:Crossover_Reverse_Lunge` crossover reverse lunge → body weight
+- `fedb:Crucifix` crucifix → weighted
+- `fedb:Dancers_Stretch` dancer's stretch → body weight
+- `fedb:Depth_Jump_Leap` depth jump leap → body weight
+- `fedb:Drop_Push` drop push → body weight
+- `fedb:Dynamic_Back_Stretch` dynamic back stretch → body weight
+- `fedb:Elbow_Circles` elbow circles → body weight
+- `fedb:Elbows_Back` elbows back → body weight
+- `fedb:Forward_Drag_with_Press` forward drag with press → weighted
+- `fedb:Frog_Hops` frog hops → body weight
+- `fedb:Front_Box_Jump` front box jump → body weight
+- `fedb:Front_Cone_Hops_or_hurdle_hops` front cone hops (or hurdle hops) → body weight
+- `fedb:Groin_and_Back_Stretch` groin and back stretch → body weight
+- `fedb:Heavy_Bag_Thrust` heavy bag thrust → body weight
+- `fedb:Hug_Knees_To_Chest` hug knees to chest → body weight
+- `fedb:Hurdle_Hops` hurdle hops → body weight
+- `fedb:Intermediate_Groin_Stretch` intermediate groin stretch → body weight
+- `fedb:Keg_Load` keg load → weighted
+- `fedb:Knee_Across_The_Body` knee across the body → body weight
+- `fedb:Kneeling_Forearm_Stretch` kneeling forearm stretch → body weight
+- `fedb:Kneeling_Hip_Flexor` kneeling hip flexor → body weight
+- `fedb:Lateral_Box_Jump` lateral box jump → body weight
+- `fedb:Lateral_Cone_Hops` lateral cone hops → body weight
+- `fedb:Linear_Depth_Jump` linear depth jump → body weight
+- `fedb:Log_Lift` log lift → weighted
+- `fedb:Looking_At_Ceiling` looking at ceiling → body weight
+- `fedb:Lying_Bent_Leg_Groin` lying bent leg groin → body weight
+- `fedb:Lying_Face_Down_Plate_Neck_Resistance` lying face down plate neck resistance → weighted
+- `fedb:Lying_Hamstring` lying hamstring → body weight
+- `fedb:Middle_Back_Stretch` middle back stretch → body weight
+- `fedb:Mixed_Grip_Chin` mixed grip chin → body weight
+- `fedb:On-Your-Back_Quad_Stretch` on-your-back quad stretch → body weight
+- `fedb:One_Half_Locust` one half locust → body weight
+- `fedb:One_Handed_Hang` one handed hang → body weight
+- `fedb:One_Knee_To_Chest` one knee to chest → body weight
+- `fedb:Overhead_Lat` overhead lat → body weight
+- `fedb:Plate_Pinch` plate pinch → weighted
+- `fedb:Plate_Twist` plate twist → weighted
+- `fedb:Platform_Hamstring_Slides` platform hamstring slides → body weight
+- `fedb:Power_Stairs` power stairs → weighted
+- `fedb:Prone_Manual_Hamstring` prone manual hamstring → body weight
+- `fedb:Prowler_Sprint` prowler sprint → body weight
+- `fedb:Quick_Leap` quick leap → body weight
+- `fedb:Reverse_Plate_Curls` reverse plate curls → weighted
+- `fedb:Rickshaw_Carry` rickshaw carry → weighted
+- `fedb:Rickshaw_Deadlift` rickshaw deadlift → weighted
+- `fedb:Round_The_World_Shoulder_Stretch` round the world shoulder stretch → body weight
+- `fedb:Sandbag_Load` sandbag load → weighted
+- `fedb:Seated_Floor_Hamstring_Stretch` seated floor hamstring stretch → body weight
+- `fedb:Seated_Hamstring` seated hamstring → body weight
+- `fedb:Seated_Head_Harness_Neck_Resistance` seated head harness neck resistance → weighted
+- `fedb:Seated_Overhead_Stretch` seated overhead stretch → body weight
+- `fedb:Shoulder_Circles` shoulder circles → body weight
+- `fedb:Shoulder_Raise` shoulder raise → body weight
+- `fedb:Shoulder_Stretch` shoulder stretch → body weight
+- `fedb:Side_Hop-Sprint` side hop-sprint → body weight
+- `fedb:Side_Lying_Groin_Stretch` side lying groin stretch → body weight
+- `fedb:Side_Standing_Long_Jump` side standing long jump → body weight
+- `fedb:Side_to_Side_Box_Shuffle` side to side box shuffle → body weight
+- `fedb:Single-Leg_High_Box_Squat` single-leg high box squat → body weight
+- `fedb:Single-Leg_Hop_Progression` single-leg hop progression → body weight
+- `fedb:Single-Leg_Stride_Jump` single-leg stride jump → body weight
+- `fedb:Single_Leg_Push-off` single leg push-off → body weight
+- `fedb:Sit_Squats` sit squats → body weight
+- `fedb:Skating` skating → body weight
+- `fedb:Sled_Drag_-_Harness` sled drag - harness → weighted
+- `fedb:Sled_Overhead_Backward_Walk` sled overhead backward walk → weighted
+- `fedb:Sled_Overhead_Triceps_Extension` sled overhead triceps extension → weighted
+- `fedb:Sled_Push` sled push → weighted
+- `fedb:Sled_Reverse_Flye` sled reverse flye → weighted
+- `fedb:Sled_Row` sled row → weighted
+- `fedb:Spinal_Stretch` spinal stretch → body weight
+- `fedb:Standing_Biceps_Stretch` standing biceps stretch → body weight
+- `fedb:Standing_Elevated_Quad_Stretch` standing elevated quad stretch → body weight
+- `fedb:Standing_Hip_Flexors` standing hip flexors → body weight
+- `fedb:Standing_Soleus_And_Achilles_Stretch` standing soleus and achilles stretch → body weight
+- `fedb:Stride_Jump_Crossover` stride jump crossover → body weight
+- `fedb:The_Straddle` the straddle → body weight
+- `fedb:Upper_Back-Leg_Grab` upper back-leg grab → body weight
+- `fedb:Upward_Stretch` upward stretch → body weight
+- `fedb:Windmills` windmills → body weight
+- `fedb:Yoke_Walk` yoke walk → weighted
+
+## Duplicates
+
+- `fedb:3_4_Sit-Up` **3/4 sit-up** [body weight] ≈ 0001 *3/4 sit-up*
+- `fedb:Advanced_Kettlebell_Windmill` **advanced kettlebell windmill** [kettlebell] ≈ 0517 *kettlebell advanced windmill*
+- `fedb:Air_Bike` **air bike** [body weight] ≈ 0003 *air bike*
+- `fedb:Alternate_Hammer_Curl` **alternate hammer curl** [dumbbell] ≈ 0313 *dumbbell hammer curl*
+- `fedb:Alternate_Heel_Touchers` **alternate heel touchers** [body weight] ≈ 0006 *alternate heel touchers*
+- `fedb:Alternate_Incline_Dumbbell_Curl` **alternate incline dumbbell curl** [dumbbell] ≈ 0318 *dumbbell incline curl*
+- `fedb:Alternating_Cable_Shoulder_Press` **alternating cable shoulder press** [cable] ≈ 0148 *cable alternate shoulder press*
+- `fedb:Alternating_Floor_Press` **alternating floor press** [kettlebell] ≈ 0519 *kettlebell alternating press on floor*
+- `fedb:Alternating_Hang_Clean` **alternating hang clean** [kettlebell] ≈ 0518 *kettlebell alternating hang clean*
+- `fedb:Alternating_Kettlebell_Press` **alternating kettlebell press** [kettlebell] ≈ 0520 *kettlebell alternating press*
+- `fedb:Alternating_Kettlebell_Row` **alternating kettlebell row** [kettlebell] ≈ 0522 *kettlebell alternating row*
+- `fedb:Alternating_Renegade_Row` **alternating renegade row** [kettlebell] ≈ 0521 *kettlebell alternating renegade row*
+- `fedb:Ankle_Circles` **ankle circles** [body weight] ≈ 1368 *ankle circles*
+- `fedb:Arnold_Dumbbell_Press` **arnold dumbbell press** [dumbbell] ≈ 2137 *dumbbell arnold press*
+- `fedb:Balance_Board` **balance board** [body weight] ≈ 0020 *balance board*
+- `fedb:Band_Assisted_Pull-Up` **band assisted pull-up** [band] ≈ 0970 *band assisted pull-up*
+- `fedb:Barbell_Curl` **barbell curl** [barbell] ≈ 0031 *barbell curl*
+- `fedb:Barbell_Deadlift` **barbell deadlift** [barbell] ≈ 0032 *barbell deadlift*
+- `fedb:Barbell_Full_Squat` **barbell full squat** [barbell] ≈ 0043 *barbell full squat*
+- `fedb:Barbell_Glute_Bridge` **barbell glute bridge** [barbell] ≈ 1409 *barbell glute bridge*
+- `fedb:Barbell_Guillotine_Bench_Press` **barbell guillotine bench press** [barbell] ≈ 0045 *barbell guillotine bench press*
+- `fedb:Barbell_Hack_Squat` **barbell hack squat** [barbell] ≈ 0046 *barbell hack squat*
+- `fedb:Barbell_Incline_Shoulder_Raise` **barbell incline shoulder raise** [barbell] ≈ 0050 *barbell incline shoulder raise*
+- `fedb:Barbell_Lunge` **barbell lunge** [barbell] ≈ 0054 *barbell lunge*
+- `fedb:Barbell_Rear_Delt_Row` **barbell rear delt row** [barbell] ≈ 0076 *barbell rear delt row*
+- `fedb:Barbell_Seated_Calf_Raise` **barbell seated calf raise** [barbell] ≈ 0088 *barbell seated calf raise*
+- `fedb:Barbell_Shrug` **barbell shrug** [barbell] ≈ 0095 *barbell shrug*
+- `fedb:Barbell_Side_Split_Squat` **barbell side split squat** [barbell] ≈ 0098 *barbell side split squat*
+- `fedb:Barbell_Squat` **barbell squat** [barbell] ≈ 0043 *barbell full squat*
+- `fedb:Barbell_Squat_To_A_Bench` **barbell squat to a bench** [barbell] ≈ 0026 *barbell bench squat*
+- `fedb:Barbell_Step_Ups` **barbell step ups** [barbell] ≈ 0114 *barbell step-up*
+- `fedb:Battling_Ropes` **battling ropes** [rope] ≈ 0128 *battling ropes*
+- `fedb:Behind_Head_Chest_Stretch` **behind head chest stretch** [body weight] ≈ 1259 *behind head chest stretch*
+- `fedb:Bench_Press_-_With_Bands` **bench press - with bands** [band] ≈ 1254 *band bench press*
+- `fedb:Bent-Arm_Barbell_Pullover` **bent-arm barbell pullover** [barbell] ≈ 1316 *barbell bent arm pullover*
+- `fedb:Bent-Knee_Hip_Raise` **bent-knee hip raise** [body weight] ≈ 0484 *hip raise (bent knee)*
+- `fedb:Bent_Over_Barbell_Row` **bent over barbell row** [barbell] ≈ 0027 *barbell bent over row*
+- `fedb:Bent_Over_Two-Dumbbell_Row` **bent over two-dumbbell row** [dumbbell] ≈ 0293 *dumbbell bent over row*
+- `fedb:Bent_Press` **bent press** [kettlebell] ≈ 0524 *kettlebell bent press*
+- `fedb:Body-Up` **body-up** [body weight] ≈ 0137 *body-up*
+- `fedb:Body_Tricep_Press` **body tricep press** [body weight] ≈ 0816 *triceps press*
+- `fedb:Bodyweight_Walking_Lunge` **bodyweight walking lunge** [body weight] ≈ 1460 *walking lunge*
+- `fedb:Bosu_Ball_Cable_Crunch_With_Side_Bends` **bosu ball cable crunch with side bends** [cable] ≈ 0221 *cable side bend crunch (bosu ball)*
+- `fedb:Bottoms-Up_Clean_From_The_Hang_Position` **bottoms-up clean from the hang position** [kettlebell] ≈ 0525 *kettlebell bottoms up clean from the hang position*
+- `fedb:Bottoms_Up` **bottoms up** [body weight] ≈ 0138 *bottoms-up*
+- `fedb:Box_Squat_with_Bands` **box squat with bands** [barbell] ≈ fe_39d29d43 *box squat*
+- `fedb:Butt-Ups` **butt-ups** [body weight] ≈ 0870 *butt-ups*
+- `fedb:Cable_Crunch` **cable crunch** [cable] ≈ 0223 *cable side crunch*
+- `fedb:Cable_Deadlifts` **cable deadlifts** [cable] ≈ 0157 *cable deadlift*
+- `fedb:Cable_Hip_Adduction` **cable hip adduction** [cable] ≈ 0168 *cable hip adduction*
+- `fedb:Cable_Incline_Pushdown` **cable incline pushdown** [cable] ≈ 0172 *cable incline pushdown*
+- `fedb:Cable_Incline_Triceps_Extension` **cable incline triceps extension** [cable] ≈ 0173 *cable incline triceps extension*
+- `fedb:Cable_Judo_Flip` **cable judo flip** [cable] ≈ 0174 *cable judo flip*
+- `fedb:Cable_Preacher_Curl` **cable preacher curl** [cable] ≈ 0195 *cable preacher curl*
+- `fedb:Cable_Reverse_Crunch` **cable reverse crunch** [cable] ≈ 0873 *cable reverse crunch*
+- `fedb:Cable_Rope_Rear-Delt_Rows` **cable rope rear-delt rows** [cable] ≈ 0203 *cable rear delt row (with rope)*
+- `fedb:Cable_Seated_Crunch` **cable seated crunch** [cable] ≈ 0212 *cable seated crunch*
+- `fedb:Cable_Shoulder_Press` **cable shoulder press** [cable] ≈ 0219 *cable shoulder press*
+- `fedb:Cable_Shrugs` **cable shrugs** [cable] ≈ 0220 *cable shrug*
+- `fedb:Cable_Wrist_Curl` **cable wrist curl** [cable] ≈ 0247 *cable wrist curl*
+- `fedb:Calf_Press` **calf press** [leverage machine] ≈ 2289 *lever calf press*
+- `fedb:Calf_Stretch_Hands_Against_Wall` **calf stretch hands against wall** [body weight] ≈ 1377 *calf stretch with hands against wall*
+- `fedb:Chair_Leg_Extended_Stretch` **chair leg extended stretch** [body weight] ≈ 1548 *chair leg extended stretch*
+- `fedb:Chest_And_Front_Of_Shoulder_Stretch` **chest and front of shoulder stretch** [body weight] ≈ 1271 *chest and front of shoulder stretch*
+- `fedb:Chin-Up` **chin-up** [body weight] ≈ 1326 *chin-up*
+- `fedb:Clean_and_Press` **clean and press** [barbell] ≈ 0028 *barbell clean and press*
+- `fedb:Clock_Push-Up` **clock push-up** [body weight] ≈ 0258 *clock push-up*
+- `fedb:Close-Grip_Barbell_Bench_Press` **close-grip barbell bench press** [barbell] ≈ 0030 *barbell close-grip bench press*
+- `fedb:Close-Grip_Dumbbell_Press` **close-grip dumbbell press** [dumbbell] ≈ 1731 *dumbbell close grip press*
+- `fedb:Close-Grip_Push-Up_off_of_a_Dumbbell` **close-grip push-up off of a dumbbell** [body weight] ≈ 0660 *push-up close-grip off dumbbell*
+- `fedb:Close-Grip_Standing_Barbell_Curl` **close-grip standing barbell curl** [barbell] ≈ 0106 *barbell standing close grip curl*
+- `fedb:Cocoons` **cocoons** [body weight] ≈ 0260 *cocoons*
+- `fedb:Concentration_Curls` **concentration curls** [dumbbell] ≈ 0297 *dumbbell concentration curl*
+- `fedb:Cross-Body_Crunch` **cross-body crunch** [body weight] ≈ 0262 *cross body crunch*
+- `fedb:Cross_Body_Hammer_Curl` **cross body hammer curl** [dumbbell] ≈ 0298 *dumbbell cross body hammer curl*
+- `fedb:Crunch_-_Hands_Overhead` **crunch - hands overhead** [body weight] ≈ 0267 *crunch (hands overhead)*
+- `fedb:Cuban_Press` **cuban press** [dumbbell] ≈ 0299 *dumbbell cuban press*
+- `fedb:Dead_Bug` **dead bug** [body weight] ≈ 0276 *dead bug*
+- `fedb:Deadlift_with_Bands` **deadlift with bands** [barbell] ≈ 0032 *barbell deadlift*
+- `fedb:Decline_Barbell_Bench_Press` **decline barbell bench press** [barbell] ≈ 0033 *barbell decline bench press*
+- `fedb:Decline_Crunch` **decline crunch** [body weight] ≈ 0277 *decline crunch*
+- `fedb:Decline_Dumbbell_Bench_Press` **decline dumbbell bench press** [dumbbell] ≈ 0301 *dumbbell decline bench press*
+- `fedb:Decline_Dumbbell_Flyes` **decline dumbbell flyes** [dumbbell] ≈ 0302 *dumbbell decline fly*
+- `fedb:Decline_Dumbbell_Triceps_Extension` **decline dumbbell triceps extension** [dumbbell] ≈ 0306 *dumbbell decline triceps extension*
+- `fedb:Decline_Push-Up` **decline push-up** [body weight] ≈ 0279 *decline push-up*
+- `fedb:Dips_-_Chest_Version` **dips - chest version** [body weight] ≈ 0251 *chest dip*
+- `fedb:Dips_-_Triceps_Version` **dips - triceps version** [body weight] ≈ 0814 *triceps dip*
+- `fedb:Donkey_Calf_Raises` **donkey calf raises** [body weight] ≈ 0284 *donkey calf raise*
+- `fedb:Double_Kettlebell_Alternating_Hang_Clean` **double kettlebell alternating hang clean** [kettlebell] ≈ 0526 *kettlebell double alternating hang clean*
+- `fedb:Double_Kettlebell_Jerk` **double kettlebell jerk** [kettlebell] ≈ 0527 *kettlebell double jerk*
+- `fedb:Double_Kettlebell_Push_Press` **double kettlebell push press** [kettlebell] ≈ 0528 *kettlebell double push press*
+- `fedb:Double_Kettlebell_Snatch` **double kettlebell snatch** [kettlebell] ≈ 0529 *kettlebell double snatch*
+- `fedb:Double_Kettlebell_Windmill` **double kettlebell windmill** [kettlebell] ≈ 0530 *kettlebell double windmill*
+- `fedb:Drag_Curl` **drag curl** [barbell] ≈ 0038 *barbell drag curl*
+- `fedb:Dumbbell_Alternate_Bicep_Curl` **dumbbell alternate bicep curl** [dumbbell] ≈ 0285 *dumbbell alternate biceps curl*
+- `fedb:Dumbbell_Bench_Press` **dumbbell bench press** [dumbbell] ≈ 0289 *dumbbell bench press*
+- `fedb:Dumbbell_Bench_Press_with_Neutral_Grip` **dumbbell bench press with neutral grip** [dumbbell] ≈ 0352 *dumbbell neutral grip bench press*
+- `fedb:Dumbbell_Bicep_Curl` **dumbbell bicep curl** [dumbbell] ≈ 0294 *dumbbell biceps curl*
+- `fedb:Dumbbell_Clean` **dumbbell clean** [dumbbell] ≈ 0295 *dumbbell clean*
+- `fedb:Dumbbell_Flyes` **dumbbell flyes** [dumbbell] ≈ 0308 *dumbbell fly*
+- `fedb:Dumbbell_Incline_Row` **dumbbell incline row** [dumbbell] ≈ 0327 *dumbbell incline row*
+- `fedb:Dumbbell_Incline_Shoulder_Raise` **dumbbell incline shoulder raise** [dumbbell] ≈ 0328 *dumbbell incline shoulder raise*
+- `fedb:Dumbbell_Lunges` **dumbbell lunges** [dumbbell] ≈ 0336 *dumbbell lunge*
+- `fedb:Dumbbell_Lying_One-Arm_Rear_Lateral_Raise` **dumbbell lying one-arm rear lateral raise** [dumbbell] ≈ 0345 *dumbbell lying one arm rear lateral raise*
+- `fedb:Dumbbell_Lying_Pronation` **dumbbell lying pronation** [dumbbell] ≈ 0347 *dumbbell lying pronation*
+- `fedb:Dumbbell_Lying_Rear_Lateral_Raise` **dumbbell lying rear lateral raise** [dumbbell] ≈ 0348 *dumbbell lying rear lateral raise*
+- `fedb:Dumbbell_Lying_Supination` **dumbbell lying supination** [dumbbell] ≈ 0349 *dumbbell lying supination*
+- `fedb:Dumbbell_One-Arm_Shoulder_Press` **dumbbell one-arm shoulder press** [dumbbell] ≈ 0361 *dumbbell one arm shoulder press*
+- `fedb:Dumbbell_One-Arm_Upright_Row` **dumbbell one-arm upright row** [dumbbell] ≈ 0363 *dumbbell one arm upright row*
+- `fedb:Dumbbell_Prone_Incline_Curl` **dumbbell prone incline curl** [dumbbell] ≈ 0374 *dumbbell prone incline curl*
+- `fedb:Dumbbell_Raise` **dumbbell raise** [dumbbell] ≈ 0376 *dumbbell raise*
+- `fedb:Dumbbell_Rear_Lunge` **dumbbell rear lunge** [dumbbell] ≈ 0381 *dumbbell rear lunge*
+- `fedb:Dumbbell_Seated_One-Leg_Calf_Raise` **dumbbell seated one-leg calf raise** [dumbbell] ≈ 0400 *dumbbell seated one leg calf raise*
+- `fedb:Dumbbell_Shrug` **dumbbell shrug** [dumbbell] ≈ 0406 *dumbbell shrug*
+- `fedb:Dumbbell_Side_Bend` **dumbbell side bend** [dumbbell] ≈ 0407 *dumbbell side bend*
+- `fedb:Dumbbell_Squat` **dumbbell squat** [dumbbell] ≈ 0413 *dumbbell squat*
+- `fedb:Dumbbell_Squat_To_A_Bench` **dumbbell squat to a bench** [dumbbell] ≈ 0291 *dumbbell bench squat*
+- `fedb:Dumbbell_Step_Ups` **dumbbell step ups** [dumbbell] ≈ 0431 *dumbbell step-up*
+- `fedb:Dynamic_Chest_Stretch` **dynamic chest stretch** [body weight] ≈ 1167 *dynamic chest stretch (male)*
+- `fedb:Elbow_to_Knee` **elbow to knee** [body weight] ≈ 0443 *elbow-to-knee*
+- `fedb:Extended_Range_One-Arm_Kettlebell_Floor_Press` **extended range one-arm kettlebell floor press** [kettlebell] ≈ 0531 *kettlebell extended range one arm press on floor*
+- `fedb:Finger_Curls` **finger curls** [barbell] ≈ 0455 *finger curls*
+- `fedb:Flat_Bench_Leg_Pull-In` **flat bench leg pull-in** [body weight] ≈ 0570 *leg pull in flat bench*
+- `fedb:Flat_Bench_Lying_Leg_Raise` **flat bench lying leg raise** [body weight] ≈ 0620 *lying leg raise flat bench*
+- `fedb:Flutter_Kicks` **flutter kicks** [body weight] ≈ 0459 *flutter kicks*
+- `fedb:Frankenstein_Squat` **frankenstein squat** [barbell] ≈ 3194 *frankenstein squat*
+- `fedb:Front_Barbell_Squat` **front barbell squat** [barbell] ≈ 0042 *barbell front squat*
+- `fedb:Front_Barbell_Squat_To_A_Bench` **front barbell squat to a bench** [barbell] ≈ 0024 *barbell bench front squat*
+- `fedb:Front_Cable_Raise` **front cable raise** [cable] ≈ 0162 *cable front raise*
+- `fedb:Front_Dumbbell_Raise` **front dumbbell raise** [dumbbell] ≈ 0310 *dumbbell front raise*
+- `fedb:Front_Raise_And_Pullover` **front raise and pullover** [barbell] ≈ 0040 *barbell front raise and pullover*
+- `fedb:Front_Squat_Clean_Grip` **front squat (clean grip)** [barbell] ≈ 0029 *barbell clean-grip front squat*
+- `fedb:Front_Squats_With_Two_Kettlebells` **front squats with two kettlebells** [kettlebell] ≈ 0533 *kettlebell front squat*
+- `fedb:Front_Two-Dumbbell_Raise` **front two-dumbbell raise** [dumbbell] ≈ 0310 *dumbbell front raise*
+- `fedb:Full_Range-Of-Motion_Lat_Pulldown` **full range-of-motion lat pulldown** [cable] ≈ 2330 *cable lat pulldown full range of motion*
+- `fedb:Gironda_Sternum_Chins` **gironda sternum chins** [body weight] ≈ 0466 *gironda sternum chin*
+- `fedb:Goblet_Squat` **goblet squat** [kettlebell] ≈ 0534 *kettlebell goblet squat*
+- `fedb:Good_Morning` **good morning** [barbell] ≈ 0044 *barbell good morning*
+- `fedb:Hammer_Curls` **hammer curls** [dumbbell] ≈ 0313 *dumbbell hammer curl*
+- `fedb:Hamstring_Stretch` **hamstring stretch** [body weight] ≈ 1511 *hamstring stretch*
+- `fedb:Handstand_Push-Ups` **handstand push-ups** [body weight] ≈ 0471 *handstand push-up*
+- `fedb:Hanging_Leg_Raise` **hanging leg raise** [body weight] ≈ 0472 *hanging leg raise*
+- `fedb:Hanging_Pike` **hanging pike** [body weight] ≈ 0473 *hanging pike*
+- `fedb:Hip_Lift_with_Band` **hip lift with band** [band] ≈ 1408 *band hip lift*
+- `fedb:Hug_A_Ball` **hug a ball** [stability ball] ≈ 1338 *exercise ball hug*
+- `fedb:Inchworm` **inchworm** [body weight] ≈ 1471 *inchworm*
+- `fedb:Incline_Cable_Flye` **incline cable flye** [cable] ≈ 0171 *cable incline fly*
+- `fedb:Incline_Dumbbell_Curl` **incline dumbbell curl** [dumbbell] ≈ 0318 *dumbbell incline curl*
+- `fedb:Incline_Dumbbell_Flyes` **incline dumbbell flyes** [dumbbell] ≈ 0319 *dumbbell incline fly*
+- `fedb:Incline_Dumbbell_Press` **incline dumbbell press** [dumbbell] ≈ 3545 *dumbbell incline alternate press*
+- `fedb:Incline_Hammer_Curls` **incline hammer curls** [dumbbell] ≈ 0320 *dumbbell incline hammer curl*
+- `fedb:Incline_Inner_Biceps_Curl` **incline inner biceps curl** [dumbbell] ≈ 0322 *dumbbell incline inner biceps curl*
+- `fedb:Incline_Push-Up` **incline push-up** [body weight] ≈ 0493 *incline push-up*
+- `fedb:Incline_Push-Up_Close-Grip` **incline push-up close-grip** [body weight] ≈ 0490 *incline close-grip push-up*
+- `fedb:Incline_Push-Up_Depth_Jump` **incline push-up depth jump** [body weight] ≈ 0492 *incline push up depth jump*
+- `fedb:Incline_Push-Up_Reverse_Grip` **incline push-up reverse grip** [body weight] ≈ 0494 *incline reverse grip push-up*
+- `fedb:Intermediate_Hip_Flexor_and_Quad_Stretch` **intermediate hip flexor and quad stretch** [body weight] ≈ 1564 *intermediate hip flexor and quad stretch*
+- `fedb:Inverted_Row` **inverted row** [body weight] ≈ 0499 *inverted row*
+- `fedb:Inverted_Row_with_Straps` **inverted row with straps** [body weight] ≈ 0498 *inverted row with straps*
+- `fedb:Iron_Crosses_stretch` **iron crosses (stretch)** [body weight] ≈ 1419 *iron cross stretch*
+- `fedb:Isometric_Chest_Squeezes` **isometric chest squeezes** [body weight] ≈ 1297 *isometric chest squeeze*
+- `fedb:Isometric_Wipers` **isometric wipers** [body weight] ≈ 0500 *isometric wipers*
+- `fedb:Jackknife_Sit-Up` **jackknife sit-up** [body weight] ≈ 0507 *jackknife sit-up*
+- `fedb:Janda_Sit-Up` **janda sit-up** [body weight] ≈ 0508 *janda sit-up*
+- `fedb:Jefferson_Squats` **jefferson squats** [barbell] ≈ 0051 *barbell jefferson squat*
+- `fedb:Kettlebell_Arnold_Press` **kettlebell arnold press** [kettlebell] ≈ 0523 *kettlebell arnold press*
+- `fedb:Kettlebell_Figure_8` **kettlebell figure 8** [kettlebell] ≈ 0532 *kettlebell figure 8*
+- `fedb:Kettlebell_Hang_Clean` **kettlebell hang clean** [kettlebell] ≈ 0535 *kettlebell hang clean*
+- `fedb:Kettlebell_Pistol_Squat` **kettlebell pistol squat** [kettlebell] ≈ 0544 *kettlebell pistol squat*
+- `fedb:Kettlebell_Seated_Press` **kettlebell seated press** [kettlebell] ≈ 0546 *kettlebell seated press*
+- `fedb:Kettlebell_Seesaw_Press` **kettlebell seesaw press** [kettlebell] ≈ 0547 *kettlebell seesaw press*
+- `fedb:Kettlebell_Sumo_High_Pull` **kettlebell sumo high pull** [kettlebell] ≈ 0548 *kettlebell sumo high pull*
+- `fedb:Kettlebell_Thruster` **kettlebell thruster** [kettlebell] ≈ 0550 *kettlebell thruster*
+- `fedb:Kettlebell_Turkish_Get-Up_Squat_style` **kettlebell turkish get-up (squat style)** [kettlebell] ≈ 0551 *kettlebell turkish get up (squat style)*
+- `fedb:Kettlebell_Windmill` **kettlebell windmill** [kettlebell] ≈ 0554 *kettlebell windmill*
+- `fedb:Kipping_Muscle_Up` **kipping muscle up** [body weight] ≈ 0558 *kipping muscle up*
+- `fedb:Kneeling_Cable_Triceps_Extension` **kneeling cable triceps extension** [cable] ≈ 0176 *cable kneeling triceps extension*
+- `fedb:Kneeling_Jump_Squat` **kneeling jump squat** [barbell] ≈ 1420 *kneeling jump squat*
+- `fedb:Leg-Up_Hamstring_Stretch` **leg-up hamstring stretch** [body weight] ≈ 1576 *leg up hamstring stretch*
+- `fedb:Leg_Extensions` **leg extensions** [leverage machine] ≈ 0585 *lever leg extension*
+- `fedb:Leg_Press` **leg press** [sled machine] ≈ 2287 *lever alternate leg press*
+- `fedb:Leverage_Chest_Press` **leverage chest press** [leverage machine] ≈ 0577 *lever chest press*
+- `fedb:Leverage_Deadlift` **leverage deadlift** [leverage machine] ≈ 0578 *lever deadlift*
+- `fedb:Leverage_Decline_Chest_Press` **leverage decline chest press** [leverage machine] ≈ 1300 *lever decline chest press*
+- `fedb:Leverage_High_Row` **leverage high row** [leverage machine] ≈ 0581 *lever high row*
+- `fedb:Leverage_Incline_Chest_Press` **leverage incline chest press** [leverage machine] ≈ 1299 *lever incline chest press*
+- `fedb:Leverage_Shoulder_Press` **leverage shoulder press** [leverage machine] ≈ 0603 *lever shoulder press*
+- `fedb:Leverage_Shrug` **leverage shrug** [leverage machine] ≈ 0604 *lever shrug*
+- `fedb:Lower_Back_Curl` **lower back curl** [body weight] ≈ 1352 *lower back curl*
+- `fedb:Lunge_Pass_Through` **lunge pass through** [kettlebell] ≈ 0536 *kettlebell lunge pass through*
+- `fedb:Lying_Dumbbell_Tricep_Extension` **lying dumbbell tricep extension** [dumbbell] ≈ 0351 *dumbbell lying triceps extension*
+- `fedb:Lying_Leg_Curls` **lying leg curls** [leverage machine] ≈ 0586 *lever lying leg curl*
+- `fedb:Lying_Supine_Dumbbell_Curl` **lying supine dumbbell curl** [dumbbell] ≈ 0350 *dumbbell lying supine curl*
+- `fedb:Machine_Bicep_Curl` **machine bicep curl** [leverage machine] ≈ 0575 *lever bicep curl*
+- `fedb:Machine_Preacher_Curls` **machine preacher curls** [leverage machine] ≈ 0592 *lever preacher curl*
+- `fedb:Machine_Triceps_Extension` **machine triceps extension** [leverage machine] ≈ 0607 *lever triceps extension*
+- `fedb:Medicine_Ball_Chest_Pass` **medicine ball chest pass** [medicine ball] ≈ 1302 *medicine ball chest pass*
+- `fedb:Mountain_Climbers` **mountain climbers** [body weight] ≈ 0630 *mountain climber*
+- `fedb:Muscle_Up` **muscle up** [body weight] ≈ 0631 *muscle up*
+- `fedb:Narrow_Stance_Squats` **narrow stance squats** [barbell] ≈ 0063 *barbell narrow stance squat*
+- `fedb:Oblique_Crunches_-_On_The_Floor` **oblique crunches - on the floor** [body weight] ≈ 0635 *oblique crunches floor*
+- `fedb:Olympic_Squat` **olympic squat** [barbell] ≈ 0043 *barbell full squat*
+- `fedb:One-Arm_Incline_Lateral_Raise` **one-arm incline lateral raise** [dumbbell] ≈ 0323 *dumbbell incline one arm lateral raise*
+- `fedb:One-Arm_Kettlebell_Clean_and_Jerk` **one-arm kettlebell clean and jerk** [kettlebell] ≈ 0537 *kettlebell one arm clean and jerk*
+- `fedb:One-Arm_Kettlebell_Floor_Press` **one-arm kettlebell floor press** [kettlebell] ≈ 1298 *kettlebell one arm floor press*
+- `fedb:One-Arm_Kettlebell_Jerk` **one-arm kettlebell jerk** [kettlebell] ≈ 0538 *kettlebell one arm jerk*
+- `fedb:One-Arm_Kettlebell_Military_Press_To_The_Side` **one-arm kettlebell military press to the side** [kettlebell] ≈ 0539 *kettlebell one arm military press to the side*
+- `fedb:One-Arm_Kettlebell_Push_Press` **one-arm kettlebell push press** [kettlebell] ≈ 0540 *kettlebell one arm push press*
+- `fedb:One-Arm_Kettlebell_Row` **one-arm kettlebell row** [kettlebell] ≈ 0541 *kettlebell one arm row*
+- `fedb:One-Arm_Kettlebell_Snatch` **one-arm kettlebell snatch** [kettlebell] ≈ 0542 *kettlebell one arm snatch*
+- `fedb:One-Arm_Medicine_Ball_Slam` **one-arm medicine ball slam** [medicine ball] ≈ 0640 *one arm slam (with medicine ball)*
+- `fedb:One-Arm_Side_Deadlift` **one-arm side deadlift** [barbell] ≈ 0066 *barbell one arm side deadlift*
+- `fedb:One_Arm_Against_Wall` **one arm against wall** [body weight] ≈ 1355 *one arm against wall*
+- `fedb:One_Arm_Chin-Up` **one arm chin-up** [body weight] ≈ 0638 *one arm chin-up*
+- `fedb:One_Arm_Floor_Press` **one arm floor press** [barbell] ≈ 0065 *barbell one arm floor press*
+- `fedb:One_Leg_Barbell_Squat` **one leg barbell squat** [barbell] ≈ 0068 *barbell one leg squat*
+- `fedb:Otis-Up` **otis-up** [weighted] ≈ 0641 *otis up*
+- `fedb:Overhead_Cable_Curl` **overhead cable curl** [cable] ≈ 1636 *cable overhead curl*
+- `fedb:Overhead_Squat` **overhead squat** [barbell] ≈ 0069 *barbell overhead squat*
+- `fedb:Palms-Down_Wrist_Curl_Over_A_Bench` **palms-down wrist curl over a bench** [barbell] ≈ 1411 *barbell palms down wrist curl over a bench*
+- `fedb:Palms-Up_Barbell_Wrist_Curl_Over_A_Bench` **palms-up barbell wrist curl over a bench** [barbell] ≈ 1412 *barbell palms up wrist curl over a bench*
+- `fedb:Pelvic_Tilt_Into_Bridge` **pelvic tilt into bridge** [body weight] ≈ 1422 *pelvic tilt into bridge*
+- `fedb:Peroneals_Stretch` **peroneals stretch** [body weight] ≈ 1388 *peroneals stretch*
+- `fedb:Pin_Presses` **pin presses** [barbell] ≈ 1751 *barbell pin presses*
+- `fedb:Plyo_Kettlebell_Pushups` **plyo kettlebell pushups** [kettlebell] ≈ 0545 *kettlebell plyo push-up*
+- `fedb:Plyo_Push-up` **plyo push-up** [body weight] ≈ 1306 *plyo push up*
+- `fedb:Posterior_Tibialis_Stretch` **posterior tibialis stretch** [body weight] ≈ 1389 *posterior tibialis stretch*
+- `fedb:Power_Clean` **power clean** [barbell] ≈ 0648 *power clean*
+- `fedb:Preacher_Curl` **preacher curl** [barbell] ≈ 0070 *barbell preacher curl*
+- `fedb:Preacher_Hammer_Dumbbell_Curl` **preacher hammer dumbbell curl** [dumbbell] ≈ 1646 *dumbbell alternate hammer preacher curl*
+- `fedb:Press_Sit-Up` **press sit-up** [barbell] ≈ 0071 *barbell press sit-up*
+- `fedb:Pullups` **pullups** [body weight] ≈ 0652 *pull-up*
+- `fedb:Push_Up_to_Side_Plank` **push up to side plank** [body weight] ≈ 0664 *push-up to side plank*
+- `fedb:Pushups` **pushups** [body weight] ≈ 0662 *push-up*
+- `fedb:Rack_Pull_with_Bands` **rack pull with bands** [barbell] ≈ 0074 *barbell rack pull*
+- `fedb:Rack_Pulls` **rack pulls** [barbell] ≈ 0074 *barbell rack pull*
+- `fedb:Reverse_Barbell_Curl` **reverse barbell curl** [barbell] ≈ 0080 *barbell reverse curl*
+- `fedb:Reverse_Barbell_Preacher_Curls` **reverse barbell preacher curls** [ez barbell] ≈ 0081 *barbell reverse preacher curl*
+- `fedb:Reverse_Cable_Curl` **reverse cable curl** [cable] ≈ 0206 *cable reverse curl*
+- `fedb:Reverse_Crunch` **reverse crunch** [body weight] ≈ 0872 *reverse crunch*
+- `fedb:Reverse_Flyes` **reverse flyes** [dumbbell] ≈ 0383 *dumbbell reverse fly*
+- `fedb:Reverse_Grip_Bent-Over_Rows` **reverse grip bent-over rows** [barbell] ≈ 0118 *barbell reverse grip bent over row*
+- `fedb:Reverse_Hyperextension` **reverse hyperextension** [leverage machine] ≈ 0593 *lever reverse hyperextension*
+- `fedb:Ring_Dips` **ring dips** [body weight] ≈ 0677 *ring dips*
+- `fedb:Rocky_Pull-Ups_Pulldowns` **rocky pull-ups/pulldowns** [body weight] ≈ 0678 *rocky pull-up pulldown*
+- `fedb:Romanian_Deadlift` **romanian deadlift** [barbell] ≈ 0085 *barbell romanian deadlift*
+- `fedb:Rope_Climb` **rope climb** [rope] ≈ 0680 *rope climb*
+- `fedb:Rope_Straight-Arm_Pulldown` **rope straight-arm pulldown** [cable] ≈ 0237 *cable straight arm pulldown (with rope)*
+- `fedb:Russian_Twist` **russian twist** [body weight] ≈ 0687 *russian twist*
+- `fedb:Scapular_Pull-Up` **scapular pull-up** [body weight] ≈ 0688 *scapular pull-up*
+- `fedb:Scissors_Jump` **scissors jump** [body weight] ≈ 3219 *scissor jumps (male)*
+- `fedb:Seated_Barbell_Twist` **seated barbell twist** [barbell] ≈ 0094 *barbell seated twist*
+- `fedb:Seated_Cable_Rows` **seated cable rows** [cable] ≈ 0861 *cable seated row*
+- `fedb:Seated_Calf_Raise` **seated calf raise** [leverage machine] ≈ 0594 *lever seated calf raise*
+- `fedb:Seated_Calf_Stretch` **seated calf stretch** [body weight] ≈ 1390 *seated calf stretch (male)*
+- `fedb:Seated_Close-Grip_Concentration_Barbell_Curl` **seated close-grip concentration barbell curl** [barbell] ≈ 0089 *barbell seated close-grip concentration curl*
+- `fedb:Seated_Dumbbell_Curl` **seated dumbbell curl** [dumbbell] ≈ 0391 *dumbbell seated curl*
+- `fedb:Seated_Dumbbell_Inner_Biceps_Curl` **seated dumbbell inner biceps curl** [dumbbell] ≈ 0393 *dumbbell seated inner biceps curl*
+- `fedb:Seated_Dumbbell_Palms-Up_Wrist_Curl` **seated dumbbell palms-up wrist curl** [dumbbell] ≈ 0401 *dumbbell seated palms up wrist curl*
+- `fedb:Seated_Dumbbell_Press` **seated dumbbell press** [dumbbell] ≈ 0388 *dumbbell seated alternate press*
+- `fedb:Seated_Good_Mornings` **seated good mornings** [barbell] ≈ 0090 *barbell seated good morning*
+- `fedb:Seated_Leg_Curl` **seated leg curl** [leverage machine] ≈ 0599 *lever seated leg curl*
+- `fedb:Seated_Side_Lateral_Raise` **seated side lateral raise** [dumbbell] ≈ 0396 *dumbbell seated lateral raise*
+- `fedb:Shoulder_Press_-_With_Bands` **shoulder press - with bands** [band] ≈ 0997 *band shoulder press*
+- `fedb:Side-Lying_Floor_Stretch` **side-lying floor stretch** [body weight] ≈ 1358 *side lying floor stretch*
+- `fedb:Side_Lateral_Raise` **side lateral raise** [dumbbell] ≈ 0334 *dumbbell lateral raise*
+- `fedb:Side_Laterals_to_Front_Raise` **side laterals to front raise** [dumbbell] ≈ 0335 *dumbbell lateral to front raise*
+- `fedb:Side_Neck_Stretch` **side neck stretch** [body weight] ≈ 1403 *neck side stretch*
+- `fedb:Side_To_Side_Chins` **side to side chins** [body weight] ≈ 0720 *side-to-side chin*
+- `fedb:Single-Arm_Push-Up` **single-arm push-up** [body weight] ≈ 0725 *single arm push-up*
+- `fedb:Smith_Incline_Shoulder_Raise` **smith incline shoulder raise** [barbell] ≈ 0759 *smith incline shoulder raises*
+- `fedb:Smith_Machine_Bench_Press` **smith machine bench press** [smith machine] ≈ 0748 *smith bench press*
+- `fedb:Smith_Machine_Bent_Over_Row` **smith machine bent over row** [smith machine] ≈ 1359 *smith bent over row*
+- `fedb:Smith_Machine_Close-Grip_Bench_Press` **smith machine close-grip bench press** [smith machine] ≈ 0751 *smith close-grip bench press*
+- `fedb:Smith_Machine_Hip_Raise` **smith machine hip raise** [smith machine] ≈ 0756 *smith hip raise*
+- `fedb:Smith_Machine_Incline_Bench_Press` **smith machine incline bench press** [smith machine] ≈ 0757 *smith incline bench press*
+- `fedb:Smith_Machine_Leg_Press` **smith machine leg press** [smith machine] ≈ 0760 *smith leg press*
+- `fedb:Smith_Machine_Reverse_Calf_Raises` **smith machine reverse calf raises** [smith machine] ≈ 0763 *smith reverse calf raises*
+- `fedb:Smith_Machine_Squat` **smith machine squat** [smith machine] ≈ 3281 *smith full squat*
+- `fedb:Smith_Machine_Upright_Row` **smith machine upright row** [smith machine] ≈ 0775 *smith upright row*
+- `fedb:Smith_Single-Leg_Split_Squat` **smith single-leg split squat** [smith machine] ≈ 0768 *smith single leg split squat*
+- `fedb:Snatch_Pull` **snatch pull** [barbell] ≈ 0776 *snatch pull*
+- `fedb:Speed_Squats` **speed squats** [barbell] ≈ 0101 *barbell speed squat*
+- `fedb:Spell_Caster` **spell caster** [dumbbell] ≈ 0777 *spell caster*
+- `fedb:Split_Squats` **split squats** [body weight] ≈ 2368 *split squats*
+- `fedb:Squat_Jerk` **squat jerk** [barbell] ≈ 0786 *squat jerk*
+- `fedb:Squat_with_Bands` **squat with bands** [barbell] ≈ 1004 *band squat*
+- `fedb:Squats_-_With_Bands` **squats - with bands** [band] ≈ 1004 *band squat*
+- `fedb:Standing_Barbell_Calf_Raise` **standing barbell calf raise** [barbell] ≈ 1372 *barbell standing calf raise*
+- `fedb:Standing_Barbell_Press_Behind_Neck` **standing barbell press behind neck** [barbell] ≈ 0788 *standing behind neck press*
+- `fedb:Standing_Bent-Over_One-Arm_Dumbbell_Triceps_Extension` **standing bent-over one-arm dumbbell triceps extension** [dumbbell] ≈ 1740 *dumbbell standing bent over one arm triceps extension*
+- `fedb:Standing_Bent-Over_Two-Arm_Dumbbell_Triceps_Extension` **standing bent-over two-arm dumbbell triceps extension** [dumbbell] ≈ 1741 *dumbbell standing bent over two arm triceps extension*
+- `fedb:Standing_Bradford_Press` **standing bradford press** [barbell] ≈ 0105 *barbell standing bradford press*
+- `fedb:Standing_Cable_Lift` **standing cable lift** [cable] ≈ 0230 *cable standing lift*
+- `fedb:Standing_Calf_Raises` **standing calf raises** [leverage machine] ≈ 0605 *lever standing calf raise*
+- `fedb:Standing_Concentration_Curl` **standing concentration curl** [dumbbell] ≈ 0418 *dumbbell standing concentration curl*
+- `fedb:Standing_Dumbbell_Calf_Raise` **standing dumbbell calf raise** [dumbbell] ≈ 0417 *dumbbell standing calf raise*
+- `fedb:Standing_Dumbbell_Reverse_Curl` **standing dumbbell reverse curl** [dumbbell] ≈ 0429 *dumbbell standing reverse curl*
+- `fedb:Standing_Dumbbell_Triceps_Extension` **standing dumbbell triceps extension** [dumbbell] ≈ 0430 *dumbbell standing triceps extension*
+- `fedb:Standing_Front_Barbell_Raise_Over_Head` **standing front barbell raise over head** [barbell] ≈ 0107 *barbell standing front raise over head*
+- `fedb:Standing_Lateral_Stretch` **standing lateral stretch** [body weight] ≈ 0794 *standing lateral stretch*
+- `fedb:Standing_Long_Jump` **standing long jump** [body weight] ≈ fe_80573e7a *side standing long jump*
+- `fedb:Standing_One-Arm_Dumbbell_Curl_Over_Incline_Bench` **standing one-arm dumbbell curl over incline bench** [dumbbell] ≈ 0422 *dumbbell standing one arm curl (over incline bench)*
+- `fedb:Standing_Overhead_Barbell_Triceps_Extension` **standing overhead barbell triceps extension** [barbell] ≈ 0109 *barbell standing overhead triceps extension*
+- `fedb:Standing_Palm-In_One-Arm_Dumbbell_Press` **standing palm-in one-arm dumbbell press** [dumbbell] ≈ 0424 *dumbbell standing one arm palm in press*
+- `fedb:Standing_Palms-In_Dumbbell_Press` **standing palms-in dumbbell press** [dumbbell] ≈ 0427 *dumbbell standing palms in press*
+- `fedb:Standing_Pelvic_Tilt` **standing pelvic tilt** [body weight] ≈ 1364 *standing pelvic tilt*
+- `fedb:Star_Jump` **star jump** [body weight] ≈ 3223 *star jump (male)*
+- `fedb:Stiff_Leg_Barbell_Good_Morning` **stiff leg barbell good morning** [barbell] ≈ 0115 *barbell stiff leg good morning*
+- `fedb:Straight-Arm_Dumbbell_Pullover` **straight-arm dumbbell pullover** [dumbbell] ≈ 0433 *dumbbell straight arm pullover*
+- `fedb:Straight-Arm_Pulldown` **straight-arm pulldown** [cable] ≈ 0238 *cable straight arm pulldown*
+- `fedb:Sumo_Deadlift` **sumo deadlift** [barbell] ≈ 0117 *barbell sumo deadlift*
+- `fedb:Sumo_Deadlift_with_Bands` **sumo deadlift with bands** [barbell] ≈ 0117 *barbell sumo deadlift*
+- `fedb:Suspended_Push-Up` **suspended push-up** [body weight] ≈ 0806 *suspended push-up*
+- `fedb:Suspended_Reverse_Crunch` **suspended reverse crunch** [body weight] ≈ 0807 *suspended reverse crunch*
+- `fedb:Suspended_Row` **suspended row** [body weight] ≈ 0808 *suspended row*
+- `fedb:Suspended_Split_Squat` **suspended split squat** [body weight] ≈ 0809 *suspended split squat*
+- `fedb:Tate_Press` **tate press** [dumbbell] ≈ 0436 *dumbbell tate press*
+- `fedb:Tire_Flip` **tire flip** [tire] ≈ 2459 *tire flip*
+- `fedb:Trap_Bar_Deadlift` **trap bar deadlift** [trap bar] ≈ 0811 *trap bar deadlift*
+- `fedb:Tricep_Side_Stretch` **tricep side stretch** [body weight] ≈ 0817 *triceps stretch*
+- `fedb:Triceps_Stretch` **triceps stretch** [body weight] ≈ 0817 *triceps stretch*
+- `fedb:Tuck_Crunch` **tuck crunch** [body weight] ≈ 0871 *tuck crunch*
+- `fedb:Two-Arm_Kettlebell_Clean` **two-arm kettlebell clean** [kettlebell] ≈ 0552 *kettlebell two arm clean*
+- `fedb:Two-Arm_Kettlebell_Military_Press` **two-arm kettlebell military press** [kettlebell] ≈ 0553 *kettlebell two arm military press*
+- `fedb:Two-Arm_Kettlebell_Row` **two-arm kettlebell row** [kettlebell] ≈ 1345 *kettlebell two arm row*
+- `fedb:Underhand_Cable_Pulldowns` **underhand cable pulldowns** [cable] ≈ 0245 *cable underhand pulldown*
+- `fedb:Upper_Back_Stretch` **upper back stretch** [body weight] ≈ 1365 *upper back stretch*
+- `fedb:Upright_Barbell_Row` **upright barbell row** [barbell] ≈ 0120 *barbell upright row*
+- `fedb:Upright_Cable_Row` **upright cable row** [cable] ≈ 0246 *cable upright row*
+- `fedb:Weighted_Bench_Dip` **weighted bench dip** [weighted] ≈ 0830 *weighted bench dip*
+- `fedb:Weighted_Pull_Ups` **weighted pull ups** [weighted] ≈ 0841 *weighted pull-up*
+- `fedb:Weighted_Squat` **weighted squat** [weighted] ≈ 0852 *weighted squat*
+- `fedb:Wide-Grip_Decline_Barbell_Pullover` **wide-grip decline barbell pullover** [barbell] ≈ 0037 *barbell decline wide-grip pullover*
+- `fedb:Wide-Grip_Rear_Pull-Up` **wide-grip rear pull-up** [body weight] ≈ 1367 *wide grip rear pull-up*
+- `fedb:Wide-Grip_Standing_Barbell_Curl` **wide-grip standing barbell curl** [barbell] ≈ 0113 *barbell standing wide-grip curl*
+- `fedb:Wind_Sprints` **wind sprints** [body weight] ≈ 0858 *wind sprints*
+- `fedb:Wrist_Circles` **wrist circles** [body weight] ≈ 1428 *wrist circles*
+- `fedb:Zercher_Squats` **zercher squats** [barbell] ≈ 1545 *barbell full zercher squat*
+- `fedb:Zottman_Curl` **zottman curl** [dumbbell] ≈ 0439 *dumbbell zottman curl*
+- `fedb:Zottman_Preacher_Curl` **zottman preacher curl** [dumbbell] ≈ 2294 *dumbbell zottman preacher curl*
+- `lh:pull-up` **pull-up** [body weight] ≈ 0652 *pull-up*
+- `lh:squat-barbell` **barbell squat** [barbell] ≈ 0043 *barbell full squat*
+- `lh:push-up` **push-up** [body weight] ≈ 0662 *push-up*
+- `lh:romanian-deadlift-barbell` **barbell romanian deadlift** [barbell] ≈ 0085 *barbell romanian deadlift*
+- `lh:romanian-deadlift-dumbbell` **dumbbell romanian deadlift** [dumbbell] ≈ 1459 *dumbbell romanian deadlift*
+- `lh:squat-bodyweight` **squat** [body weight] ≈ fe_73f61259 *bodyweight squat*
+- `lh:face-pull` **face pull** [cable] ≈ fe_733d0bef *face pull*
+- `lh:bench-press-barbell` **barbell bench press** [barbell] ≈ 0025 *barbell bench press*
+- `lh:squat-dumbbell` **dumbbell squat** [dumbbell] ≈ 0413 *dumbbell squat*
+- `lh:deadlift-barbell` **barbell deadlift** [barbell] ≈ 0032 *barbell deadlift*
+- `lh:leg-press-machine` **machine leg press** [leverage machine] ≈ 2287 *lever alternate leg press*
+- `lh:arnold-press` **arnold press** [dumbbell] ≈ 2137 *dumbbell arnold press*
+- `lh:hanging-leg-raise` **hanging leg raise** [body weight] ≈ 0472 *hanging leg raise*
+- `lh:shoulder-press-machine` **machine shoulder press** [leverage machine] ≈ 0603 *lever shoulder press*
+- `lh:leg-extension` **leg extension** [leverage machine] ≈ 0585 *lever leg extension*
+- `lh:rear-delt-row-barbell` **barbell rear delt row** [barbell] ≈ 0076 *barbell rear delt row*
+- `lh:walking-lunge-barbell` **barbell walking lunge** [barbell] ≈ fe_bdf36d05 *barbell walking lunge*
+- `lh:upright-row-barbell` **barbell upright row** [barbell] ≈ 0120 *barbell upright row*
+- `lh:floor-press-dumbbell` **dumbbell floor press** [dumbbell] ≈ fe_3a88fabe *dumbbell floor press*
+- `lh:incline-curl-dumbbell` **dumbbell incline curl** [dumbbell] ≈ 0318 *dumbbell incline curl*
+- `lh:v-up` **v-up** [body weight] ≈ 0137 *body-up*
+- `lh:hack-squat-barbell` **barbell hack squat** [barbell] ≈ 0046 *barbell hack squat*
+- `lh:sit-up` **sit-up** [body weight] ≈ (dropped by hand) *sit-up*
+- `lh:incline-bench-press-smith-machine` **smith incline bench press** [smith machine] ≈ 0757 *smith incline bench press*
+- `lh:mountain-climbers` **mountain climbers** [body weight] ≈ 0630 *mountain climber*
+- `lh:tricep-pushdown-cable-with-bar` **cable bar tricep pushdown** [cable] ≈ 0241 *cable triceps pushdown (v-bar)*
+- `lh:incline-push-up` **incline push-up** [body weight] ≈ 0493 *incline push-up*
+- `lh:deadlift-dumbbell` **dumbbell deadlift** [dumbbell] ≈ 0300 *dumbbell deadlift*
+- `lh:stiff-legged-deadlift-barbell` **barbell stiff-legged deadlift** [barbell] ≈ (dropped by hand) *stiff-legged barbell deadlift*
+- `lh:incline-bench-press-dumbbell` **dumbbell incline bench press** [dumbbell] ≈ 0314 *dumbbell incline bench press*
+- `lh:squat-smith-machine` **smith squat** [smith machine] ≈ 0770 *smith squat*
+- `lh:power-jerk` **power jerk** [barbell] ≈ fe_bd3da88e *power jerk*
+- `lh:preacher-curl-barbell` **barbell preacher curl** [barbell] ≈ 0070 *barbell preacher curl*
+- `lh:clean-and-jerk` **clean and jerk** [barbell] ≈ fe_cd806e69 *clean and jerk*
+- `lh:hang-clean` **hang clean** [barbell] ≈ fe_e5006c00 *hang clean*
+- `lh:incline-bench-press-barbell` **barbell incline bench press** [barbell] ≈ 0047 *barbell incline bench press*
+- `lh:lateral-raise-machine` **machine lateral raise** [leverage machine] ≈ 0584 *lever lateral raise*
+- `lh:hip-thrust-barbell` **barbell hip thrust** [barbell] ≈ fe_c3cd5826 *barbell hip thrust*
+- `lh:preacher-curl-dumbbell` **dumbbell preacher curl** [dumbbell] ≈ 0372 *dumbbell preacher curl*
+- `lh:good-morning` **good morning** [barbell] ≈ 0044 *barbell good morning*
+- `lh:chin-up` **chin-up** [body weight] ≈ 1326 *chin-up*
+- `lh:rack-pull` **rack pull** [barbell] ≈ 0074 *barbell rack pull*
+- `lh:front-raise-dumbbell` **dumbbell front raise** [dumbbell] ≈ 0310 *dumbbell front raise*
+- `lh:hang-snatch` **hang snatch** [barbell] ≈ fe_27a79037 *hang snatch*
+- `lh:pull-apart-band` **band pull-apart** [band] ≈ fe_c5980115 *band pull apart*
+- `lh:decline-bench-press-dumbbell` **dumbbell decline bench press** [dumbbell] ≈ 0301 *dumbbell decline bench press*
+- `lh:pullover-barbell` **barbell pullover** [barbell] ≈ 0073 *barbell pullover*
+- `lh:reverse-fly-dumbbell` **dumbbell reverse fly** [dumbbell] ≈ 0383 *dumbbell reverse fly*
+- `lh:seated-row-machine` **machine seated row** [leverage machine] ≈ 1350 *lever seated row*
+- `lh:pullover-dumbbell` **dumbbell pullover** [dumbbell] ≈ 0375 *dumbbell pullover*
+- `lh:farmers-walk` **farmers walk** [dumbbell] ≈ 2133 *farmers walk*
+- `lh:curl-barbell` **barbell curl** [barbell] ≈ 0031 *barbell curl*
+- `lh:goblet-squat` **goblet squat** [dumbbell] ≈ 1760 *dumbbell goblet squat*
+- `lh:seated-shoulder-press-dumbbell` **dumbbell seated shoulder press** [dumbbell] ≈ 0405 *dumbbell seated shoulder press*
+- `lh:sumo-deadlift-barbell` **barbell sumo deadlift** [barbell] ≈ 0117 *barbell sumo deadlift*
+- `lh:twist-cable` **cable twist** [cable] ≈ 0243 *cable twist*
+- `lh:seated-leg-curl` **seated leg curl** [leverage machine] ≈ 0599 *lever seated leg curl*
+- `lh:push-press-dumbbell` **dumbbell push press** [dumbbell] ≈ 1700 *dumbbell push press*
+- `lh:kneeling-push-up` **kneeling push-up** [body weight] ≈ 3211 *kneeling push-up (male)*
+- `lh:lateral-raise-dumbbell` **dumbbell lateral raise** [dumbbell] ≈ 0334 *dumbbell lateral raise*
+- `lh:front-raise-barbell` **barbell front raise** [barbell] ≈ 0041 *barbell front raise*
+- `lh:inverted-row` **inverted row** [body weight] ≈ 0499 *inverted row*
+- `lh:crunch` **crunch** [body weight] ≈ (dropped by hand) *crunches*
+- `lh:close-grip-push-up` **close-grip push-up** [body weight] ≈ 0259 *close-grip push-up*
+- `lh:power-clean` **power clean** [barbell] ≈ 0648 *power clean*
+- `lh:deficit-deadlift` **deficit deadlift** [barbell] ≈ fe_19bacbfe *deficit deadlift*
+- `lh:wrist-curl-barbell` **barbell wrist curl** [barbell] ≈ 0126 *barbell wrist curl*
+- `lh:crunch-cable` **cable crunch** [cable] ≈ 0223 *cable side crunch*
+- `lh:decline-sit-up` **decline sit-up** [body weight] ≈ 0282 *decline sit-up*
+- `lh:flutter-kick` **flutter kick** [body weight] ≈ 0459 *flutter kicks*
+- `lh:dead-bug` **dead bug** [body weight] ≈ 0276 *dead bug*
+- `lh:chest-press-machine` **machine chest press** [leverage machine] ≈ 0577 *lever chest press*
+- `lh:lying-external-shoulder-rotation-dumbbell` **dumbbell lying external shoulder rotation** [dumbbell] ≈ 0863 *dumbbell lying external shoulder rotation*
+- `lh:standing-shoulder-press-barbell` **barbell shoulder press** [barbell] ≈ (dropped by hand) *barbell shoulder press*
+- `lh:snatch` **snatch** [barbell] ≈ fe_cf79d00d *snatch*
+- `lh:hammer-curl-dumbbell` **dumbbell hammer curl** [dumbbell] ≈ 0313 *dumbbell hammer curl*
+- `lh:lunge-dumbbell` **dumbbell lunge** [dumbbell] ≈ 0336 *dumbbell lunge*
+- `lh:cable-curl-bar` **cable curl** [body weight] ≈ 0868 *cable curl*
+- `lh:concentration-curl` **concentration curl** [dumbbell] ≈ 0297 *dumbbell concentration curl*
+- `lh:squat-jerk` **squat jerk** [barbell] ≈ 0786 *squat jerk*
+- `lh:seated-calf-raise` **seated calf raise** [leverage machine] ≈ 0594 *lever seated calf raise*
+- `lh:split-jerk` **split jerk** [barbell] ≈ fe_92691bbd *split jerk*
+- `lh:close-grip-bench-press` **close-grip bench press** [barbell] ≈ 0030 *barbell close-grip bench press*
+- `lh:clean` **clean** [barbell] ≈ fe_a708b446 *clean*
+- `lh:side-plank` **side plank** [body weight] ≈ fe_445fb6f4 *plank*
+- `lh:decline-bench-press-barbell` **barbell decline bench press** [barbell] ≈ 0033 *barbell decline bench press*
+- `lh:shrug-barbell` **barbell shrug** [barbell] ≈ 0095 *barbell shrug*
+- `lh:shrug-dumbbell` **dumbbell shrug** [dumbbell] ≈ 0406 *dumbbell shrug*
+- `lh:kettlebell-swing` **kettlebell swing** [kettlebell] ≈ 0549 *kettlebell swing*
+- `lh:lying-leg-curl` **lying leg curl** [leverage machine] ≈ 0586 *lever lying leg curl*
+- `lh:lunge-barbell` **barbell lunge** [barbell] ≈ 0054 *barbell lunge*
+- `lh:plate-front-raise` **plate front raise** [weighted] ≈ (dropped by hand) *front plate raise*
+- `lh:bench-press-dumbbell` **dumbbell bench press** [dumbbell] ≈ 0289 *dumbbell bench press*
+- `lh:pendlay-row` **pendlay row** [barbell] ≈ 3017 *barbell pendlay row*
+- `lh:bench-press-smith-machine` **smith bench press** [smith machine] ≈ 0748 *smith bench press*
+- `lh:sled-push` **sled push** [weighted] ≈ fe_b0db9ee4 *sled push*
+- `lh:squat-box` **box squat** [body weight] ≈ fe_39d29d43 *box squat*
+- `lh:front-squat` **front squat** [barbell] ≈ 0042 *barbell front squat*
+- `lh:seated-shoulder-press-smith-machine` **smith seated shoulder press** [smith machine] ≈ 0765 *smith seated shoulder press*
+- `lh:power-snatch` **power snatch** [barbell] ≈ fe_8c91cfbf *power snatch*
+- `lh:burpee` **burpee** [body weight] ≈ 1160 *burpee*
+- `lh:wide-grip-seated-row-cable` **cable wide grip seated row** [cable] ≈ 0218 *cable seated wide-grip row*
+- `lh:alternating-rope-wave` **alternating rope wave** [rope] ≈ lh_a5525833 *rope wave*
+- `lh:pallof-press` **pallof press** [cable] ≈ fe_beb68c59 *pallof press*
+- `lh:tire-flip` **tire flip** [tire] ≈ 2459 *tire flip*
+- `lh:push-up-medicine-ball` **medicine ball push-up** [medicine ball] ≈ 0663 *push-up medicine ball*
+- `lh:zottman-curl` **zottman curl** [dumbbell] ≈ 0439 *dumbbell zottman curl*
+- `lh:reverse-curl-barbell` **barbell reverse curl** [barbell] ≈ 0080 *barbell reverse curl*
+- `lh:hammer-curl-cable-with-rope` **cable rope hammer curl** [cable] ≈ 0165 *cable hammer curl (with rope)*
+- `lh:alternating-arnold-press-dumbbell` **dumbbell alternating arnold press** [dumbbell] ≈ 2137 *dumbbell arnold press*
+- `lh:jump-squat-bodyweight` **jump squat** [body weight] ≈ 0514 *jump squat*
+- `lh:monster-walk-band` **band monster walk** [band] ≈ (dropped by hand) *monster walk*
+- `lh:seated-good-morning-barbell` **barbell seated good morning** [barbell] ≈ 0090 *barbell seated good morning*
+- `lh:split-squat-barbell` **barbell split squat** [barbell] ≈ 0098 *barbell side split squat*
+- `lh:cardio-run` **run** [body weight] ≈ 0685 *run*
+- `lh:cardio-jump-rope` **jump rope** [rope] ≈ 2612 *jump rope*
+- `wg:f41ac754-45a0-443b-afe5-e624e215229f` **front lever** [body weight] ≈ 3296 *front lever*
+
+## Kept
+
+- `fedb:90_90_Hamstring` fe_7ee918c7 90/90 hamstring [body weight · hamstrings]
+- `fedb:Adductor` fe_6a412386 adductor [roller · adductors]
+- `fedb:Adductor_Groin` fe_93c058e5 adductor/groin [body weight · adductors]
+- `fedb:Alternate_Leg_Diagonal_Bound` fe_145fc5c5 alternate leg diagonal bound [body weight · quads]
+- `fedb:Alternating_Deltoid_Raise` fe_9ed54def alternating deltoid raise [dumbbell · delts]
+- `fedb:Ankle_On_The_Knee` fe_83ba823f ankle on the knee [body weight · glutes]
+- `fedb:Anterior_Tibialis-SMR` fe_d869346a anterior tibialis-smr [roller · calves]
+- `fedb:Arm_Circles` fe_a1a83fa2 arm circles [body weight · delts]
+- `fedb:Atlas_Stone_Trainer` fe_96c2542c atlas stone trainer [weighted · spine]
+- `fedb:Atlas_Stones` fe_e14c40b0 atlas stones [weighted · spine]
+- `fedb:Axle_Deadlift` fe_3b9c3300 axle deadlift [barbell · spine]
+- `fedb:Back_Flyes_-_With_Bands` fe_36f82b2e back flyes - with bands [band · delts]
+- `fedb:Backward_Drag` fe_5cf97810 backward drag [weighted · quads]
+- `fedb:Backward_Medicine_Ball_Throw` fe_600d2dda backward medicine ball throw [medicine ball · delts]
+- `fedb:Ball_Leg_Curl` fe_355b0511 ball leg curl [stability ball · hamstrings]
+- `fedb:Band_Good_Morning` fe_ee435c8e band good morning [band · hamstrings]
+- `fedb:Band_Good_Morning_Pull_Through` fe_e7aaa024 band good morning (pull through) [band · hamstrings]
+- `fedb:Band_Hip_Adductions` fe_221f9f3f band hip adductions [band · adductors]
+- `fedb:Band_Pull_Apart` fe_c5980115 band pull apart [band · delts]
+- `fedb:Band_Skull_Crusher` fe_b768feb9 band skull crusher [band · triceps]
+- `fedb:Barbell_Ab_Rollout` fe_2253e51d barbell ab rollout [barbell · abs]
+- `fedb:Barbell_Curls_Lying_Against_An_Incline` fe_1b6b374d barbell curls lying against an incline [barbell · biceps]
+- `fedb:Barbell_Hip_Thrust` fe_c3cd5826 barbell hip thrust [barbell · glutes]
+- `fedb:Barbell_Rollout_from_Bench` fe_55548916 barbell rollout from bench [barbell · abs]
+- `fedb:Barbell_Shrug_Behind_The_Back` fe_ad80b92c barbell shrug behind the back [barbell · traps]
+- `fedb:Barbell_Side_Bend` fe_7129ad50 barbell side bend [barbell · abs]
+- `fedb:Barbell_Walking_Lunge` fe_bdf36d05 barbell walking lunge [barbell · quads]
+- `fedb:Bear_Crawl_Sled_Drags` fe_9d024c46 bear crawl sled drags [weighted · quads]
+- `fedb:Bench_Jump` fe_f7389a76 bench jump [body weight · quads]
+- `fedb:Bench_Sprint` fe_a0de7c59 bench sprint [body weight · quads]
+- `fedb:Bent_Over_Dumbbell_Rear_Delt_Raise_With_Head_On_Bench` fe_6a512480 bent over dumbbell rear delt raise with head on bench [dumbbell · delts]
+- `fedb:Bent_Over_Low-Pulley_Side_Lateral` fe_65fca891 bent over low-pulley side lateral [cable · delts]
+- `fedb:Bent_Over_Two-Arm_Long_Bar_Row` fe_9d0cada2 bent over two-arm long bar row [barbell · upper back]
+- `fedb:Bicycling` fe_02571964 bicycling [stationary bike · cardiovascular system]
+- `fedb:Board_Press` fe_56ee0dd4 board press [barbell · triceps]
+- `fedb:Bodyweight_Flyes` fe_309f232f bodyweight flyes [ez barbell · pectorals]
+- `fedb:Bodyweight_Squat` fe_73f61259 bodyweight squat [body weight · quads]
+- `fedb:Box_Jump_Multiple_Response` fe_cefcfc24 box jump (multiple response) [body weight · hamstrings]
+- `fedb:Box_Skip` fe_03380345 box skip [body weight · hamstrings]
+- `fedb:Box_Squat` fe_39d29d43 box squat [barbell · quads]
+- `fedb:Brachialis-SMR` fe_93f021f2 brachialis-smr [roller · biceps]
+- `fedb:Cable_Iron_Cross` fe_c1d3b963 cable iron cross [cable · pectorals]
+- `fedb:Calf-Machine_Shoulder_Shrug` fe_fba8bec9 calf-machine shoulder shrug [leverage machine · traps]
+- `fedb:Calf_Raises_-_With_Bands` fe_c52fc16d calf raises - with bands [band · calves]
+- `fedb:Calves-SMR` fe_979b52dd calves-smr [roller · calves]
+- `fedb:Car_Deadlift` fe_38e0ed51 car deadlift [weighted · quads]
+- `fedb:Car_Drivers` fe_7617a80b car drivers [barbell · delts]
+- `fedb:Carioca_Quick_Step` fe_0e398d77 carioca quick step [body weight · adductors]
+- `fedb:Cat_Stretch` fe_efa54bbb cat stretch [body weight · spine]
+- `fedb:Chain_Handle_Extension` fe_389668ed chain handle extension [weighted · triceps]
+- `fedb:Chain_Press` fe_4701f750 chain press [weighted · pectorals]
+- `fedb:Chair_Upper_Body_Stretch` fe_d6a43a86 chair upper body stretch [body weight · delts]
+- `fedb:Childs_Pose` fe_980f74fc child's pose [body weight · spine]
+- `fedb:Chin_To_Chest_Stretch` fe_afede2f4 chin to chest stretch [body weight · levator scapulae]
+- `fedb:Circus_Bell` fe_d7839951 circus bell [weighted · delts]
+- `fedb:Clean` fe_a708b446 clean [barbell · hamstrings]
+- `fedb:Clean_Deadlift` fe_c84620de clean deadlift [barbell · hamstrings]
+- `fedb:Clean_Pull` fe_30711b62 clean pull [barbell · quads]
+- `fedb:Clean_Shrug` fe_6c25c740 clean shrug [barbell · traps]
+- `fedb:Clean_and_Jerk` fe_cd806e69 clean and jerk [barbell · delts]
+- `fedb:Clean_from_Blocks` fe_d36894f8 clean from blocks [barbell · quads]
+- `fedb:Conans_Wheel` fe_0d33a637 conan's wheel [weighted · quads]
+- `fedb:Cross_Over_-_With_Bands` fe_63a03475 cross over - with bands [band · pectorals]
+- `fedb:Crossover_Reverse_Lunge` fe_8146683f crossover reverse lunge [body weight · spine]
+- `fedb:Crucifix` fe_9eaee395 crucifix [weighted · delts]
+- `fedb:Crunch_-_Legs_On_Exercise_Ball` fe_afeccc9e crunch - legs on exercise ball [body weight · abs]
+- `fedb:Dancers_Stretch` fe_27f52397 dancer's stretch [body weight · spine]
+- `fedb:Deadlift_with_Chains` fe_d44f1dbe deadlift with chains [barbell · spine]
+- `fedb:Decline_Close-Grip_Bench_To_Skull_Crusher` fe_7654a3c6 decline close-grip bench to skull crusher [barbell · triceps]
+- `fedb:Deficit_Deadlift` fe_19bacbfe deficit deadlift [barbell · spine]
+- `fedb:Depth_Jump_Leap` fe_854631ae depth jump leap [body weight · quads]
+- `fedb:Double_Leg_Butt_Kick` fe_41f00fac double leg butt kick [body weight · quads]
+- `fedb:Downward_Facing_Balance` fe_ccb7b35e downward facing balance [stability ball · glutes]
+- `fedb:Drop_Push` fe_a379dd4d drop push [body weight · pectorals]
+- `fedb:Dumbbell_Floor_Press` fe_3a88fabe dumbbell floor press [dumbbell · triceps]
+- `fedb:Dumbbell_Scaption` fe_bcca803e dumbbell scaption [dumbbell · delts]
+- `fedb:Dumbbell_Seated_Box_Jump` fe_ec5e03d4 dumbbell seated box jump [dumbbell · quads]
+- `fedb:Dynamic_Back_Stretch` fe_c8a2e0b4 dynamic back stretch [body weight · lats]
+- `fedb:EZ-Bar_Skullcrusher` fe_39e41e86 ez-bar skullcrusher [ez barbell · triceps]
+- `fedb:Elbow_Circles` fe_3ffb0445 elbow circles [body weight · delts]
+- `fedb:Elbows_Back` fe_a105e804 elbows back [body weight · pectorals]
+- `fedb:Elevated_Back_Lunge` fe_68227796 elevated back lunge [barbell · quads]
+- `fedb:Elevated_Cable_Rows` fe_0c159918 elevated cable rows [cable · lats]
+- `fedb:External_Rotation` fe_593cfa37 external rotation [dumbbell · delts]
+- `fedb:External_Rotation_with_Band` fe_cbe20356 external rotation with band [band · delts]
+- `fedb:Face_Pull` fe_733d0bef face pull [cable · delts]
+- `fedb:Fast_Skipping` fe_ada8ee71 fast skipping [body weight · quads]
+- `fedb:Floor_Press` fe_81eff975 floor press [barbell · triceps]
+- `fedb:Foot-SMR` fe_5424b31b foot-smr [roller · calves]
+- `fedb:Forward_Drag_with_Press` fe_e61c1367 forward drag with press [weighted · pectorals]
+- `fedb:Frog_Hops` fe_2ff5462a frog hops [body weight · quads]
+- `fedb:Frog_Sit-Ups` fe_8be2b06d frog sit-ups [body weight · abs]
+- `fedb:Front_Box_Jump` fe_49c960d4 front box jump [body weight · hamstrings]
+- `fedb:Front_Cone_Hops_or_hurdle_hops` fe_4395ed1f front cone hops (or hurdle hops) [body weight · quads]
+- `fedb:Front_Leg_Raises` fe_ae05bfdf front leg raises [body weight · hamstrings]
+- `fedb:Glute_Kickback` fe_e1c2f111 glute kickback [body weight · glutes]
+- `fedb:Good_Morning_off_Pins` fe_a88b5363 good morning off pins [barbell · hamstrings]
+- `fedb:Groin_and_Back_Stretch` fe_af691cf5 groin and back stretch [body weight · adductors]
+- `fedb:Groiners` fe_10a7b7ec groiners [body weight · adductors]
+- `fedb:Hamstring-SMR` fe_a3a2374b hamstring-smr [roller · hamstrings]
+- `fedb:Hang_Clean` fe_e5006c00 hang clean [barbell · quads]
+- `fedb:Hang_Clean_-_Below_the_Knees` fe_8aeb1069 hang clean - below the knees [barbell · quads]
+- `fedb:Hang_Snatch` fe_27a79037 hang snatch [barbell · hamstrings]
+- `fedb:Hanging_Bar_Good_Morning` fe_754315f1 hanging bar good morning [barbell · hamstrings]
+- `fedb:Heaving_Snatch_Balance` fe_6fe10ba8 heaving snatch balance [barbell · quads]
+- `fedb:Heavy_Bag_Thrust` fe_977428f5 heavy bag thrust [body weight · pectorals]
+- `fedb:Hip_Circles_prone` fe_86c3bc53 hip circles (prone) [body weight · abductors]
+- `fedb:Hip_Extension_with_Bands` fe_7f2f9279 hip extension with bands [band · glutes]
+- `fedb:Hip_Flexion_with_Band` fe_1156afc8 hip flexion with band [band · quads]
+- `fedb:Hug_Knees_To_Chest` fe_193d396e hug knees to chest [body weight · spine]
+- `fedb:Hurdle_Hops` fe_a78a55d1 hurdle hops [body weight · hamstrings]
+- `fedb:IT_Band_and_Glute_Stretch` fe_cfe25ffe it band and glute stretch [band · abductors]
+- `fedb:Iliotibial_Tract-SMR` fe_50f4f201 iliotibial tract-smr [roller · abductors]
+- `fedb:Incline_Bench_Pull` fe_326d844c incline bench pull [barbell · upper back]
+- `fedb:Intermediate_Groin_Stretch` fe_6019f4aa intermediate groin stretch [body weight · hamstrings]
+- `fedb:Internal_Rotation_with_Band` fe_3e63999f internal rotation with band [band · delts]
+- `fedb:Isometric_Neck_Exercise_-_Front_And_Back` fe_b281bc41 isometric neck exercise - front and back [body weight · levator scapulae]
+- `fedb:Isometric_Neck_Exercise_-_Sides` fe_415256f8 isometric neck exercise - sides [body weight · levator scapulae]
+- `fedb:Jerk_Balance` fe_03d624a1 jerk balance [barbell · delts]
+- `fedb:Keg_Load` fe_8b285fa6 keg load [weighted · spine]
+- `fedb:Kettlebell_Dead_Clean` fe_33d91e6d kettlebell dead clean [kettlebell · hamstrings]
+- `fedb:Kettlebell_Halo` fe_c52488b3 kettlebell halo [kettlebell · delts]
+- `fedb:Kettlebell_Halo_With_Overhead_Extension` fe_d094d96f kettlebell halo with overhead extension [kettlebell · delts]
+- `fedb:Kettlebell_One-Legged_Deadlift` fe_d58993f3 kettlebell one-legged deadlift [kettlebell · hamstrings]
+- `fedb:Kettlebell_Overhead_Triceps_Extension` fe_050fc8e8 kettlebell overhead triceps extension [kettlebell · triceps]
+- `fedb:Kettlebell_Pass_Between_The_Legs` fe_8e29091d kettlebell pass between the legs [kettlebell · abs]
+- `fedb:Kettlebell_Pirate_Ships` fe_bf84b238 kettlebell pirate ships [kettlebell · delts]
+- `fedb:Knee_Across_The_Body` fe_9cd4d40e knee across the body [body weight · glutes]
+- `fedb:Knee_Tuck_Jump` fe_c0bd86b2 knee tuck jump [body weight · hamstrings]
+- `fedb:Kneeling_Cable_Crunch_With_Alternating_Oblique_Twists` fe_3e751df2 kneeling cable crunch with alternating oblique twists [cable · abs]
+- `fedb:Kneeling_Forearm_Stretch` fe_2620801f kneeling forearm stretch [body weight · forearms]
+- `fedb:Kneeling_Hip_Flexor` fe_ca6cb927 kneeling hip flexor [body weight · quads]
+- `fedb:Kneeling_Single-Arm_High_Pulley_Row` fe_22aff575 kneeling single-arm high pulley row [cable · lats]
+- `fedb:Landmine_Linear_Jammer` fe_8778fec6 landmine linear jammer [barbell · delts]
+- `fedb:Lateral_Bound` fe_28fd27fa lateral bound [body weight · adductors]
+- `fedb:Lateral_Box_Jump` fe_40c0944b lateral box jump [body weight · adductors]
+- `fedb:Lateral_Cone_Hops` fe_468f06ae lateral cone hops [body weight · adductors]
+- `fedb:Latissimus_Dorsi-SMR` fe_550812ad latissimus dorsi-smr [roller · lats]
+- `fedb:Leg-Over_Floor_Press` fe_25d7ca40 leg-over floor press [kettlebell · pectorals]
+- `fedb:Leg_Lift` fe_ecf0a29a leg lift [body weight · glutes]
+- `fedb:Leg_Pull-In` fe_f953df0f leg pull-in [body weight · abs]
+- `fedb:Leverage_Iso_Row` fe_f9d54bcc leverage iso row [leverage machine · lats]
+- `fedb:Linear_Depth_Jump` fe_c150419e linear depth jump [body weight · quads]
+- `fedb:Log_Lift` fe_e29aa012 log lift [weighted · delts]
+- `fedb:Looking_At_Ceiling` fe_5c1dc150 looking at ceiling [body weight · quads]
+- `fedb:Low_Pulley_Row_To_Neck` fe_0d8cd7c1 low pulley row to neck [cable · delts]
+- `fedb:Lower_Back-SMR` fe_6736dea8 lower back-smr [roller · spine]
+- `fedb:Lying_Bent_Leg_Groin` fe_c32a75f2 lying bent leg groin [body weight · adductors]
+- `fedb:Lying_Close-Grip_Bar_Curl_On_High_Pulley` fe_9e62bc69 lying close-grip bar curl on high pulley [cable · biceps]
+- `fedb:Lying_Crossover` fe_f6d74824 lying crossover [body weight · abductors]
+- `fedb:Lying_Face_Down_Plate_Neck_Resistance` fe_4dd9522f lying face down plate neck resistance [weighted · levator scapulae]
+- `fedb:Lying_Glute` fe_6888c3d9 lying glute [body weight · glutes]
+- `fedb:Lying_Hamstring` fe_a91f74c4 lying hamstring [body weight · hamstrings]
+- `fedb:Lying_High_Bench_Barbell_Curl` fe_f5f2821b lying high bench barbell curl [barbell · biceps]
+- `fedb:Lying_Prone_Quadriceps` fe_9501b3a9 lying prone quadriceps [body weight · quads]
+- `fedb:Medicine_Ball_Full_Twist` fe_f1d51a49 medicine ball full twist [medicine ball · abs]
+- `fedb:Middle_Back_Shrug` fe_9da0ddb7 middle back shrug [dumbbell · upper back]
+- `fedb:Middle_Back_Stretch` fe_c804d7d5 middle back stretch [body weight · upper back]
+- `fedb:Mixed_Grip_Chin` fe_b8f4c30d mixed grip chin [body weight · upper back]
+- `fedb:Muscle_Snatch` fe_eb2bbf53 muscle snatch [barbell · hamstrings]
+- `fedb:Narrow_Stance_Hack_Squats` fe_dee34fb2 narrow stance hack squats [leverage machine · quads]
+- `fedb:Narrow_Stance_Leg_Press` fe_ab72d637 narrow stance leg press [sled machine · quads]
+- `fedb:Neck-SMR` fe_fddd840b neck-smr [roller · levator scapulae]
+- `fedb:Neck_Press` fe_b808300c neck press [barbell · pectorals]
+- `fedb:On-Your-Back_Quad_Stretch` fe_ca195b1e on-your-back quad stretch [body weight · quads]
+- `fedb:One-Arm_High-Pulley_Cable_Side_Bends` fe_8d841121 one-arm high-pulley cable side bends [cable · abs]
+- `fedb:One-Arm_Kettlebell_Clean` fe_1f8e8468 one-arm kettlebell clean [kettlebell · hamstrings]
+- `fedb:One-Arm_Long_Bar_Row` fe_e881770a one-arm long bar row [barbell · upper back]
+- `fedb:One-Arm_Overhead_Kettlebell_Squats` fe_4ec719fd one-arm overhead kettlebell squats [kettlebell · quads]
+- `fedb:One-Legged_Cable_Kickback` fe_1d24b920 one-legged cable kickback [cable · glutes]
+- `fedb:One_Half_Locust` fe_8a1410b5 one half locust [body weight · quads]
+- `fedb:One_Handed_Hang` fe_146a662d one handed hang [body weight · lats]
+- `fedb:One_Knee_To_Chest` fe_84579dba one knee to chest [body weight · glutes]
+- `fedb:Open_Palm_Kettlebell_Clean` fe_4ed63785 open palm kettlebell clean [kettlebell · hamstrings]
+- `fedb:Overhead_Lat` fe_6577b791 overhead lat [body weight · lats]
+- `fedb:Overhead_Slam` fe_2360a42d overhead slam [medicine ball · lats]
+- `fedb:Pallof_Press` fe_beb68c59 pallof press [cable · abs]
+- `fedb:Peroneals-SMR` fe_449c5665 peroneals-smr [roller · calves]
+- `fedb:Physioball_Hip_Bridge` fe_fe0e3df2 physioball hip bridge [stability ball · glutes]
+- `fedb:Piriformis-SMR` fe_29a27d0d piriformis-smr [roller · glutes]
+- `fedb:Plank` fe_445fb6f4 plank [body weight · abs]
+- `fedb:Plate_Pinch` fe_86b20510 plate pinch [weighted · forearms]
+- `fedb:Plate_Twist` fe_75002120 plate twist [weighted · abs]
+- `fedb:Platform_Hamstring_Slides` fe_90c145ad platform hamstring slides [body weight · hamstrings]
+- `fedb:Plie_Dumbbell_Squat` fe_3eca1437 plie dumbbell squat [dumbbell · quads]
+- `fedb:Power_Clean_from_Blocks` fe_6ee93643 power clean from blocks [barbell · hamstrings]
+- `fedb:Power_Jerk` fe_bd3da88e power jerk [barbell · quads]
+- `fedb:Power_Partials` fe_6ff053b3 power partials [dumbbell · delts]
+- `fedb:Power_Snatch` fe_8c91cfbf power snatch [barbell · hamstrings]
+- `fedb:Power_Stairs` fe_f222e2b6 power stairs [weighted · hamstrings]
+- `fedb:Prone_Manual_Hamstring` fe_ffcee5f3 prone manual hamstring [body weight · hamstrings]
+- `fedb:Prowler_Sprint` fe_55be5ac8 prowler sprint [body weight · cardiovascular system]
+- `fedb:Push-Ups_With_Feet_On_An_Exercise_Ball` fe_98668e49 push-ups with feet on an exercise ball [stability ball · pectorals]
+- `fedb:Pyramid` fe_347b0bdb pyramid [stability ball · spine]
+- `fedb:Quadriceps-SMR` fe_84427ae0 quadriceps-smr [roller · quads]
+- `fedb:Quick_Leap` fe_67660445 quick leap [body weight · quads]
+- `fedb:Rack_Delivery` fe_963a25f6 rack delivery [barbell · delts]
+- `fedb:Rear_Leg_Raises` fe_632a9a51 rear leg raises [body weight · quads]
+- `fedb:Recumbent_Bike` fe_d83d1357 recumbent bike [stationary bike · cardiovascular system]
+- `fedb:Return_Push_from_Stance` fe_be29439e return push from stance [medicine ball · delts]
+- `fedb:Reverse_Band_Deadlift` fe_69cdff41 reverse band deadlift [barbell · spine]
+- `fedb:Reverse_Band_Power_Squat` fe_cbe3f42f reverse band power squat [barbell · quads]
+- `fedb:Reverse_Plate_Curls` fe_b27a1bdb reverse plate curls [weighted · biceps]
+- `fedb:Reverse_Triceps_Bench_Press` fe_e490e8fd reverse triceps bench press [barbell · triceps]
+- `fedb:Rhomboids-SMR` fe_0aa41055 rhomboids-smr [roller · upper back]
+- `fedb:Rickshaw_Carry` fe_33d32439 rickshaw carry [weighted · forearms]
+- `fedb:Rickshaw_Deadlift` fe_5e6a939d rickshaw deadlift [weighted · quads]
+- `fedb:Rocket_Jump` fe_192b88dd rocket jump [body weight · quads]
+- `fedb:Romanian_Deadlift_from_Deficit` fe_7463199e romanian deadlift from deficit [barbell · hamstrings]
+- `fedb:Round_The_World_Shoulder_Stretch` fe_6201158d round the world shoulder stretch [body weight · delts]
+- `fedb:Rowing_Stationary` fe_4d705453 rowing, stationary [leverage machine · cardiovascular system]
+- `fedb:Sandbag_Load` fe_d9630c6c sandbag load [weighted · quads]
+- `fedb:Scissor_Kick` fe_95b60a54 scissor kick [body weight · abs]
+- `fedb:Seated_Band_Hamstring_Curl` fe_32604a3c seated band hamstring curl [band · hamstrings]
+- `fedb:Seated_Biceps` fe_d43cb9e4 seated biceps [body weight · biceps]
+- `fedb:Seated_Floor_Hamstring_Stretch` fe_0800acbf seated floor hamstring stretch [body weight · hamstrings]
+- `fedb:Seated_Front_Deltoid` fe_1eb79787 seated front deltoid [body weight · delts]
+- `fedb:Seated_Hamstring` fe_39a52d65 seated hamstring [body weight · hamstrings]
+- `fedb:Seated_Head_Harness_Neck_Resistance` fe_a9d5426f seated head harness neck resistance [weighted · levator scapulae]
+- `fedb:Seated_Leg_Tucks` fe_867c1638 seated leg tucks [body weight · abs]
+- `fedb:Seated_Overhead_Stretch` fe_cad94732 seated overhead stretch [body weight · abs]
+- `fedb:Seated_Palm-Up_Barbell_Wrist_Curl` fe_c2eeb1a6 seated palm-up barbell wrist curl [barbell · forearms]
+- `fedb:Seated_Two-Arm_Palms-Up_Low-Pulley_Wrist_Curl` fe_3d19177e seated two-arm palms-up low-pulley wrist curl [cable · forearms]
+- `fedb:See-Saw_Press_Alternating_Side_Press` fe_0efcbebf see-saw press (alternating side press) [dumbbell · delts]
+- `fedb:Shotgun_Row` fe_46da7cae shotgun row [cable · lats]
+- `fedb:Shoulder_Circles` fe_6c40b890 shoulder circles [body weight · delts]
+- `fedb:Shoulder_Raise` fe_a6c217ae shoulder raise [body weight · delts]
+- `fedb:Shoulder_Stretch` fe_480f1c55 shoulder stretch [body weight · delts]
+- `fedb:Side_Hop-Sprint` fe_727db046 side hop-sprint [body weight · quads]
+- `fedb:Side_Lying_Groin_Stretch` fe_739fb414 side lying groin stretch [body weight · adductors]
+- `fedb:Side_Standing_Long_Jump` fe_80573e7a side standing long jump [body weight · quads]
+- `fedb:Side_to_Side_Box_Shuffle` fe_948050cb side to side box shuffle [body weight · quads]
+- `fedb:Single-Arm_Cable_Crossover` fe_36ca8fed single-arm cable crossover [cable · pectorals]
+- `fedb:Single-Arm_Linear_Jammer` fe_09a6a4b7 single-arm linear jammer [barbell · delts]
+- `fedb:Single-Leg_High_Box_Squat` fe_ac720d70 single-leg high box squat [body weight · quads]
+- `fedb:Single-Leg_Hop_Progression` fe_6b0b21e0 single-leg hop progression [body weight · quads]
+- `fedb:Single-Leg_Stride_Jump` fe_2398dba8 single-leg stride jump [body weight · quads]
+- `fedb:Single_Dumbbell_Raise` fe_497ddd39 single dumbbell raise [dumbbell · delts]
+- `fedb:Single_Leg_Push-off` fe_0edd97fa single leg push-off [body weight · quads]
+- `fedb:Sit_Squats` fe_b21c57e5 sit squats [body weight · quads]
+- `fedb:Skating` fe_5679dadc skating [body weight · cardiovascular system]
+- `fedb:Sled_Drag_-_Harness` fe_fc282087 sled drag - harness [weighted · quads]
+- `fedb:Sled_Overhead_Backward_Walk` fe_4276887b sled overhead backward walk [weighted · delts]
+- `fedb:Sled_Overhead_Triceps_Extension` fe_b329a309 sled overhead triceps extension [weighted · triceps]
+- `fedb:Sled_Push` fe_b0db9ee4 sled push [weighted · quads]
+- `fedb:Sled_Reverse_Flye` fe_1ac473ae sled reverse flye [weighted · delts]
+- `fedb:Sled_Row` fe_53f370cd sled row [weighted · upper back]
+- `fedb:Sledgehammer_Swings` fe_c7c4afee sledgehammer swings [hammer · abs]
+- `fedb:Smith_Machine_Hang_Power_Clean` fe_5ddadac2 smith machine hang power clean [smith machine · hamstrings]
+- `fedb:Smith_Machine_Stiff-Legged_Deadlift` fe_3ffcd6ca smith machine stiff-legged deadlift [smith machine · hamstrings]
+- `fedb:Snatch` fe_cf79d00d snatch [barbell · quads]
+- `fedb:Snatch_Balance` fe_0aa5476a snatch balance [barbell · quads]
+- `fedb:Snatch_Deadlift` fe_e9e581b0 snatch deadlift [barbell · hamstrings]
+- `fedb:Snatch_Shrug` fe_c44b1b2c snatch shrug [barbell · traps]
+- `fedb:Snatch_from_Blocks` fe_2b8bb082 snatch from blocks [barbell · quads]
+- `fedb:Speed_Band_Overhead_Triceps` fe_806d55f5 speed band overhead triceps [band · triceps]
+- `fedb:Spinal_Stretch` fe_db8f2c8e spinal stretch [body weight · upper back]
+- `fedb:Split_Clean` fe_f2e0efe3 split clean [barbell · quads]
+- `fedb:Split_Jerk` fe_92691bbd split jerk [barbell · quads]
+- `fedb:Split_Jump` fe_002781c5 split jump [body weight · quads]
+- `fedb:Split_Snatch` fe_86c8b0dc split snatch [barbell · hamstrings]
+- `fedb:Squat_with_Chains` fe_af67e792 squat with chains [barbell · quads]
+- `fedb:Squat_with_Plate_Movers` fe_2fd0ed7e squat with plate movers [barbell · quads]
+- `fedb:Standing_Biceps_Stretch` fe_e9921cee standing biceps stretch [body weight · biceps]
+- `fedb:Standing_Cable_Chest_Press` fe_1a815e46 standing cable chest press [cable · pectorals]
+- `fedb:Standing_Cable_Wood_Chop` fe_1505efd0 standing cable wood chop [cable · abs]
+- `fedb:Standing_Elevated_Quad_Stretch` fe_cc5e6b72 standing elevated quad stretch [body weight · quads]
+- `fedb:Standing_Hip_Circles` fe_6a9deac0 standing hip circles [body weight · abductors]
+- `fedb:Standing_Hip_Flexors` fe_208fbae1 standing hip flexors [body weight · quads]
+- `fedb:Standing_Leg_Curl` fe_04d51221 standing leg curl [leverage machine · hamstrings]
+- `fedb:Standing_Low-Pulley_Deltoid_Raise` fe_dba3ec42 standing low-pulley deltoid raise [cable · delts]
+- `fedb:Standing_Palms-Up_Barbell_Behind_The_Back_Wrist_Curl` fe_2792e209 standing palms-up barbell behind the back wrist curl [barbell · forearms]
+- `fedb:Standing_Soleus_And_Achilles_Stretch` fe_f0962113 standing soleus and achilles stretch [body weight · calves]
+- `fedb:Standing_Two-Arm_Overhead_Throw` fe_d40cf4a5 standing two-arm overhead throw [medicine ball · delts]
+- `fedb:Step-up_with_Knee_Raise` fe_e1a85370 step-up with knee raise [body weight · glutes]
+- `fedb:Stomach_Vacuum` fe_b9e20b65 stomach vacuum [body weight · abs]
+- `fedb:Straight_Bar_Bench_Mid_Rows` fe_1cef0e2c straight bar bench mid rows [barbell · upper back]
+- `fedb:Straight_Raises_on_Incline_Bench` fe_9cefc74c straight raises on incline bench [barbell · delts]
+- `fedb:Stride_Jump_Crossover` fe_a53049d0 stride jump crossover [body weight · quads]
+- `fedb:Superman` fe_56b13a36 superman [body weight · spine]
+- `fedb:Supine_One-Arm_Overhead_Throw` fe_25fe4647 supine one-arm overhead throw [medicine ball · abs]
+- `fedb:T-Bar_Row_with_Handle` fe_2bfb85d5 t-bar row with handle [barbell · upper back]
+- `fedb:The_Straddle` fe_58e661ba the straddle [body weight · hamstrings]
+- `fedb:Toe_Touchers` fe_2b02231f toe touchers [body weight · abs]
+- `fedb:Torso_Rotation` fe_2f089211 torso rotation [stability ball · abs]
+- `fedb:Upper_Back-Leg_Grab` fe_57cf0633 upper back-leg grab [body weight · hamstrings]
+- `fedb:Upright_Row_-_With_Bands` fe_2b220bd7 upright row - with bands [band · traps]
+- `fedb:Upward_Stretch` fe_50347d50 upward stretch [body weight · delts]
+- `fedb:V-Bar_Pullup` fe_742b4a69 v-bar pullup [body weight · lats]
+- `fedb:Vertical_Swing` fe_f6fba75b vertical swing [dumbbell · hamstrings]
+- `fedb:Weighted_Ball_Hyperextension` fe_689c9fb3 weighted ball hyperextension [stability ball · spine]
+- `fedb:Weighted_Ball_Side_Bend` fe_8119824a weighted ball side bend [stability ball · abs]
+- `fedb:Weighted_Sit-Ups_-_With_Bands` fe_31b14764 weighted sit-ups - with bands [band · abs]
+- `fedb:Wide_Stance_Stiff_Legs` fe_05a78a6f wide stance stiff legs [barbell · hamstrings]
+- `fedb:Windmills` fe_850c44b5 windmills [body weight · abductors]
+- `fedb:Wrist_Rotations_with_Straight_Bar` fe_e19751d6 wrist rotations with straight bar [barbell · forearms]
+- `fedb:Yoke_Walk` fe_602efec2 yoke walk [weighted · quads]
+- `lh:one-handed-cross-body-curl` lh_e80062ec one-handed cross-body curl [dumbbell · biceps]
+- `lh:frog-pumps` lh_6b8bbe7e frog pumps [body weight · glutes]
+- `lh:lying-windshield-wiper` lh_53a44f77 lying windshield wiper [body weight · abs]
+- `lh:one-legged-glute-bridge` lh_9d1519c8 one-legged glute bridge [body weight · glutes]
+- `lh:burpee-bosu` lh_5299ed17 bosu burpee [bosu ball · pectorals]
+- `lh:plank-bosu` lh_af9bc770 bosu plank [bosu ball · abs]
+- `lh:glute-kickback-machine` lh_fb5b02eb machine glute kickback [leverage machine · glutes]
+- `lh:pause-squat-barbell` lh_a3a920dc barbell pause squat [barbell · glutes]
+- `lh:eccentric-heel-drop` lh_b4f73a3a eccentric heel drop [body weight · calves]
+- `lh:squat-belt` lh_ca47ae3b belt squat [weighted · glutes]
+- `lh:hang-power-clean` lh_ff5877ba hang power clean [barbell · glutes]
+- `lh:squat-landmine` lh_81b44c71 landmine squat [barbell · glutes]
+- `lh:push-up-feet-in-rings` lh_bd79b5b6 ring (feet) push-up [body weight · pectorals]
+- `lh:lateral-walk-band` lh_97e30ada band lateral walk [band · glutes]
+- `lh:kneeling-side-plank` lh_0ea69908 kneeling side plank [body weight · abs]
+- `lh:one-handed-plate-pinch` lh_ecb1dff3 one-handed plate pinch [weighted · forearms]
+- `lh:wrist-extension-barbell` lh_4a282081 barbell wrist extension [barbell · forearms]
+- `lh:monkey-row` lh_3d5fd5e9 monkey row [dumbbell · delts]
+- `lh:one-legged-hip-thrust` lh_85eec0be one-legged hip thrust [body weight · glutes]
+- `lh:torso-rotation-machine` lh_104fdf44 torso rotation machine [leverage machine · abs]
+- `lh:lunge-bodyweight` lh_be29bb17 lunge [body weight · glutes]
+- `lh:horizontal-internal-shoulder-rotation-dumbbell` lh_78bb1a50 dumbbell horizontal internal shoulder rotation [dumbbell · delts]
+- `lh:bar-hang` lh_b8379230 bar hang [body weight · forearms]
+- `lh:shallow-lunge-bodyweight` lh_647de8d8 shallow lunge [body weight · glutes]
+- `lh:hanging-knee-raise` lh_bd66eca1 hanging knee raise [body weight · abs]
+- `lh:push-press-barbell` lh_aeddcaee barbell push press [barbell · delts]
+- `lh:horizontal-wood-chop-band` lh_c0da3449 band horizontal wood chop [band · abs]
+- `lh:side-kicks-band` lh_a67dc2e0 band side kicks [band · abductors]
+- `lh:roll-up` lh_19bebecc roll-up [body weight · abs]
+- `lh:gripper` lh_16411171 gripper [weighted · forearms]
+- `lh:towel-pull-up` lh_facda989 towel pull-up [body weight · forearms]
+- `lh:hip-thrust-machine` lh_f89aa9c5 machine hip thrust [leverage machine · glutes]
+- `lh:seated-snatch-grip-behind-the-neck-press` lh_6c3474cb seated snatch grip behind the neck press [barbell · delts]
+- `lh:floor-back-extension` lh_fcfe2d1b floor back extension [body weight · spine]
+- `lh:standing-cable-leg-curl` lh_86fea814 standing cable leg curl [cable · hamstrings]
+- `lh:bulgarian-split-squat` lh_31cd0501 bulgarian split squat [body weight · glutes]
+- `lh:one-legged-balance` lh_b567f204 one-legged balance [body weight · calves]
+- `lh:feet-up-bench-press-barbell` lh_d6ac96ab barbell feet-up bench press [barbell · pectorals]
+- `lh:one-handed-plate-wrist-curl` lh_22b25f72 one-handed plate wrist curl [weighted · forearms]
+- `lh:seated-oblique-twist` lh_ad4d02e9 seated oblique twist [body weight · abs]
+- `lh:one-handed-wrist-extension-dumbbell` lh_00ddcc87 dumbbell one-handed wrist extension [dumbbell · forearms]
+- `lh:one-handed-lat-pulldown` lh_364e64c1 one-handed lat pulldown [cable · lats]
+- `lh:deadlift-fat-bar` lh_16eb22d0 fat bar deadlift [barbell · forearms]
+- `lh:one-handed-standing-chest-fly-band` lh_70c30658 band one-handed standing chest fly [band · pectorals]
+- `lh:underhand-grip-inverted-row` lh_b63a5240 underhand grip inverted row [body weight · lats]
+- `lh:mountain-climbers-bosu` lh_e39cf01a bosu mountain climbers [bosu ball · abs]
+- `lh:standing-bicycle-crunch` lh_d41605a6 standing bicycle crunch [body weight · abs]
+- `lh:side-lying-clamshell` lh_5dc60321 side-lying clamshell [body weight · abductors]
+- `lh:fire-hydrants` lh_06efe3dc fire hydrants [body weight · glutes]
+- `lh:pause-deadlift-barbell` lh_7c2a82e2 barbell pause deadlift [barbell · glutes]
+- `lh:runners-5` lh_b2169655 runner's 5 [body weight · calves]
+- `lh:oblique-sit-up` lh_05444bea oblique sit-up [body weight · abs]
+- `lh:shrug-trap-bar` lh_7228a812 trap bar shrug [trap bar · traps]
+- `lh:half-air-squat` lh_7e366f90 half air squat [body weight · glutes]
+- `lh:front-hold-plate` lh_2361bbde plate front hold [weighted · delts]
+- `lh:one-handed-chest-press-dumbbell` lh_6afa3e71 dumbbell one-handed chest press [dumbbell · pectorals]
+- `lh:rope-wave` lh_a5525833 rope wave [rope · biceps]
+- `lh:prone-incline-front-raise-dumbbell` lh_576cbf28 dumbbell prone incline front raise [dumbbell · delts]
+- `lh:kickstand-squat-kettlebell` lh_fb2197c4 kettlebell kickstand squat [kettlebell · glutes]
+- `lh:one-handed-shoulder-press-landmine` lh_a1c0e7db landmine one-handed shoulder press [barbell · pectorals]
+- `lh:landmine-rotation` lh_8e3e6996 landmine rotation [barbell · abs]
+- `lh:step-up` lh_07daed87 step-up [body weight · glutes]
+- `lh:one-handed-plank` lh_300ed364 one-handed plank [body weight · abs]
+- `lh:sled-pull` lh_ca5f5cb1 sled pull [weighted · calves]
+- `lh:forearm-roll-up-barbell` lh_f997366e barbell forearm roll-up [barbell · forearms]
+- `lh:forearm-twist-dumbbell` lh_7733b575 dumbbell forearm twist [dumbbell · forearms]
+- `lh:z-press-dumbbell` lh_d04efa71 dumbbell z press [dumbbell · delts]
+- `lh:z-press-barbell` lh_894aa159 barbell z press [barbell · delts]
+- `lh:upright-downward-internal-rotation-cable` lh_a306d2ab cable upright downward internal rotation [cable · delts]
+- `lh:upright-upward-external-rotation-cable` lh_ef7da1eb cable upright upward external rotation [cable · delts]
+- `lh:plank-pull-through` lh_dd21077f plank pull through [body weight · abs]
+- `lh:meadows-row` lh_1a186491 meadows row [barbell · lats]
+- `lh:one-handed-high-cable-row` lh_e4fb3924 one-handed high-cable row [cable · lats]
+- `lh:one-handed-leaning-lateral-raise-dumbbell` lh_337b0c23 dumbbell one-handed leaning lateral raise [dumbbell · delts]
+- `lh:horizontal-wood-chop-cable` lh_908bec0e cable horizontal wood chop [cable · abs]
+- `lh:single-leg-v-up` lh_e9ef04ae single-leg v-up [body weight · abs]
+- `lh:around-the-world-kettlebell` lh_b17f9aa1 kettlebell around the world [kettlebell · abs]
+- `lh:lu-raise-dumbbell` lh_417fd499 dumbbell lu raise [dumbbell · delts]
+- `lh:crush-grip-curl-dumbbell` lh_ce7d4d1d dumbbell crush grip curl [dumbbell · biceps]
+- `lh:one-handed-hammer-isometric-hold-dumbbell` lh_1475f025 dumbbell one-handed hammer isometric hold [dumbbell · biceps]
+- `lh:hanging-side-to-side-knee-drive` lh_1f6d1828 hanging side-to-side knee drive [body weight · abs]
+- `lh:lateral-lunge-dumbbell` lh_a1a610cd dumbbell lateral lunge [dumbbell · glutes]
+- `lh:single-arm-bottoms-up-overhead-press-kettlebell` lh_d91f651d kettlebell single-arm bottoms-up overhead press [kettlebell · delts]
+- `lh:alternating-z-press-double-kettlebell` lh_f92c655f double kettlebell alternating z press [kettlebell · delts]
+- `lh:feet-elevated-bulgarian-row-ring` lh_661accf4 ring feet-elevated bulgarian row [body weight · biceps]
+- `lh:feet-elevated-oblique-crunch-stability-ball` lh_21122059 stability ball feet-elevated oblique crunch [stability ball · abs]
+- `lh:nordic-hamstring-curl` lh_2d1f6c3d nordic hamstring curl [body weight · hamstrings]
+- `lh:kneeling-cuban-rotation-barbell` lh_567657bf barbell kneeling cuban rotation [barbell · delts]
+- `lh:single-arm-front-rack-contralateral-walking-lunge-kettlebell` lh_d921179b kettlebell single-arm front rack contralateral walking lunge [kettlebell · glutes]
+- `lh:front-rack-knee-over-toe-split-squat-dumbbell` lh_efed36d3 dumbbell front rack knee over toe split squat [dumbbell · glutes]
+- `lh:single-arm-bulgarian-split-squat-dumbbell` lh_b7e99b9f dumbbell single-arm bulgarian split squat [dumbbell · glutes]
+- `lh:one-handed-overhead-contralateral-step-up-dumbbell` lh_04ccbbe0 dumbbell one-handed overhead contralateral step-up [dumbbell · glutes]
+- `lh:sumo-squat-dumbbell` lh_eb253f9c dumbbell sumo squat [dumbbell · glutes]
+- `lh:one-handed-suitcase-walking-lunge-dumbbell` lh_6fdbad68 dumbbell one-handed suitcase walking lunge [dumbbell · glutes]
+- `lh:one-handed-standing-chest-fly-cable` lh_e251826a cable one-handed standing chest fly [cable · pectorals]
+- `lh:isometric-pull-up-hold` lh_95ebb830 isometric pull-up hold [body weight · forearms]
+- `lh:quadruped-hip-extension` lh_8646661d quadruped hip extension [body weight · glutes]
+- `lh:single-arm-front-rack-walking-lunge-dumbbell` lh_cffa970e dumbbell single-arm front rack walking lunge [dumbbell · glutes]
+- `lh:single-leg-romanian-deadlift-jump` lh_cec6c2d9 single-leg romanian deadlift jump [body weight · calves]
+- `lh:single-arm-thruster-landmine` lh_173f0632 landmine single-arm thruster [barbell · glutes]
+- `lh:forearm-plank-knee-to-elbow` lh_25f02c2f forearm plank knee to elbow [body weight · abs]
+- `lh:skull-crusher-cable-with-rope` lh_21da8c13 cable rope skull crusher [cable · triceps]
+- `lh:one-handed-bayesian-curl-cable` lh_7e6139b5 cable one-handed bayesian curl [cable · biceps]
+- `lh:bottoms-up-seesaw-overhead-press-kettlebell` lh_9190bc6a kettlebell bottoms up seesaw overhead press [kettlebell · delts]
+- `lh:front-rack-low-switch-cossack-squat-kettlebell` lh_a1ea046d kettlebell front rack low switch cossack squat [kettlebell · glutes]
+- `lh:alternating-single-arm-dead-clean-to-push-press-kettlebell` lh_8eca367b kettlebell alternating single-arm dead clean to push press [kettlebell · glutes]
+- `lh:front-rack-march-kettlebell` lh_5c33d9e2 kettlebell front rack march [kettlebell · abs]
+- `lh:front-rack-curtsy-lunge-barbell` lh_641dc09a barbell front rack curtsy lunge [barbell · glutes]
+- `lh:alternating-tall-kneeling-arnold-press-hand-weights` lh_2433e2f9 dumbbell alternating tall kneeling arnold press [dumbbell · delts]
+- `lh:seated-rotational-slam-medicine-ball` lh_fb0607b9 medicine ball seated rotational slam [medicine ball · abs]
+- `lh:horn-grip-bicep-curl-kettlebell` lh_20a7660d kettlebell horn grip bicep curl [kettlebell · biceps]
+- `lh:swing-and-high-pull-double-kettlebell` lh_9589bd08 double kettlebell swing and high pull [kettlebell · glutes]
+- `lh:one-arm-row-lunge-band` lh_e024e1f4 band one-arm row lunge [band · glutes]
+- `lh:one-leg-prone-hip-extension` lh_1ba60d1d one-leg prone hip extension [body weight · glutes]
+- `lh:drinking-bird-row-band` lh_c39f3233 band drinking bird row [band · lats]
+- `lh:standing-clamshell` lh_ebe7c2ee standing clamshell [body weight · glutes]
+- `lh:one-leg-front-foot-elevated-split-squat-dumbbell` lh_15452318 dumbbell one-leg front foot elevated split squat [dumbbell · glutes]
+- `lh:hip-hinge-band` lh_4b66781b band hip hinge [band · glutes]
+- `lh:seated-half-good-morning-band` lh_3469dedf band seated half good morning [band · glutes]
+- `lh:prisoner-squat-bodyweight` lh_1c63130b prisoner squat [body weight · glutes]
+- `lh:one-leg-lying-heel-slide` lh_64288c96 one-leg lying heel slide [body weight · hamstrings]
+- `lh:thumbs-up-lateral-raise-dumbbell` lh_69eeb08a dumbbell thumbs-up lateral raise [dumbbell · delts]
+- `lh:one-leg-kneeling-bottoms-up-hold-kettlebell` lh_d7e410e4 kettlebell one-leg kneeling bottoms-up hold [kettlebell · delts]
+- `lh:alternating-side-lunge-pull-plate` lh_b055bb5a plate alternating side lunge pull [weighted · glutes]
+- `lh:hand-release-push-up` lh_444db891 hand-release push-up [body weight · pectorals]
+- `lh:prone-assisted-neck-bridge` lh_8b9e598d prone assisted neck bridge [body weight · spine]
+- `lh:one-arm-tabletop-spine-twist` lh_d6dedfc6 one-arm tabletop spine twist [body weight · spine]
+- `lh:one-leg-wide-lunge` lh_427cc63a one-leg wide lunge [body weight · glutes]
+- `lh:one-leg-seated-rock-paper-scissor-toes` lh_2488069d one-leg seated rock-paper-scissor toes [body weight · calves]
+- `lh:one-leg-seated-knee-to-chest-foam-roller` lh_e84109f3 foam roller one-leg seated knee-to-chest [roller · glutes]
+- `lh:seated-calf-massage-lacrosse-ball` lh_14216c38 lacrosse ball seated calf massage [roller · calves]
+- `lh:one-arm-front-bend-wall-push` lh_13ceed01 one-arm front bend wall push [body weight · pectorals]
+- `lh:one-leg-lying-ankle-nerve-floss` lh_4c141ddc one-leg lying ankle nerve floss [body weight · calves]
+- `lh:lying-overhead-shoulder-rotation-dowel` lh_300367c4 dowel lying overhead shoulder rotation [body weight · delts]
+- `lh:neck-twist-lacrosse-ball` lh_f4ee5779 lacrosse ball neck twist [roller · traps]
+- `lh:alternating-lying-chin-tuck-neck-twist` lh_bbc91bf3 alternating lying chin tuck neck twist [body weight · traps]
+- `lh:one-arm-lying-spine-twist-yoga-block` lh_d9905a13 yoga block one-arm lying spine twist [body weight · spine]
+- `lh:one-leg-lying-outer-thigh-hip-twist` lh_6bb3cb8d one-leg lying outer thigh hip twist [body weight · abductors]
+- `lh:one-leg-foot-plank-yoga-block` lh_276b7bfb yoga block one-leg foot plank [body weight · calves]
+- `lh:one-arm-lunging-spinal-wall-twist` lh_935633d1 one-arm lunging lower back wall twist [body weight · spine]
+- `lh:one-leg-seated-hamstring-roll-foam-roller` lh_b804c37e foam roller one-leg seated hamstring roll [roller · hamstrings]
+- `lh:one-leg-elevated-pigeon-stretch` lh_d50d56d0 one-leg elevated pigeon stretch [body weight · glutes]
+- `lh:one-arm-bicep-wall-stretch` lh_b3d157e7 one-arm bicep wall stretch [body weight · biceps]
+- `lh:segmental-lower-back-flexion` lh_28f5b519 segmental lower back flexion [body weight · traps]
+- `lh:one-leg-incline-reverse-pigeon-bench` lh_3438f4cc bench one-leg incline reverse pigeon [body weight · glutes]
+- `lh:one-leg-seated-pretzel-stretch` lh_7bdfedb6 one-leg seated pretzel stretch [body weight · glutes]
+- `lh:prone-quad-rolling-foam-roller` lh_017ff18f foam roller prone quad rolling [roller · quads]
+- `lh:shoulder-teepee-dowel` lh_7a322044 dowel shoulder teepee [body weight · delts]
+- `lh:seated-crossed-leg-forward-stretch` lh_c814bdce seated crossed leg forward stretch [body weight · glutes]
+- `lh:one-leg-bent-knee-calf-stretch-yoga-block` lh_27d413a5 yoga block one-leg bent knee calf stretch [body weight · calves]
+- `lh:overhead-shrug-neck-rotation` lh_a84923d2 overhead shrug neck rotation [body weight · traps]
+- `lh:front-line-opener` lh_e1d50b77 front line opener [body weight · pectorals]
+- `lh:one-leg-prone-quad-stretch-band` lh_9057adbd band one-leg prone quad stretch [band · quads]
+- `lh:one-leg-seated-calf-release-lacrosse-ball` lh_a1914245 lacrosse ball one-leg seated calf release [roller · calves]
+- `lh:one-leg-seated-ankle-crosses` lh_74472297 one-leg seated ankle crosses [body weight · calves]
+- `lh:hamstring-floor-sweep` lh_052dc3b8 hamstring floor sweep [body weight · glutes]
+- `lh:halo-neck-rotation` lh_4950e65b halo neck rotation [body weight · traps]
+- `lh:one-arm-prone-rotator-cuff-external-rotation` lh_0fe11f7f one-arm prone rotator cuff external rotation [body weight · delts]
+- `lh:kneeling-reclining-hero-pose-pillow` lh_1a8dd353 pillow kneeling reclining hero pose [body weight · quads]
+- `lh:wrist-extensor-rotation-stretch` lh_0d629a34 wrist extensor rotation stretch [body weight · forearms]
+- `lh:one-arm-posterior-shoulder-pull-dowel` lh_c5547a33 dowel one-arm posterior shoulder pull [body weight · delts]
+- `lh:one-arm-kneeling-lower-back-wall-sweep-foam-roller` lh_4b67f7c5 foam roller one-arm kneeling lower back wall sweep [roller · spine]
+- `lh:one-arm-front-shoulder-active-massage-lacrosse-ball` lh_95a9db24 lacrosse ball one-arm front shoulder active massage [roller · delts]
+- `lh:seated-knee-to-heel-taps` lh_754f802f seated knee to heel taps [body weight · glutes]
+- `lh:assisted-wrist-rotation` lh_9810c307 assisted wrist rotation [body weight · forearms]
+- `lh:one-leg-kneeling-couch-quad-stretch` lh_dbd57180 one-leg kneeling couch quad stretch [body weight · quads]
+- `lh:hands-and-knees-segmental-cat-cow` lh_666c03d3 hands-and-knees segmental cat cow [body weight · spine]
+- `lh:one-arm-seated-lower-back-rotation-stretch` lh_b1d2e640 one-arm seated lower back rotation stretch [body weight · spine]
+- `lh:cardio-row` lh_e430fead rowing [body weight · cardiovascular system]
+- `lh:cardio-swim` lh_1ff15091 swimming [body weight · cardiovascular system]
+- `wg:d551f24d-44fe-4761-9448-edf14d627827` wg_aa5aadda body-ups [body weight · triceps]
+- `wg:d059c63d-0a81-48a3-912a-44070c0def2e` wg_62f9ade6 hollow hold [body weight · abs]
+- `wg:6441ff9e-037e-48d9-8800-67b430dc8e37` wg_b2ed5cfb pause bench [barbell · pectorals]
+- `wg:2b6c09f7-dbf1-45ea-baf6-9a12e0b12396` wg_929c6692 renegade row [dumbbell · lats]
+- `wg:46ee5805-512a-43a2-944c-97f7744b0078` wg_67024b03 wall squat [body weight · hamstrings]
+- `wg:e872658a-3bac-4d9e-bcf2-15919ebea43a` wg_41280c2b commando pull-ups [body weight · delts]
+- `wg:9b5f8c6e-2436-4ded-aea9-8c698b0c8768` wg_9f081188 kettlebell deadlifts [kettlebell · hamstrings]
+- `wg:f0f53b8e-0136-4195-baf3-781903651359` wg_18476392 dumbbell hang power cleans [dumbbell · hamstrings]
+- `wg:0c30c543-e2cc-499b-bc31-8c28db445ed2` wg_87635d18 dumbbell sumo deadlift [dumbbell · hamstrings]
+- `wg:f20ab712-f953-4705-8710-9681392ddd07` wg_65c29ced wall balls [medicine ball · delts]
+- `wg:8c132ea0-7885-474f-8514-0909ae22bdf6` wg_b7f8589c dragon squat [body weight · quads]
+- `wg:e79616cb-f5fb-4b10-b99d-09d43774e142` wg_843c1809 front lever tuck [body weight · delts]
+- `wg:603895ca-20a0-4272-a62b-293d14220390` wg_92470778 reverse snow angel [body weight · traps]
+- `wg:676e8149-863e-4174-a09a-a327b247c00d` wg_20ff24a4 finger pushup [body weight · pectorals]
+- `wg:2418b290-801c-45fd-a990-fc9f234ab1e5` wg_9b184068 dumbbell drag curls [dumbbell · biceps]
+- `wg:7cc24acf-3fc9-4d14-a461-cd00d1d18f0e` wg_176974e1 dumbbell single-leg hip thrust [dumbbell · glutes]
+- `wg:00eae665-ff78-4373-9c43-f44a4a1b43e0` wg_363cbed6 frog stand [body weight · delts]
+- `wg:29a361d5-1300-4fb4-90d6-d6350bec9cb9` wg_aac2f536 exercise band dorsiflexion [band · calves]
+- `wg:70c97a79-5e88-4549-a74c-0e5190a5c048` wg_80e2c4af exercise band plantarflexion [band · calves]
+- `wg:662b9911-fa55-4564-b830-fdb6a046b162` wg_460d5e99 ice cream maker [body weight · lats]
+- `wg:b61dff58-6e47-4671-853b-208e7cd0ced4` wg_9d63c735 front lever pull-up [body weight · biceps]
+- `wg:e781dae5-90b8-4105-8aa6-82d278ac5ff5` wg_b8b27c7d helms row [dumbbell · lats]
+- `wg:587af8f1-516b-44c3-8660-70f262e1bef8` wg_369e55d9 dumbbell hex press [dumbbell · pectorals]
+- `wg:34cce09a-edb3-4140-892a-1cf70da8d98b` wg_63bf63dd elephant walks [body weight · hamstrings]
+- `wg:af59f161-147a-49ba-85c8-6c9f4e5ffe63` wg_01220c7d standing pancake [body weight · hamstrings]
+- `wg:2a983b8f-b77e-4f8f-8335-0e5caecd715f` wg_35fb5a55 scapula pulls [body weight · lats]
+- `wg:96f9d74a-7bf4-4ec1-9cd6-c62c13cf7b67` wg_7ddd3bf7 pin squat [barbell · hamstrings]
+- `wg:70479b75-0df4-4ac2-a324-4a44b148304c` wg_921415dd cable press around [cable · delts]
+- `wg:37314b67-1aad-4405-aa88-70846d5f035d` wg_518a6936 cross-body cable y-raise [cable · delts]
+- `wg:b3049397-a1d1-4442-9113-3532bcd1f278` wg_cc3fbf35 spider curl [dumbbell · biceps]
+- `wg:6b68043c-a900-41f4-89fb-ea5c8193f216` wg_9d382827 floor skull crusher [ez barbell · triceps]
+- `wg:a8a4ea81-9531-48e1-b6dc-f7621c7b9283` wg_822e408d 1-arm half-kneeling lat pulldown [cable · lats]
+- `wg:1bb3bbaf-2dc2-4651-95db-71faf5304075` wg_d33dc168 butterfly sit up [body weight · abs]
+- `wg:9816dc3a-9739-4c70-bce0-4131f889e4f2` wg_0b54471b levitation crunch [body weight · abs]
+- `wg:02b96dc1-d1d9-4fc7-b54c-82dda1691485` wg_22195222 drag pushdown [cable · triceps]
+- `wg:31a58615-d3ae-4233-9c50-9143c899ce8c` wg_1b3dc2aa dumbbell cheat curl [dumbbell · biceps]
+- `wg:81015468-545f-4170-9b46-701afe77848e` wg_03a2e7d5 alternative db gorilla rows [dumbbell · lats]
+- `wg:b407768d-d519-47b8-818a-44c9761a8be6` wg_f8874313 dumbbell frog press [dumbbell · glutes]
+- `wg:82f19d1c-f12b-49f0-bfdd-24239f93eabc` wg_34ab4169 dumbbell bradford press [dumbbell · delts]
+- `wg:ffdb4806-d64e-474b-8ce5-8df9a57fb9c7` wg_33d4048e pendulum squat [leverage machine · quads]
+- `wg:42d09639-a5a6-4aa6-b115-e4c96b1d3735` wg_2d15d144 toes to bar [body weight · abs]
+- `wg:6349365e-e901-4280-a1b7-65734986f47d` wg_69923e1d bird dog [body weight · abs]
+- `wg:dbed4613-e1d5-483f-90ae-6db5d593911e` wg_71f3c486 copenhagen adduction exercise [body weight · glutes]
+- `wg:075bff87-f676-4d9d-92b4-39d557453fc7` wg_1bcee122 typewriter pull-ups [body weight · biceps]
+- `wg:5cbaa028-114d-4a15-9a95-70d9b3146f30` wg_cb770f23 kettlebell sumo deadlift [kettlebell · hamstrings]
+- `wg:51ab6376-eb3e-42dc-ad48-46166c94adac` wg_59975397 dumbbell bent over face pull [dumbbell · delts]
+- `wg:af77220c-098c-47c2-9f8c-92a651998903` wg_babb6c2d dumbbell hip thrust [dumbbell · glutes]
+- `wg:73144238-414e-438f-8b0c-832a6591aa2f` wg_ffea60a5 seated figure four [body weight · glutes]
+- `wg:ae6a522e-db10-45ba-9642-987468d8a4de` wg_63e04a06 dumbbell thruster [dumbbell · hamstrings]
+- `wg:9396a728-3da4-4390-ae4d-882395805008` wg_7e7d8a35 tuck l-sit [body weight · abs]
+- `wg:90f12b1b-b33e-4d83-9f9e-e26d3a4b8e0b` wg_fa10e66a sleeper stretch [body weight · delts]
+- `wg:b6c19c36-34be-4d9f-8c07-8bdf9ab3ba1a` wg_960f9089 suitcase carry [dumbbell · abs]
+- `wg:d18407c2-75d0-43d8-8bbc-dfbb256b6b2f` wg_453bb2d3 trap bar squat [trap bar · quads]
+- `wg:fa5252d3-973c-4b35-9324-a02460545283` wg_d4f411cb ankle dorsiflexion rocks [body weight · calves]
+- `wg:57018827-f344-4627-88e5-03e4f2f49859` wg_91781045 behind the back cable lateral raise [cable · delts]
+- `wg:62f90b5c-7451-4fd0-91ae-4dd93c51aa41` wg_931203bd trap-3 raise [body weight · traps]
+- `wg:36411665-4a87-4ab5-b5d3-e4eaa2802a62` wg_e5c12297 horse stance (side splits) [body weight · glutes]
+- `wg:d2cf769a-9271-41ae-90fc-aef813e41740` wg_8359c822 straddle l-sit [body weight · abs]
+- `wg:64b50772-c73d-4833-8518-947a648fa623` wg_368a513d barbell silverback shrug [barbell · traps]
+- `wg:553fb643-32f0-447f-aecb-cdf75398d742` wg_fe0bf582 hip airplane [body weight · glutes]
+- `wg:cf6bf132-fe21-4b70-8f73-006545246f05` wg_f80566b5 reverse clamshell [body weight · glutes]
+- `wg:142fcef5-63a7-4d30-81e4-bc9d7073fe99` wg_e533baea ytw raises [body weight · delts]
+- `wg:3096b34e-1781-4f99-8187-d9acac8e712b` wg_0d80a438 band terminal knee extension [band · quads]
+- `wg:d5e5c5a1-69af-42b0-9106-dc8284e7262a` wg_63ae3d59 front split stretch [body weight · hamstrings]
+- `wg:1d1a53dd-e00f-477e-83f7-09c8ef9a71cd` wg_86f0000d elbow lever [body weight · abs]
+- `wg:a825d0f7-de61-4ca3-a2b2-0f8b00303464` wg_758afda0 90/90 hip switches [body weight · glutes]
+- `wg:28d18142-8777-4dba-a3a1-6151cec94500` wg_62ded35b lean-away cable lateral raise [cable · delts]
+- `wg:11914fdd-02d9-4aa6-88be-0c10cd54c609` wg_afe56ec7 kelso shrugs [barbell · traps]

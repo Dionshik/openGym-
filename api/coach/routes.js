@@ -25,6 +25,16 @@ const USER_ERROR = {
   unprivileged: 'the Coach is switched off on this instance for safety reasons'
 };
 const HTTP_FOR = { off: 503, busy: 409, cap: 429, consent: 403, shared: 409, unprivileged: 503 };
+// An exercise lookup is awaited rather than queued, so the ways a provider call can fail come
+// back on the request itself. The class travels as `code`; the client words it (JOB_ERRORS).
+const LOOKUP_ERROR = {
+  empty: 'describe the exercise first',
+  busy: 'a lookup is already running',
+  cap: 'that is enough lookups for today — try again tomorrow',
+  timeout: 'the Coach took too long and gave up',
+  unusable: 'the Coach answered with something the app could not use'
+};
+const LOOKUP_HTTP = { empty: 400, timeout: 504, auth: 502, provider: 502, missing: 502, unusable: 502 };
 
 export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
   /** Every user route starts the same way: signed in, feature on, feature reachable. */
@@ -105,6 +115,23 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       const user = guard(req, res); if (!user) return;
       const body = await readBody(req);
       json(res, 200, { ok: true, sharing: jobs.setShare(user.id, !!body.share) });
+    },
+
+    /* "Describe it in your own words": the text goes to the provider, which says what exercise
+       it is; the catalogue rows that name resolves to, and the draft of a new exercise, come
+       back on this request. Nothing is stored and nothing is added — the user picks. */
+    'POST /api/coach/match': async (req, res) => {
+      const user = guard(req, res); if (!user) return;
+      const body = await readBody(req);
+      try {
+        json(res, 200, await jobs.match(user.id, body.text));
+      } catch (e) {
+        if (!(e instanceof jobs.CoachError)) throw e;
+        json(res, LOOKUP_HTTP[e.code] || HTTP_FOR[e.code] || 400, {
+          error: LOOKUP_ERROR[e.code] || USER_ERROR[e.code] || 'the Coach could not run — the instance owner needs to check its setup',
+          code: e.code
+        });
+      }
     },
 
     'POST /api/coach/pending/resolve': async (req, res) => {
@@ -212,6 +239,8 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       if (body.community !== undefined) patch.community = !!body.community;
       if (body.caps) {
         patch.caps = {
+          // The card has no field for the lookup cap; saving the two it does have must not reset it.
+          ...current.caps,
           perProfileDaily: Math.max(0, Math.min(200, +body.caps.perProfileDaily || 0)),
           instanceDaily: Math.max(0, Math.min(5000, +body.caps.instanceDaily || 0))
         };

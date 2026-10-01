@@ -4,7 +4,8 @@
 import { PROMPTS } from './prompts.js';
 
 export const taskOf = (kind, payload) =>
-  kind === 'review' ? 'review' : kind === 'debrief' ? 'debrief' : payload && payload.refine ? 'refine' : 'create';
+  kind === 'review' ? 'review' : kind === 'debrief' ? 'debrief' : kind === 'match' ? 'match'
+    : payload && payload.refine ? 'refine' : 'create';
 
 /**
  * The prompt in two parts: `system` is the rules — byte-identical for every job of the same
@@ -16,7 +17,9 @@ export const taskOf = (kind, payload) =>
  */
 export function buildPromptParts(kind, payload, repair) {
   const task = taskOf(kind, payload);
-  const system = PROMPTS.common + '\n\n---\n\n' + PROMPTS[task];
+  // The exercise lookup is not coaching: it reads no plan and no training, so the coaching
+  // rules in common.md would be forty lines about a payload it never gets. Its prompt stands alone.
+  const system = task === 'match' ? PROMPTS.match : PROMPTS.common + '\n\n---\n\n' + PROMPTS[task];
   // Compact JSON, not pretty-printed: the indentation was ~30% of the payload's tokens and
   // a model reads either just as well.
   let user = '## Payload\n\n```json\n' + JSON.stringify(payload) + '\n```\n';

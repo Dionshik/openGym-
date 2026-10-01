@@ -15,7 +15,10 @@ docker compose pull   # prebuilt images from GitLab's registry (amd64 + arm64; t
 docker compose up -d
 ```
 
-- First start downloads the exercise images/GIFs (~140 MB) once into `media/img` and `media/gif`.
+- First start downloads the exercise images/GIFs (~140 MB) once into `media/img` and `media/gif`,
+  and start/end photographs for some of the additional exercises (~90 MB) into `media/img/fedb`.
+  Those photographs come from a project that does not own them — `NOTICE.md` says what that
+  means and how to run without them (an empty `media/img/fedb/.complete` skips the download).
 - Open **http://localhost:8080** and create a profile with a passkey.
 - Rather build from source than pull prebuilt images? Skip `docker compose pull` and run
   `docker compose up -d --build` instead — no Node needed locally either way.
@@ -123,6 +126,30 @@ right now, each user's workout history and body weight, the ability to disable a
 out and locked out everywhere until you re-enable it), and — with `INVITE_ONLY=1` — generating and
 revoking invite codes. Existing accounts keep working when you switch invite-only on. Admin access
 is gated by your passkey and enforced server-side, so it needs no separate login.
+
+### Shared exercises and moderators
+
+A custom exercise belongs to whoever made it and nobody else sees it — until they press
+**Suggest for everyone** on it. That puts it in a queue; an admin or a moderator then approves it
+(correcting it first if it needs it) or declines it with a note the suggester will read. An
+approved exercise appears in every profile's library on the instance, marked *shared*, and can be
+planned and logged like a built-in one. The suggester keeps their own copy; for them the two are
+one exercise.
+
+A shared exercise is never deleted — somebody's routine or workout history may already name it.
+It can be **retired**: it stops being offered, and everything that already uses it keeps working.
+
+A **moderator** is a member you trust with exactly that queue, and with invite codes of their
+own. Make one from the Admin dashboard: tap a user, **Make moderator**. They get a
+**Moderation** entry in Settings and nothing from the dashboard itself — no user list, nobody's
+training data, no activity log, no Coach settings — and they see and revoke only the invite
+codes they created, because the full list names everyone who ever joined. The role is stored on
+the user in `db.json` (`"role": "moderator"`), takes effect on their next request, and is
+taken back the same way it was given. Admins can do everything a moderator can; their decisions
+and a moderator's both land in the activity log.
+
+The pool lives in `./data/pool.json`. People who use the app as guests, and the standalone
+mobile app when it is not paired to a server, have no pool: there is no server to hold one.
 
 ### The activity log
 
@@ -243,8 +270,8 @@ Everything is in `./data`:
 tar czf opengym-backup-$(date +%F).tar.gz data/
 ```
 
-That archive contains all profiles, passkeys and workout history — and, if the activity log is
-on, `audit.log` with everyone's sign-in times. Worth knowing before you ship the archive to a
+That archive contains all profiles, passkeys and workout history, the shared exercise pool
+(`pool.json`) — and, if the activity log is on, `audit.log` with everyone's sign-in times. Worth knowing before you ship the archive to a
 backup service you don't run. Restore by unpacking it back into the project folder. (Individual
 users can also export their own data as JSON from Settings.)
 

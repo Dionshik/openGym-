@@ -17,6 +17,9 @@
 //     riding into a backup or a sync.
 import * as payloadLib from '../../../api/coach/core/payload.js'
 import { runPipeline } from '../../../api/coach/core/pipeline.js'
+import { buildMatchPayload, cleanText, resolveMatch } from '../../../api/coach/core/match.js'
+import { withPoolRows } from '../../../api/coach/core/pool-view.js'
+import { hasLookupConsent } from './exercise-match.js'
 import { HTTP_PROVIDERS, baseUrlFor } from '../../../api/coach/core/providers.js'
 import anthropic from '../../../api/coach/core/adapters/anthropic.js'
 import openai from '../../../api/coach/core/adapters/openai.js'
@@ -47,6 +50,11 @@ let last = null   // how the most recent job ended — the same shape the server
 // no admin card — the user is the operator.
 let notify = null
 export function setNotifier(fn) { notify = fn }
+// The shared exercise pool of the server this phone is paired to, if any — handed in by
+// coach-api.js (which already holds the store) rather than imported here, so this module stays
+// loadable without one. Empty on a phone that is not paired: there is no pool to know about.
+let poolRows = () => []
+export function setPoolSource(fn) { poolRows = typeof fn === 'function' ? fn : () => [] }
 
 /* ---------- what this phone is configured with ---------- */
 
@@ -111,6 +119,52 @@ export async function localDisclosure() {
   }
 }
 
+/* ---------- exercise lookup ("describe it in your own words") ----------
+   The same core call the server makes (api/coach/core/match.js), awaited rather than run as a
+   job: a sentence in, catalogue rows and a draft out, nothing kept. Its own daily count, for
+   the reason the server keeps one — several in a row is normal, and they must not spend the
+   ten runs a day the Coach itself gets. */
+export const LOCAL_MATCH_CAP = 30
+let matching = false
+
+async function matchCapState() {
+  const d = await loadCoachDevice()
+  const used = d.matchDaily && d.matchDaily.d === todayISO() ? d.matchDaily.n : 0
+  return { used, limit: LOCAL_MATCH_CAP }
+}
+
+export async function localMatch(S, text) {
+  const fail = (code, message, detail) => Object.assign(new Error(message), { code, detail: detail || null })
+  const asked = cleanText(text)
+  if (!asked) throw fail('empty', t('Describe the exercise first.'))
+  if (matching) throw fail('busy', t('Still looking up the last one — give it a moment.'))
+  if (!hasLookupConsent(S)) throw fail('consent', t('The Coach needs your go-ahead first.'))
+  const d = await loadCoachDevice()
+  const adapter = ADAPTERS[d.provider]
+  if (d.mode !== 'byok' || !adapter) throw fail('off', t('The Coach isn’t set up on this phone.'))
+  const cap = await matchCapState()
+  if (cap.used >= cap.limit) throw fail('cap', t('That is enough lookups for today — the search above still works.'))
+
+  matching = true
+  try {
+    await saveCoachDevice({ matchDaily: { d: todayISO(), n: cap.used + 1 } })
+    const key = await getApiKey()
+    const attempt = await runPipeline({
+      adapter, cfg: cfgOf(d), kind: 'match', payload: buildMatchPayload(S, asked),
+      model: d.model || HTTP_PROVIDERS[d.provider].defaultModel, timeoutMs: timeoutFor(d.provider),
+      invokeOpts: { env: envOf(d, key), fetch: nativeFetch }
+    })
+    if (!attempt.ok) {
+      // No admin card on a phone: the provider's own words are the only thing the person
+      // holding it can act on, so they ride along for the sheet to show.
+      const detail = attempt.detail || (Array.isArray(attempt.errors) ? attempt.errors.slice(0, 3).map(String).join(' · ').slice(0, 300) : null)
+      throw fail(attempt.errorClass || 'provider', 'the lookup failed', detail)
+    }
+    // A phone paired to a server holds that server's shared pool; resolve against it too.
+    return { items: resolveMatch(attempt.result.items, withPoolRows(S, poolRows(), { all: true })), cap: await matchCapState() }
+  } finally { matching = false }
+}
+
 /** The models the configured endpoint serves — the setup screen's list, and its reachability test. */
 export async function localModels(settings, key) {
   const adapter = ADAPTERS[settings.provider]
@@ -141,6 +195,8 @@ async function start(S, kind, opts) {
 
 async function run(S, kind, opts, d, adapter) {
   const key = await getApiKey()
+  // The shared exercises this plan names, filed with the profile's own (core/pool-view.js).
+  S = withPoolRows(S, poolRows())
   const payload = payloadLib.build(S, {
     handle: await handle(), kind, intake: opts.intake, note: opts.note, refine: opts.refine, previous: opts.previous, workoutId: opts.workoutId
   })
@@ -186,4 +242,4 @@ function workoutMetaOf(S, workoutId) {
 }
 
 // Test seam.
-export function _resetLocal() { job = null; lastError = null; last = null }
+export function _resetLocal() { job = null; lastError = null; last = null; matching = false }

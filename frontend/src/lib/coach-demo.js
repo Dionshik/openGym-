@@ -176,6 +176,13 @@ export const demoDebrief = (S, workoutId) => {
   return start('debrief', () => buildDebrief(S, workoutId))
 }
 export const demoResolve = () => { pending = null; return { ok: true } }
+// "Describe it in your own words", with no model behind it: the demo splits the text and lets
+// the app's own search do the finding. The pause is the same honest fake the jobs use.
+export const demoMatch = async text => {
+  const { plainMatch } = await import('./exercise-match.js')
+  await new Promise(r => setTimeout(r, 900))
+  return plainMatch(text)
+}
 export const demoDisclosure = () => ({
   provider: 'demo', providerLabel: t('the configured AI provider'),
   categories: ['plan', 'training', 'bodyweight', 'profile', 'prefs'], version: 1

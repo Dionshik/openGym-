@@ -171,8 +171,12 @@ export function buildPlanBundle(S, name) {
     ex: (r.ex || []).map(cleanEx)
   }))
   const usedIds = new Set(routines.flatMap(r => r.ex.map(e => e.id)))
-  const customEx = (S.customEx || [])
-    .filter(c => usedIds.has(c.id))
+  // A shared exercise (the instance pool) is not in S.customEx, and the file has to stand on its
+  // own: on another server the id would resolve to nothing and the routine would lose the
+  // exercise on import. So the ones this plan uses travel in the file exactly like the user's own.
+  const own = new Set((S.customEx || []).map(c => c.id))
+  const shared = [...usedIds].filter(id => !own.has(id) && EXIDX[id]?.pool).map(id => EXIDX[id])
+  const customEx = [...(S.customEx || []).filter(c => usedIds.has(c.id)), ...shared]
     .map(cleanCustom)
   // A weekday can hold several routines (merge order preserved). `[].concat` normalises a
   // legacy scalar id to a one-element list, so a bundle written before this change and one
@@ -251,6 +255,9 @@ export function mergePlan(s, bundle, { schedule } = {}) {
   ;(source.customEx || []).forEach(c => {
     const same = s.customEx.find(x => (x.n || '').toLowerCase() === (c.n || '').toLowerCase() && x.bp === c.bp)
     if (same) { exIdMap[c.id] = same.id; return }
+    // The file names an exercise this instance already shares under the very same id (a plan
+    // passed between two people on one server): use the shared one, do not mint a private copy.
+    if (EXIDX[c.id]?.pool) { exIdMap[c.id] = c.id; return }
     const nid = uid()
     exIdMap[c.id] = nid
     // Stored exactly as the form would have created it — `custom: true` is what lets the recipient

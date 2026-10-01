@@ -1,4 +1,6 @@
 import { EXDB } from './exercises-data.js'
+import { EXTRA } from './exercises-extra.js'
+import { EXTRA_WGER } from './exercises-extra-wger.js'
 import { USER_EXERCISE_MUSCLE_OVERRIDES, exerciseMuscleMetadataFor } from './exercise-muscle-batch-1.js'
 import { t, getVersion, exerciseNameSearchText } from './i18n-core.js'
 
@@ -22,7 +24,21 @@ const catalogueExercise = ex => {
   return out
 }
 
-export const CATALOGUE = EXDB.map(catalogueExercise)
+// EXDB is the upstream dataset and stays exactly that: its count, its order and its ids are
+// what the translated packs, the pinned tests and every upstream merge are keyed on. The rows
+// it lacks (Olympic lifts, strongman, newer accessory variants, mobility work) come from other
+// open sources via scripts/build-extra-exercises.mjs and are appended here, so everything that
+// reads the catalogue sees them and everything that reads EXDB is undisturbed. They carry no
+// img/gif; Media.jsx already shows a placeholder for a row without one.
+//
+// Some of them name two photographs (img, img2). Those files sit next to the upstream images
+// only where the instance fetched them itself — the docker `media` service. A build whose media
+// base is a CDN of the upstream dataset (the phone app, the demo) has nowhere to get them from,
+// so there the rows are simply photo-less, like a custom exercise, rather than 294 broken images.
+const ENV = import.meta.env || {}
+const PHOTOS = !ENV.VITE_IMG_BASE || !!ENV.VITE_EXTRA_PHOTOS
+const extraRows = PHOTOS ? [...EXTRA, ...EXTRA_WGER] : [...EXTRA, ...EXTRA_WGER].map(({ img, img2, ...row }) => row)
+export const CATALOGUE = [...EXDB, ...extraRows].map(catalogueExercise)
 
 // The generated dataset already supplies secondary muscles for most exercises. Keep the
 // handful of conservative catalogue additions that are useful to the muscle map here so a
@@ -58,18 +74,42 @@ export function equipmentOf(list) {
 
 // Custom (user-created) exercises live in synced state S.customEx (issue #11) and are
 // merged into the id index here so every EXIDX[id] lookup keeps working unchanged.
-let customIds = []
-export function registerCustom(list) {
-  customIds.forEach(id => {
-    delete EXIDX[id]
-    const builtIn = CATALOGUE.find(ex => ex.id === id)
-    if (builtIn) EXIDX[id] = builtIn
-  })
-  customIds = (list || []).map(e => e.id)
-  ;(list || []).forEach(e => { EXIDX[e.id] = e })
+//
+// A third source sits between the two: the instance's shared pool — exercises members suggested
+// and a moderator approved (api/pool.js), fetched by the store and registered here. One id can
+// exist in more than one place, and the order it resolves in is the user's own copy, then the
+// pool, then the built-in catalogue:
+//   - a custom exercise may deliberately carry a built-in id, to override it on this device;
+//   - a pool row carries the id of the custom exercise it was suggested from, so for the person
+//     who suggested it the two are one exercise and their own copy is the one they see — and
+//     if they delete that copy, the pool row is what the id resolves to from then on;
+//   - a pool row never replaces a built-in exercise (the server refuses one that would).
+const BUILTIN = new Map(CATALOGUE.map(e => [e.id, e]))
+let customList = []
+let poolList = []       // every row the server serves, retired ones included — they must resolve
+let poolVisible = []    // the rows offered for new use: not retired, not somebody's own copy
+let dynamicIds = []
+function reindex() {
+  dynamicIds.forEach(id => { const builtIn = BUILTIN.get(id); if (builtIn) EXIDX[id] = builtIn; else delete EXIDX[id] })
+  dynamicIds = []
+  poolList.forEach(e => { if (!BUILTIN.has(e.id)) { EXIDX[e.id] = e; dynamicIds.push(e.id) } })
+  customList.forEach(e => { EXIDX[e.id] = e; dynamicIds.push(e.id) })
+  const own = new Set(customList.map(e => e.id))
+  poolVisible = poolList.filter(e => !e.retired && !own.has(e.id) && !BUILTIN.has(e.id))
 }
-// Full searchable catalogue — customs first so your own exercises are easy to find.
-export const allExercises = st => [...(st.customEx || []), ...CATALOGUE]
+export function registerCustom(list) {
+  customList = list || []
+  reindex()
+}
+// `pool: true` is what marks a row as shared. Deliberately not `custom`: that flag means "yours
+// to edit and delete", and a shared exercise is neither.
+export function registerPool(list) {
+  poolList = (list || []).filter(e => e && typeof e.id === 'string').map(e => ({ ...e, pool: true }))
+  reindex()
+}
+// Full searchable catalogue — customs first so your own exercises are easy to find, then what
+// the instance shares, then the built-ins.
+export const allExercises = st => [...(st.customEx || []), ...poolVisible, ...CATALOGUE]
 
 function searchableText(value) {
   if (Array.isArray(value)) return value.map(searchableText).join(' ')
@@ -129,11 +169,12 @@ export function matchesExerciseSearch(exercise, query) {
 // A build can point them somewhere else — the demo build pulls them off a CDN instead of
 // shipping ~140 MB of images into the deployment. `import.meta.env` is undefined in plain
 // Node; the guard keeps this module loadable without Vite.
-const ENV = import.meta.env || {}
 const IMG_BASE = ENV.VITE_IMG_BASE || 'img/'
 const GIF_BASE = ENV.VITE_GIF_BASE || 'gif/'
 export const imgSrc = ex => IMG_BASE + ex.img
 export const gifSrc = ex => GIF_BASE + ex.gif
+// The second photograph of a two-frame exercise (end position; `img` is the start).
+export const img2Src = ex => IMG_BASE + ex.img2
 
 // Cardio exercises log time + speed instead of weight × reps.
 export const isCardio = idOrEx => (typeof idOrEx === 'string' ? EXIDX[idOrEx] : idOrEx)?.bp === 'cardio'

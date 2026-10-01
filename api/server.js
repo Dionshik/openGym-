@@ -15,6 +15,7 @@ import webpush from 'web-push';
 import * as coachConfig from './coach/config.js';
 import * as coachJobs from './coach/jobs.js';
 import { coachRoutes } from './coach/routes.js';
+import { createPool } from './pool.js';
 import { startCadence } from './coach/cadence.js';
 import { startWarmup } from './coach/warmup.js';
 import { dayReminderPush, restTimerPush, testPush } from './push-messages.js';
@@ -69,6 +70,16 @@ try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch {}
 db.subs = db.subs || [];
 db.invites = db.invites || [];
 const isAdmin = user => !!user && (user.admin === true || ADMIN_UIDS.includes(user.id));
+// A moderator is a member an admin trusts with two things: the shared exercise pool (approving,
+// editing and retiring what people suggest) and invite codes of their own. Nothing else on the
+// dashboard — no user list, no training data, no activity log, no Coach settings. The role is
+// stored on the user record (`role: 'moderator'`), granted and taken back by an admin from the
+// dashboard, and read per request like `admin` is, so a change bites on the very next call.
+// An admin can do everything a moderator can.
+const isMod = user => isAdmin(user) || (!!user && user.role === 'moderator');
+// What a client is told about who it is signed in as. One place, so the four responses that
+// carry it (me, register, login, pair) cannot disagree about which flags exist.
+const publicUser = user => ({ id: user.id, name: user.name, admin: isAdmin(user), mod: isMod(user) });
 // 0600: db.json holds passkey credential material. It used to be covered by a blanket 0700 on
 // the whole directory; now that the directory stays traversable, the file carries its own mode.
 function saveDb() { atomicWrite(dbFile, JSON.stringify(db, null, 2), 0o600); }
@@ -77,6 +88,14 @@ function atomicWrite(file, content, mode) {
   fs.writeFileSync(tmp, content, mode ? { mode } : undefined);
   fs.renameSync(tmp, file);
 }
+// The shared exercise pool (pool.js): exercises members suggested and a moderator approved,
+// served to every profile on the instance. Its own file, pool.json — never `state-*.json`,
+// which is how the Coach and the MCP bridge enumerate profiles.
+const pool = createPool({ dataDir: DATA, atomicWrite });
+// The pool's revision rides on the two data calls every device already makes, so a device
+// learns the pool changed without a polling loop of its own. Absent while nothing was ever
+// shared: an instance that does not use the pool answers these exactly as it always did.
+const poolRev = () => (pool.rev() ? { pool: pool.rev() } : {});
 const stateFile = uid => path.join(DATA, 'state-' + uid.replace(/[^a-zA-Z0-9_-]/g, '') + '.json');
 function readState(uid) {
   try { return JSON.parse(fs.readFileSync(stateFile(uid), 'utf8')); } catch { return null; }
@@ -437,6 +456,14 @@ function requireAdmin(req, res) {
   if (!isAdmin(user)) { audit(req, 'admin.denied', { ok: false, user }); json(res, 403, { error: 'forbidden' }); return null; }
   return user;
 }
+// The same guard one rung down: admins and moderators. Used by the invite routes and by
+// everything under /api/mod/*.
+function requireMod(req, res) {
+  const user = readSession(req);
+  if (!user) { json(res, 401, { error: 'not signed in' }); return null; }
+  if (!isMod(user)) { audit(req, 'admin.denied', { ok: false, user }); json(res, 403, { error: 'forbidden' }); return null; }
+  return user;
+}
 const expireCookie = name => `${name}=; Path=/; Max-Age=0; HttpOnly;${SECURE} SameSite=Lax`;
 function sessionCookie(user) {
   const fresh = `${COOKIE}=${makeSession(user)}; Path=/; Max-Age=${SESSION_DAYS * 86400}; HttpOnly;${SECURE} SameSite=Lax`;
@@ -690,13 +717,15 @@ const routes = {
   // the app it was before the feature existed.
   'GET /api/config': async (req, res) => {
     const coach = coachConfig.publicConfig();
-    json(res, 200, { invite_only: INVITE_ONLY, allow_guest: ALLOW_GUEST, ...(coach ? { coach } : {}) });
+    // `pool` tells the client this server has the shared exercise pool at all — a paired phone
+    // or a newer web bundle may be talking to an older API that answers 404 to /api/pool.
+    json(res, 200, { invite_only: INVITE_ONLY, allow_guest: ALLOW_GUEST, pool: true, ...(coach ? { coach } : {}) });
   },
 
   'GET /api/me': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } });
+    json(res, 200, { user: publicUser(user) });
   },
 
   'POST /api/register/options': async (req, res) => {
@@ -771,7 +800,7 @@ const routes = {
     });
     saveDb();
     audit(req, 'auth.register.ok', { user, msg: invite ? invite.code : null });
-    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } }, { 'Set-Cookie': sessionCookie(user) });
+    json(res, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookie(user) });
   },
 
   'POST /api/login/options': async (req, res) => {
@@ -832,7 +861,7 @@ const routes = {
       return json(res, 403, { error: 'this account has been disabled' });
     }
     audit(req, 'auth.login.ok', { user });
-    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } }, { 'Set-Cookie': sessionCookie(user) });
+    json(res, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookie(user) });
   },
 
   // Reads the session purely so the sign-out can be recorded; the cookie is cleared either way.
@@ -886,7 +915,7 @@ const routes = {
       return json(res, 400, { error: 'invalid or expired code' });
     }
     audit(req, 'auth.pair.ok', { user });
-    json(res, 200, { token: makeSession(user), user: { id: user.id, name: user.name, admin: isAdmin(user) } });
+    json(res, 200, { token: makeSession(user), user: publicUser(user) });
   },
 
   // `rev` is the server's own count of writes to this profile (also stored inside the document as
@@ -896,7 +925,7 @@ const routes = {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
     const state = readState(user.id);
-    json(res, 200, { state, rev: state?._rev || 0 });
+    json(res, 200, { state, rev: state?._rev || 0, ...poolRev() });
   },
   // Just the revision: the client asks this every half minute while it is open and on every
   // return to the foreground, and fetches the document only when the number moved — a signed-in
@@ -904,7 +933,7 @@ const routes = {
   'GET /api/data/rev': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    json(res, 200, { rev: readState(user.id)?._rev || 0 });
+    json(res, 200, { rev: readState(user.id)?._rev || 0, ...poolRev() });
   },
 
   'PUT /api/data': async (req, res) => {
@@ -1050,7 +1079,7 @@ const routes = {
       const last = workouts[workouts.length - 1];
       return {
         id: u.id, name: u.name, created: u.created || null,
-        disabled: !!u.disabled, admin: isAdmin(u), invitedBy: u.invitedBy || null,
+        disabled: !!u.disabled, admin: isAdmin(u), moderator: u.role === 'moderator', invitedBy: u.invitedBy || null,
         workouts: workouts.length,
         lastWorkout: last ? last.d : null,
         lastSync: S._ts || null,
@@ -1069,7 +1098,7 @@ const routes = {
     if (!u) return json(res, 404, { error: 'no such user' });
     const S = readState(u.id) || {};
     json(res, 200, {
-      user: { id: u.id, name: u.name, created: u.created || null, disabled: !!u.disabled, admin: isAdmin(u), invitedBy: u.invitedBy || null },
+      user: { id: u.id, name: u.name, created: u.created || null, disabled: !!u.disabled, admin: isAdmin(u), moderator: u.role === 'moderator', invitedBy: u.invitedBy || null },
       unit: S.unit || 'kg',
       lastSync: S._ts || null,
       routines: records(S.routines).map(r => ({ id: r.id, name: r.name, emoji: r.emoji, count: records(r.ex).length })),
@@ -1089,6 +1118,21 @@ const routes = {
     saveDb();
     audit(req, u.disabled ? 'admin.user.disable' : 'admin.user.enable', { user: admin, target: u });
     json(res, 200, { ok: true, id: u.id, disabled: u.disabled });
+  },
+
+  // Grant or take back the moderator role. An admin is already more than a moderator, so there
+  // is nothing to grant one; `role: null` (or anything that is not 'moderator') removes it.
+  'POST /api/admin/user/role': async (req, res) => {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const body = await readBody(req);
+    const u = db.users.find(x => x.id === body.id);
+    if (!u) return json(res, 404, { error: 'no such user' });
+    if (isAdmin(u)) return json(res, 400, { error: 'an admin already has every moderator right' });
+    const moderator = body.role === 'moderator';
+    if (moderator) u.role = 'moderator'; else delete u.role;
+    saveDb();
+    audit(req, 'admin.user.role', { user: admin, target: u, msg: moderator ? 'moderator' : 'member' });
+    json(res, 200, { ok: true, id: u.id, moderator });
   },
 
   // Disable locks an account out; this removes it. The one destructive action in the app, so the
@@ -1112,23 +1156,28 @@ const routes = {
     // The training history and any Coach credential of theirs, both outside db.json.
     try { fs.unlinkSync(stateFile(u.id)); } catch { /* already gone */ }
     try { coachConfig.clearProfileAuth(u.id); } catch { /* nothing stored */ }
+    // Suggestions of theirs still waiting go with them; exercises they shared stay, unsigned.
+    try { pool.dropUser(u.id); } catch (e) { console.error('pool: could not drop', u.id, e); }
     saveDb();
     // Logged with the name, because the id is about to mean nothing to anyone reading this back.
     audit(req, 'admin.user.delete', { user: admin, msg: name });
     json(res, 200, { ok: true, id: u.id });
   },
 
+  // Invite codes are the one part of the dashboard a moderator shares with the admins — but only
+  // the codes they made themselves. The full list names everyone who ever joined by invite, and
+  // that is a user list by another route; a moderator's own codes name only the people they let in.
   'GET /api/admin/invites': async (req, res) => {
-    if (!requireAdmin(req, res)) return;
+    const mod = requireMod(req, res); if (!mod) return;
     // resolve usedBy uid → name for display
-    const invites = db.invites.map(i => ({
+    const invites = db.invites.filter(i => isAdmin(mod) || i.createdBy === mod.id).map(i => ({
       ...i, usedByName: i.usedBy ? (db.users.find(u => u.id === i.usedBy) || {}).name || null : null
     }));
     json(res, 200, { invites, invite_only: INVITE_ONLY });
   },
 
   'POST /api/admin/invites/new': async (req, res) => {
-    const admin = requireAdmin(req, res); if (!admin) return;
+    const admin = requireMod(req, res); if (!admin) return;
     const body = await readBody(req);
     let code;
     // 16 hex chars = 64 bits, up from 8 chars / 32 bits. The app has no rate limiting by design
@@ -1144,10 +1193,12 @@ const routes = {
   },
 
   'POST /api/admin/invites/revoke': async (req, res) => {
-    const admin = requireAdmin(req, res); if (!admin) return;
+    const admin = requireMod(req, res); if (!admin) return;
     const body = await readBody(req);
     const inv = db.invites.find(i => i.code === text(body.code).toUpperCase());
-    if (!inv) return json(res, 404, { error: 'no such code' });
+    // Somebody else's code is answered exactly like a code that does not exist: a moderator
+    // must not be able to learn which codes are out there by trying to revoke them.
+    if (!inv || (!isAdmin(admin) && inv.createdBy !== admin.id)) return json(res, 404, { error: 'no such code' });
     if (inv.usedBy) return json(res, 400, { error: 'already used — cannot revoke' });
     db.invites = db.invites.filter(i => i.code !== inv.code);
     saveDb();
@@ -1195,7 +1246,11 @@ const routes = {
   // Routes live in coach/routes.js and are handed the helpers above rather than importing
   // them: they are closures over db and SECRET, and passing them in keeps that module free of
   // a cycle. Every one of them is inert while the feature is unconfigured.
-  ...coachRoutes({ json, readBody, readSession, requireAdmin })
+  ...coachRoutes({ json, readBody, readSession, requireAdmin }),
+
+  /* ---------- shared exercise pool ---------- */
+  // Suggest / withdraw for every signed-in profile, the queue for admins and moderators.
+  ...pool.routes({ json, readBody, readSession, requireMod, audit })
 };
 
 /* ---------- Coach: boot recovery, notifications, scheduled reviews ---------- */

@@ -18,7 +18,7 @@
 // body-weight records are interesting here. parseBodyweight() scans for those without
 // building a DOM.
 
-import { EXDB, EXIDX } from './exercises.js'
+import { EXDB, EXIDX, CATALOGUE } from './exercises.js'
 import { uid } from './format.js'
 import { isWarmupRow } from './workout-model.js'
 import { HEVY_TITLE_MAP } from './hevy-id-map.js'
@@ -138,12 +138,21 @@ const keyOf = name => wordsOf(name).sort().join(' ')
 let INDEX = null
 function buildIndex() {
   if (INDEX) return INDEX
-  INDEX = { exact: new Map(), all: [] }
+  INDEX = { exact: new Map(), all: [], extra: new Map() }
   EXDB.forEach(e => {
     const w = wordsOf(e.n)
     const k = w.slice().sort().join(' ')
     if (!INDEX.exact.has(k)) INDEX.exact.set(k, e.id)
     INDEX.all.push({ id: e.id, set: new Set(w), n: w.length })
+  })
+  // The catalogue rows that are not upstream's (exercises-extra*.js) get an index of their own,
+  // consulted last and on an exact word-bag only. Everything above keeps resolving exactly as it
+  // did — adding them to `all` would turn unique matches into ties and send lifts people have
+  // imported for years to a different id — while a name that IS one of the new rows ("Nordic
+  // Hamstring Curl", "Hang Clean") stops becoming a duplicate custom exercise.
+  CATALOGUE.slice(EXDB.length).forEach(e => {
+    const k = keyOf(e.n)
+    if (k && !INDEX.extra.has(k)) INDEX.extra.set(k, e.id)
   })
   return INDEX
 }
@@ -249,7 +258,7 @@ export function matchExercise(name) {
     if (extra < bestExtra) { best = c.id; bestExtra = extra; ties = 1 }
     else if (extra === bestExtra) ties++
   }
-  return ties === 1 ? best : null
+  return ties === 1 ? best : (idx.extra.get(sorted) || null)
 }
 
 /**

@@ -150,6 +150,41 @@ score out of ten, what went well, what to watch, and what to do next time, each 
 session's own numbers. A debrief cannot carry a change; an answer that tries is refused by the
 validator rather than trimmed. The card is kept in the Coach's history like everything else.
 
+### Describing an exercise in your own words
+
+Wherever an exercise is added — a routine, a running workout, a swap — the picker gains a row,
+**Describe it in your own words**, on any instance where the Coach is available. Type what you
+want the way you would say it, in any language, one exercise or several ("жим лёжа, the
+pulldown machine, something for rear delts"), and each one comes back as the library rows it
+most likely is, with a **Create "…"** row underneath for when the library does not have it.
+Rows behave exactly like search results: tap for sets and reps first, **+** to add with the
+defaults. The create row opens the ordinary custom-exercise form, filled in — name, body part,
+equipment, muscles, a short description — and saves nothing until you press the button.
+
+How it works is the reason it is safe to leave on. The model **never sees the catalogue and
+never returns an id**: it says in plain English which exercise the words mean ("barbell bench
+press"), and `api/coach/core/match.js` decides which of the catalogue's 1,859 rows that name is,
+deterministically. So an exercise that does not exist cannot come back, the request is a
+sentence rather than a catalogue (it fits a 3B local model and costs next to nothing on a paid
+API), and what the validator has to hold is small: a closed list of body parts, equipment and
+muscles, and a `customId` that must be one of your own.
+
+What it sends is narrower than anything else the Coach does — **the text you typed, the names
+of your own custom exercises, and your language**. No plan, no logged training, no body weight,
+no pseudonym. That is why it has a go-ahead of its own, given on the sheet next to the button
+that sends it (`coach.lookupConsent`): it unlocks lookups and nothing that reads your training
+log. Agreeing to the Coach's full disclosure covers it too. As everywhere else, the gate is
+enforced by the server, not by the sheet.
+
+A lookup is awaited rather than queued — nothing is stored and there is nothing to poll — so it
+has to answer inside a proxy's patience: the server gives the provider **50 seconds**. A cloud
+API answers in two or three; a small model on a CPU may not make it on a cold start, and the
+sheet then says so and the ordinary search is still there. Lookups have their own daily count,
+**30 per profile** (`caps.matchPerProfileDaily` in `coach.json`, `0` for unlimited), so a
+routine built this way does not spend the Coach's own daily runs; a spent instance-wide cap
+stops them all the same. They appear in the admin card's recent jobs as **Exercise lookup**,
+counts and outcomes only.
+
 ### Comparing with others on the instance
 
 Off unless the admin turns it on (**Settings → Admin → AI Coach → Advanced → Let people compare
@@ -224,6 +259,11 @@ reversible.
 Excluded on purpose and permanently: **display name and user id, passkey and credential
 material, push subscriptions, invite data, theme and appearance settings, and every other
 profile's everything.**
+
+An exercise lookup ([Describing an exercise in your own words](#describing-an-exercise-in-your-own-words))
+does not go through `payload.js` at all. Its payload is built in `api/coach/core/match.js`, also
+by name, and carries three things: the typed text, the names of the profile's own custom
+exercises, and the language to answer in.
 
 ## Bodyweight and per-side work
 

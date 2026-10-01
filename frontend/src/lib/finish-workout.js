@@ -16,10 +16,15 @@ export function buildCompletedWorkout(active, { end = Date.now(), prs = [], snap
       ...(entry.rid ? { rid: entry.rid } : {}),
       ...(entry.noProg === true ? { noProg: true } : {}),
     }
-    const snapshot = typeof snapshotFor === 'function' ? snapshotFor(entry) : null
+    // An entry reopened from the history (lib/workout-edit.js) may name an exercise that no
+    // longer exists; the name and muscles the log kept for it are the only record left, and a
+    // fresh snapshot cannot be taken. They are written back as they were — a live session's
+    // entries carry neither field, so nothing changes for one.
+    const snapshot = (typeof snapshotFor === 'function' ? snapshotFor(entry) : null) || entry.muscleSnapshot || null
     if (snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot) && Object.keys(snapshot).length) {
       completed.muscleSnapshot = { ...snapshot }
     }
+    if (typeof entry.n === 'string' && entry.n) completed.n = entry.n
     // What you typed about this exercise today, and whether you asked to see it again next
     // time. Written only when there is something to keep, so an untouched entry is byte-for-byte
     // the shape it always was.

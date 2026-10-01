@@ -1,4 +1,4 @@
-/* JSON schemas for the three answer shapes, handed to providers that can enforce a schema
+/* JSON schemas for the answer shapes, handed to providers that can enforce a schema
  * while decoding (Ollama/llama.cpp grammar sampling, LM Studio, vLLM, OpenAI json_schema).
  *
  * Deliberately flat: no $ref, no anyOf/oneOf, no additionalProperties tricks — llama.cpp's
@@ -111,4 +111,33 @@ export const DEBRIEF_SCHEMA = {
   required: ['coach_contract', 'summary', 'score']
 };
 
-export const SCHEMAS = { review: REVIEW_SCHEMA, create: CREATE_SCHEMA, refine: CREATE_SCHEMA, debrief: DEBRIEF_SCHEMA };
+// "Describe it in your own words" (match.js). The caps are that module's MAX_ITEMS and
+// MAX_NAMES: a small model asked for "up to four names" will otherwise list synonyms until it
+// runs out of output.
+export const MATCH_SCHEMA = {
+  type: 'object',
+  properties: {
+    coach_contract: { type: 'integer' },
+    items: {
+      type: 'array',
+      maxItems: 8,
+      items: {
+        type: 'object',
+        properties: {
+          said: STR,
+          names: { type: 'array', maxItems: 4, items: STR },
+          bp: STR, eq: STR, customId: STR,
+          create: {
+            type: 'object',
+            properties: { name: STR, desc: STR, primary: STRINGS, secondary: STRINGS },
+            required: ['name']
+          }
+        },
+        required: ['names', 'create']
+      }
+    }
+  },
+  required: ['coach_contract', 'items']
+};
+
+export const SCHEMAS = { review: REVIEW_SCHEMA, create: CREATE_SCHEMA, refine: CREATE_SCHEMA, debrief: DEBRIEF_SCHEMA, match: MATCH_SCHEMA };

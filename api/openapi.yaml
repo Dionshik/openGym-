@@ -86,6 +86,10 @@ tags:
     description: Live-workout presence heartbeat
   - name: admin
     description: Admin dashboard — requires an admin session (`ADMIN_UIDS` or `admin:true`)
+  - name: pool
+    description: >-
+      The shared exercise pool — exercises members suggested and an admin or a moderator
+      approved, served to every profile on the instance
 
 security:
   - cookieAuth: []
@@ -138,6 +142,9 @@ paths:
                     description: >-
                       When false, the client hides "continue without account".
                       Guest mode is purely client-side and never calls this API.
+                  pool:
+                    type: boolean
+                    description: This server has the shared exercise pool (`/api/pool`).
               example: { invite_only: true, allow_guest: false }
 
   /api/me:
@@ -589,6 +596,9 @@ paths:
                 type: object
                 properties:
                   rev: { type: integer }
+                  pool:
+                    type: integer
+                    description: Revision of the shared exercise pool (`GET /api/pool`). Absent while nothing was ever shared.
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /api/push/public-key:
@@ -948,12 +958,225 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: "no such user" }
 
+  /api/admin/user/role:
+    post:
+      tags: [admin]
+      operationId: adminUserRole
+      summary: 'Admin: grant or take back the moderator role'
+      description: |
+        A moderator decides on the shared exercise pool (`/api/mod/pool*`) and manages invite
+        codes of their own; the role opens nothing else. `role: "moderator"` grants it, anything
+        else (normally `null`) removes it. An admin already has every moderator right, so one
+        cannot be given the role. Stored on the user record, read on every request. Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id: { type: string, description: The user id. }
+                role: { oneOf: [{ type: string, enum: [moderator] }, { type: 'null' }] }
+      responses:
+        '200':
+          description: Role updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, const: true }
+                  id: { type: string }
+                  moderator: { type: boolean }
+        '400':
+          description: Target is an admin.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No user with that id.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/pool:
+    get:
+      tags: [pool]
+      operationId: poolGet
+      summary: The shared exercise pool
+      description: |
+        Every approved exercise (and every retired one, flagged `retired` — it must keep
+        resolving for routines and history that name it), plus how the caller's own suggestions
+        stand. Never who suggested an exercise. `rev` is the number that also rides on
+        `GET /api/data` and `GET /api/data/rev` as `pool`; clients fetch this route when it moved.
+      responses:
+        '200':
+          description: The pool as the caller sees it.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rev: { type: integer }
+                  items: { type: array, items: { $ref: '#/components/schemas/PoolExercise' } }
+                  mine: { type: array, items: { $ref: '#/components/schemas/PoolSuggestion' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/pool/submit:
+    post:
+      tags: [pool]
+      operationId: poolSubmit
+      summary: Suggest one of your own exercises for everyone
+      description: |
+        Puts a custom exercise in the moderation queue, or replaces a suggestion of the caller's
+        that is still waiting or was declined. The pool row keeps the custom exercise's own id.
+        Refused (`code`): `id`, `name`, `bp`, `eq` — the exercise is incomplete; `builtin` — the
+        id belongs to a built-in exercise; `taken` — somebody else's suggestion has this id;
+        `shared` — already approved; `name` (409) — the library already has that name; `cap`
+        (429) — ten suggestions of the caller's are already waiting.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [exercise]
+              properties:
+                exercise: { $ref: '#/components/schemas/PoolExercise' }
+      responses:
+        '200':
+          description: Queued. `mine` is the caller's updated list.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, const: true }
+                  mine: { type: array, items: { $ref: '#/components/schemas/PoolSuggestion' } }
+        '400': { description: The exercise is incomplete or malformed., content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { description: Cannot be suggested (see `code`)., content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: Too many suggestions waiting., content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/pool/withdraw:
+    post:
+      tags: [pool]
+      operationId: poolWithdraw
+      summary: Take a suggestion back
+      description: Removes a suggestion of the caller's that is waiting or was declined. An approved exercise cannot be withdrawn — a moderator retires it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [id], properties: { id: { type: string } } }
+      responses:
+        '200': { description: Removed., content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, mine: { type: array, items: { $ref: '#/components/schemas/PoolSuggestion' } } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: No such suggestion of the caller's., content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: Already shared., content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/mod/pool:
+    get:
+      tags: [pool]
+      operationId: modPool
+      summary: 'Moderation: everything in the pool'
+      description: Requires an admin or a moderator. Every row with its status and who suggested it — the queue, what is shared, what was declined.
+      responses:
+        '200':
+          description: All rows.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rev: { type: integer }
+                  items: { type: array, items: { $ref: '#/components/schemas/PoolRow' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/mod/pool/review:
+    post:
+      tags: [pool]
+      operationId: modPoolReview
+      summary: 'Moderation: approve or decline a suggestion'
+      description: |
+        `action: "approve"` shares the exercise with every profile, optionally applying `edits`
+        first (the id never changes). `action: "reject"` declines it; `note` is shown to the
+        suggester. Only a waiting suggestion can be decided. Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, action]
+              properties:
+                id: { type: string }
+                action: { type: string, enum: [approve, reject] }
+                edits: { $ref: '#/components/schemas/PoolExercise' }
+                note: { type: string, maxLength: 200 }
+      responses:
+        '200': { description: Decided., content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, item: { $ref: '#/components/schemas/PoolRow' } } } } } }
+        '400': { description: Bad action or malformed edits., content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No such suggestion., content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: Already decided, or the name is taken., content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/mod/pool/update:
+    post:
+      tags: [pool]
+      operationId: modPoolUpdate
+      summary: 'Moderation: correct a shared exercise'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, exercise]
+              properties:
+                id: { type: string }
+                exercise: { $ref: '#/components/schemas/PoolExercise' }
+      responses:
+        '200': { description: Saved., content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, item: { $ref: '#/components/schemas/PoolRow' } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No such shared exercise., content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/mod/pool/retire:
+    post:
+      tags: [pool]
+      operationId: modPoolRetire
+      summary: 'Moderation: stop (or resume) offering a shared exercise'
+      description: A retired exercise is still served, so routines and history that name it keep resolving; clients stop offering it for new use. Nothing in the pool is ever deleted once it was approved.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id: { type: string }
+                retired: { type: boolean, default: true }
+      responses:
+        '200': { description: Updated., content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, item: { $ref: '#/components/schemas/PoolRow' } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No such shared exercise., content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
   /api/admin/invites:
     get:
       tags: [admin]
       operationId: adminInvites
-      summary: 'Admin: list invite codes'
-      description: All invite codes, with the redeeming user's name resolved for display.
+      summary: 'Admin or moderator: list invite codes'
+      description: >-
+        Invite codes, with the redeeming user's name resolved for display. An admin sees all of
+        them; a moderator sees — and may revoke — only the codes they created.
       responses:
         '200':
           description: All invites.
@@ -1170,7 +1393,49 @@ components:
         id: { type: string, description: Stable user id (16 base64url chars). }
         name: { type: string }
         admin: { type: boolean }
-      example: { id: "Zk3q9XyPbA2LmN0v", name: "Ada", admin: false }
+        mod: { type: boolean, description: May moderate the shared exercise pool — true for a moderator and for every admin. }
+      example: { id: "Zk3q9XyPbA2LmN0v", name: "Ada", admin: false, mod: false }
+
+    PoolExercise:
+      type: object
+      description: >-
+        A shared exercise. `bp` and `eq` are catalogue values; muscles are the body map's slugs.
+        `retired` is present (true) only on a row that is no longer offered.
+      required: [id, n, bp, eq]
+      properties:
+        id: { type: string, description: The id of the custom exercise it was suggested from. }
+        n: { type: string, maxLength: 60 }
+        bp: { type: string }
+        eq: { type: string }
+        tg: { type: string }
+        primaries: { type: array, items: { type: string } }
+        secondaries: { type: array, items: { type: string } }
+        muscleGroups: { type: array, items: { type: string } }
+        sm: { type: array, items: { type: string } }
+        desc: { type: string, maxLength: 1000 }
+        retired: { type: boolean }
+
+    PoolSuggestion:
+      type: object
+      description: How one of the caller's own suggestions stands.
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [pending, approved, rejected, retired] }
+        note: { type: string, description: The moderator's reason, on a declined one. }
+
+    PoolRow:
+      description: A pool row as moderators see it — the exercise plus its history.
+      allOf:
+        - $ref: '#/components/schemas/PoolExercise'
+        - type: object
+          properties:
+            status: { type: string, enum: [pending, approved, rejected, retired] }
+            by: { oneOf: [{ type: string }, { type: 'null' }], description: User id of the suggester; null once that account is deleted. }
+            byName: { oneOf: [{ type: string }, { type: 'null' }] }
+            at: { type: number, description: When it was suggested (ms). }
+            reviewedBy: { type: string }
+            reviewedAt: { type: number }
+            note: { type: string }
 
     # ------------------------------------------------------------------ WebAuthn
     # These mirror @simplewebauthn/server v13's JSON shapes (themselves the W3C
@@ -1420,6 +1685,7 @@ components:
         created: { oneOf: [{ type: string }, { type: 'null' }], description: ISO timestamp. }
         disabled: { type: boolean }
         admin: { type: boolean }
+        moderator: { type: boolean, description: Holds the moderator role (see /api/admin/user/role). }
         invitedBy:
           oneOf: [{ type: string }, { type: 'null' }]
           description: The invite code this account was created with.

@@ -30,6 +30,27 @@ services:
         else
           echo "✓ Exercise media already present — skipping download."
         fi
+        # Start/end photographs for the catalogue rows that came from free-exercise-db
+        # (frontend/src/lib/exercises-extra.js names them as img/fedb/<id>/0.jpg and 1.jpg).
+        # Its own check, so an instance that already has the media above still gets these, and
+        # its own marker file, so a download that was cut off is tried again. Pinned to the
+        # commit the rows were generated from. A failure here is not fatal: the exercises simply
+        # show the placeholder, and the next start tries again.
+        if [ ! -f /out/img/fedb/.complete ]; then
+          echo "↓ Downloading exercise photographs (~90 MB, one time)…"
+          echo "  Source:  github.com/yuhonas/free-exercise-db (data: The Unlicense)."
+          echo "  The photographs' own origin and rights are NOT established by that project;"
+          echo "  openGym does not redistribute them. Details in NOTICE.md. To run without"
+          echo "  them: create the empty file media/img/fedb/.complete before starting."
+          ( rm -rf /tmp/fe && mkdir -p /tmp/fe /out/img/fedb && cd /tmp/fe \
+            && git init -q && git remote add origin https://github.com/yuhonas/free-exercise-db \
+            && git fetch -q --depth 1 origin f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5 \
+            && git checkout -q FETCH_HEAD \
+            && for d in exercises/*/; do n=$$(basename "$$d"); mkdir -p "/out/img/fedb/$$n" && cp "$$d"0.jpg "$$d"1.jpg "/out/img/fedb/$$n/" 2>/dev/null || true; done \
+            && touch /out/img/fedb/.complete \
+            && echo "✓ Exercise photographs ready ($$(ls /out/img/fedb | wc -l) exercises)." ) \
+            || echo "⚠ Could not download the exercise photographs — continuing without them."
+        fi
     restart: "no"
 
   # Passkey auth + per-user data (Node, no framework).

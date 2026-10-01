@@ -65,6 +65,26 @@ if (MODE === 'unknown-exercise') {
   });
 }
 
+// An exercise lookup: split the text the way a person lists things and hand each piece back as
+// its own English name. No interpretation — a test that types a catalogue name gets that row.
+if (kind === 'match') {
+  const parts = String(P.text || '').split(/[,;]+/).map(s => s.trim()).filter(Boolean).slice(0, 8);
+  const own = (P.custom || []);
+  out({
+    coach_contract: 1,
+    items: parts.map(said => {
+      const mine = own.find(c => c.n.toLowerCase() === said.toLowerCase());
+      return {
+        said,
+        names: [said.toLowerCase()],
+        bp: 'chest',
+        ...(MODE === 'foreign-custom' ? { customId: 'not-yours' } : mine ? { customId: mine.id } : {}),
+        create: { name: said, desc: 'Fixture description.', primary: ['chest', 'not-a-muscle'], secondary: ['triceps'] }
+      };
+    })
+  });
+}
+
 if (MODE === 'nochange' || (kind === 'review' && !(P.window?.workouts || []).length)) {
   out({ coach_contract: 1, nochange: true, reading: 'Not enough new training to read anything into yet — keep logging and ask again in a week.' });
 }

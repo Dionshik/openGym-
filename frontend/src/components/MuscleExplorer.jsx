@@ -17,6 +17,7 @@ import { isFav, sortFavouritesFirst } from '../lib/favourites.js'
 // a result into a selection; without it the explorer behaves like the normal Library.
 export default function MuscleExplorer({ onPick, onDetail, onPlan }) {
   const S = useStore(s => s.S)
+  const pool = useStore(s => s.pool)
   const [selected, setSelected] = useState(null)
   const [q, setQ] = useState('')
   const [bp, setBp] = useState('')
@@ -29,7 +30,7 @@ export default function MuscleExplorer({ onPick, onDetail, onPlan }) {
   const catalog = useMemo(() => {
     const all = allExercises(S)
     return (profile && !showAll) ? all.filter(e => exAvailable(S, e)) : all
-  }, [S.customEx, S.equipFilterOn, S.activeEquipId, S.equipProfiles, showAll])
+  }, [S.customEx, pool, S.equipFilterOn, S.activeEquipId, S.equipProfiles, showAll])
   const counts = useMemo(() => Object.fromEntries(MUSCLES.map(m => [m,
     catalog.filter(e => musclesOf(e)[m]).length
   ])), [catalog])

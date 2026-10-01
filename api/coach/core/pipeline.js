@@ -15,6 +15,7 @@ import { buildPrompt, buildPromptParts } from './prompt.js';
 import { SCHEMAS } from './schemas.js';
 import { extractJSON, contractOK } from './parse.js';
 import { validatePlan, validateReview, validateDebrief } from './validate.js';
+import { validateMatch } from './match.js';
 
 /**
  * One attempt: prompt → provider → parse → validate.
@@ -56,6 +57,14 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
   // Its errors join the parse failures above on the same one repair round: a model that named
   // an exercise that does not exist is told which one, and usually gets it right the second
   // time. A model that cannot be told is a failed job, not a retry loop.
+  // An exercise lookup answers in its own shape and has its own validator (match.js); what
+  // comes back is the interpretation only — the caller resolves it against the catalogue.
+  if (kind === 'match') {
+    const m = validateMatch(parsed.value, { customIds: (payload.custom || []).map(c => c.id) });
+    if (!m.ok) return { ok: false, repairable: !repair, errors: m.errors, raw: r.text, errorClass: 'unusable' };
+    return { ok: true, result: { items: m.items } };
+  }
+
   // The user's own exercises are in the library slice the model was given (flagged `custom`),
   // so they are a legitimate thing for it to name back — the validator has to agree.
   const customIds = (payload.library || []).filter(e => e && e.custom).map(e => e.id);

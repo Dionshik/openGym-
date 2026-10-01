@@ -23,6 +23,9 @@ import { runPipeline } from './core/pipeline.js';
 import { extractJSON } from './core/parse.js';
 import { hashPlan } from './core/plan-hash.js';
 import { buildPrompt } from './core/prompt.js';
+import { buildMatchPayload, cleanText, resolveMatch } from './core/match.js';
+import { withPoolRows } from './core/pool-view.js';
+import { readPoolRows } from '../pool.js';
 import { handleFor } from './handle.js';
 import { fetchFor } from './node-fetch.js';
 import { canDropPrivileges, unprivilegedIds } from './adapters/spawn.js';
@@ -72,9 +75,13 @@ function patchUser(uid, patch) {
  *  is cancelled where the adapter can be (the HTTP ones — a spawned runtime runs to its end),
  *  and either way finishes without writing anything back (see finish). */
 export function clearUser(uid) {
-  const { daily } = readUser(uid);
+  const { daily, matchDaily } = readUser(uid);
   try { fs.unlinkSync(userFile(uid)); } catch { /* nothing to clear */ }
-  if (daily?.date === todayISO()) writeUser(uid, { ...EMPTY, daily });
+  const kept = {
+    ...(daily?.date === todayISO() ? { daily } : {}),
+    ...(matchDaily?.date === todayISO() ? { matchDaily } : {})
+  };
+  if (Object.keys(kept).length) writeUser(uid, { ...EMPTY, ...kept });
   const queued = queue.findIndex(j => j.uid === uid);
   if (queued >= 0) { queue.splice(queued, 1); inflight.delete(uid); }
   aborts.get(uid)?.abort();
@@ -100,9 +107,13 @@ export function setShare(uid, share) {
   return !!share;
 }
 
+// A profile's state as the Coach reads it: with the shared-pool exercises its routines and
+// workouts name filed among its own (core/pool-view.js has the why).
 export function readState(uid) {
-  try { return JSON.parse(fs.readFileSync(path.join(DATA, 'state-' + safe(uid) + '.json'), 'utf8')); }
+  let S;
+  try { S = JSON.parse(fs.readFileSync(path.join(DATA, 'state-' + safe(uid) + '.json'), 'utf8')); }
   catch { return null; }
+  return withPoolRows(S, readPoolRows(DATA));
 }
 
 /* ---------- caps ---------- */
@@ -120,6 +131,20 @@ export function capState(uid) {
   const rec = readUser(uid);
   const used = rec.daily?.date === todayISO() ? rec.daily.count : 0;
   return { used, limit: caps.perProfileDaily || 0 };
+}
+/* Exercise lookups (match) keep a count of their own. One is a sentence in and a few lines out
+   — a fraction of a plan or a review — and somebody building a routine asks several in a row;
+   charged against the Coach's own daily cap they would spend it before a single review ran. */
+function bumpMatchDaily(uid) {
+  const rec = readUser(uid);
+  const d = todayISO();
+  patchUser(uid, { matchDaily: rec.matchDaily?.date === d ? { date: d, count: rec.matchDaily.count + 1 } : { date: d, count: 1 } });
+}
+export function matchCapState(uid) {
+  const caps = cfgStore.load().caps || {};
+  const rec = readUser(uid);
+  const used = rec.matchDaily?.date === todayISO() ? rec.matchDaily.count : 0;
+  return { used, limit: caps.matchPerProfileDaily || 0 };
 }
 // The instance-wide count is kept the same way in coach.json, not read off the job log: the
 // log keeps its last hundred entries, and a count that stops at a hundred is not a cap.
@@ -185,31 +210,7 @@ export function enqueue(uid, opts) {
   if (!cfgStore.isEnabled() || !cfgStore.isConnected()) throw new CoachError('off', 'the Coach is not set up on this instance');
   if (inflight.has(uid)) throw new CoachError('busy', 'the Coach is already thinking about your training');
 
-  const S = readState(uid);
-  // Consent is enforced here, server-side, not by the screen that collects it: a UI-only gate
-  // is not a gate (FR-08/13).
-  if (!S?.coach?.consent?.agreedAt) throw new CoachError('consent', 'the Coach needs your go-ahead first');
-
-  // Whose account pays. In instance mode the credential binds to the first profile that spends
-  // it and every other profile is refused outright — not warned. A warning would move the
-  // decision onto whoever clicks past it, and the decision is about spending somebody else's
-  // personal subscription.
-  const cred = cfgStore.credentialFor(uid);
-  if (!cred.ok) {
-    if (cred.reason === 'shared-account') throw new CoachError('shared', cred.message);
-    throw new CoachError('off', 'this profile has no provider account connected');
-  }
-  // Spending is what binds: a personal credential (setup token, OAuth) belongs to the first
-  // profile that runs a job on it from here on; an API key binds to nobody and is shared.
-  cfgStore.bindInstanceCredential(uid);
-
-  // The privilege drop is what keeps a provider runtime out of ./data. If it cannot be
-  // performed, there is no job — see canDropPrivileges for why this is not a warning either.
-  // A provider that spawns nothing has no process to drop, and is not refused for it.
-  if (adapterFor(cfgStore.load().provider)?.spawns !== false) {
-    const priv = canDropPrivileges();
-    if (!priv.ok) throw new CoachError('unprivileged', `Coach jobs are disabled: ${priv.why}`);
-  }
+  admit(uid);
 
   const caps = cfgStore.load().caps || {};
   const { used, limit } = capState(uid);
@@ -240,6 +241,47 @@ export function enqueue(uid, opts) {
   queue.push(job);
   pump();
   return { id: job.id };
+}
+
+/**
+ * The checks every provider call has to pass before anything is spent, whichever shape the
+ * call takes: consent, whose account pays, and the privilege drop. Throws CoachError; returns
+ * the profile's state so the caller does not read the file twice.
+ */
+function admit(uid, { lookup = false } = {}) {
+  const S = readState(uid);
+  // Consent is enforced here, server-side, not by the screen that collects it: a UI-only gate
+  // is not a gate (FR-08/13).
+  //
+  // An exercise lookup has a go-ahead of its own (`lookupConsent`), given on the sheet that
+  // sends it and covering exactly what that sheet sends: the typed words and the names of the
+  // person's own exercises. It unlocks lookups and nothing else — a plan or a review reads the
+  // training log, and still needs the Coach's full disclosure agreed to. The full one covers
+  // the lookup too.
+  const agreed = S?.coach?.consent?.agreedAt || (lookup && S?.coach?.lookupConsent?.agreedAt);
+  if (!agreed) throw new CoachError('consent', 'the Coach needs your go-ahead first');
+
+  // Whose account pays. In instance mode the credential binds to the first profile that spends
+  // it and every other profile is refused outright — not warned. A warning would move the
+  // decision onto whoever clicks past it, and the decision is about spending somebody else's
+  // personal subscription.
+  const cred = cfgStore.credentialFor(uid);
+  if (!cred.ok) {
+    if (cred.reason === 'shared-account') throw new CoachError('shared', cred.message);
+    throw new CoachError('off', 'this profile has no provider account connected');
+  }
+  // Spending is what binds: a personal credential (setup token, OAuth) belongs to the first
+  // profile that runs a job on it from here on; an API key binds to nobody and is shared.
+  cfgStore.bindInstanceCredential(uid);
+
+  // The privilege drop is what keeps a provider runtime out of ./data. If it cannot be
+  // performed, there is no job — see canDropPrivileges for why this is not a warning either.
+  // A provider that spawns nothing has no process to drop, and is not refused for it.
+  if (adapterFor(cfgStore.load().provider)?.spawns !== false) {
+    const priv = canDropPrivileges();
+    if (!priv.ok) throw new CoachError('unprivileged', `Coach jobs are disabled: ${priv.why}`);
+  }
+  return S;
 }
 
 function pump() {
@@ -358,6 +400,73 @@ async function execute(job) {
     return finish(job, { outcome: 'ready', pending });
   } finally {
     aborts.delete(job.uid);
+    if (jobDir) removeJobDir(jobDir, unprivilegedIds());
+  }
+}
+
+/* ---------- exercise lookup ("describe it in your own words") ----------
+   Not a job. A plan or a review is minutes of work whose result has to outlive the request, so
+   it goes through the queue and waits in `pending`. A lookup is a sentence, answered while the
+   picker is still open, and worth nothing once it closes — so it is one awaited call: nothing
+   queued, nothing stored, nothing to poll. It is still a provider call on somebody's account,
+   so it passes the same gates (admit) and has a cap of its own. */
+
+// Under the 60 seconds nginx — the bundled one, and most proxies in front of it — gives an
+// upstream by default: past that the client would see the proxy's 504 instead of this answer.
+export const MATCH_TIMEOUT_MS = 50000;
+const matching = new Set();     // uids with a lookup in flight
+
+/**
+ * Interpret `text` and resolve it against the catalogue and the profile's own exercises.
+ * Throws CoachError for the refusals the routes layer maps to a status (`off`, `empty`, `busy`,
+ * `consent`, `shared`, `unprivileged`, `cap`) and for a call that ran and failed (`timeout`,
+ * `auth`, `provider`, `missing`, `unusable`).
+ */
+export async function match(uid, text) {
+  if (!cfgStore.isEnabled() || !cfgStore.isConnected()) throw new CoachError('off', 'the Coach is not set up on this instance');
+  const asked = cleanText(text);
+  if (!asked) throw new CoachError('empty', 'nothing to look up');
+  if (matching.has(uid)) throw new CoachError('busy', 'a lookup is already running');
+  const S = admit(uid, { lookup: true });
+
+  const caps = cfgStore.load().caps || {};
+  const { used, limit } = matchCapState(uid);
+  if (limit > 0 && used >= limit) throw new CoachError('cap', 'daily limit reached');
+  // A spent instance cap stops lookups too, though they do not count towards it: the owner
+  // said "no more today", and a lookup is still their account.
+  if (caps.instanceDaily > 0 && instanceUsedToday() >= caps.instanceDaily) throw new CoachError('cap', 'this instance has reached its daily limit');
+
+  const cfg = cfgStore.load();
+  const adapter = adapterFor(cfg.provider);
+  if (!adapter) throw new CoachError('off', 'the Coach is not set up on this instance');
+  bumpMatchDaily(uid);
+
+  matching.add(uid);
+  const startedAt = Date.now();
+  const log = (outcome, errorClass, detail) => cfgStore.logJob({
+    at: new Date().toISOString(), uid, kind: 'match', trigger: 'manual',
+    outcome, errorClass: errorClass || null, ms: Date.now() - startedAt, detail: detail || null
+  });
+  const jobDir = adapter.spawns === false ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'coach-'));
+  try {
+    const env = cfgStore.jobEnv(jobDir || os.tmpdir(), cfgStore.credentialFor(uid));
+    const ids = jobDir && unprivilegedIds();
+    if (ids) shareJobDir(jobDir, ids);
+    const attempt = await runPipeline({
+      adapter, cfg, kind: 'match', payload: buildMatchPayload(S, asked),
+      model: cfgStore.modelFor(cfg), timeoutMs: MATCH_TIMEOUT_MS,
+      invokeOpts: { jobDir, env, fetch: fetchFor(MATCH_TIMEOUT_MS) }
+    });
+    if (!attempt.ok) {
+      log('failed', attempt.errorClass, attempt.detail);
+      throw new CoachError(attempt.errorClass || 'provider', 'the lookup failed');
+    }
+    log('ready');
+    // Resolved against the whole pool, not just the rows this profile already uses: "the sled
+    // thing Ann added" should find it. Only the payload above went to the provider.
+    return { items: resolveMatch(attempt.result.items, withPoolRows(S, readPoolRows(DATA), { all: true })), cap: matchCapState(uid) };
+  } finally {
+    matching.delete(uid);
     if (jobDir) removeJobDir(jobDir, unprivilegedIds());
   }
 }

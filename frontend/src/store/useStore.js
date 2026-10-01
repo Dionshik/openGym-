@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { api, setRemoteAuth } from '../lib/api.js'
 import { localTZ } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
-import { registerCustom } from '../lib/exercises.js'
+import { registerCustom, registerPool } from '../lib/exercises.js'
 import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
 import { guestAllowed } from '../lib/guest.js'
 import { MOBILE, initReminderSync, nativeLoad, nativeSave, onAppActive, syncReminder, writeAutoBackup } from '../lib/mobile.js'
@@ -18,6 +18,19 @@ const KEY = 'gym_state_v1'
 // a document this device never saw is refused (409) instead of dropping another device's work;
 // `ts` tells a pull whether anything changed here since. See pushState/pullState.
 const SYNC_KEY = 'gym_sync'
+// The instance's shared exercise pool as this device last saw it: { rev, items, mine }. Not part
+// of S — it is the server's, the same for every profile on it, and has no business being PUT
+// back per user, exported in a backup or merged between devices. Cached so the exercises it
+// names still resolve (and can still be logged) in a gym with no signal.
+const POOL_KEY = 'gym_pool_v1'
+const EMPTY_POOL = { rev: 0, items: [], mine: [] }
+const loadPool = () => {
+  try {
+    const p = JSON.parse(localStorage.getItem(POOL_KEY))
+    return p && Array.isArray(p.items) ? { rev: p.rev || 0, items: p.items, mine: Array.isArray(p.mine) ? p.mine : [] } : EMPTY_POOL
+  } catch { return EMPTY_POOL }
+}
+const POOL_MIN_MS = 30000    // an on-demand refresh (a screen opening) closer than this to the last one is skipped
 const CHECK_MIN_MS = 3000    // rev checks closer together than this are the same event (focus + visibility)
 const POLL_MS = 30000        // while the app is open and signed in, ask the server for its revision this often
 export const DEF = {
@@ -117,6 +130,18 @@ export const useStore = create((set, get) => {
   let lastCheck = 0
   let pollTm = null
   let offlineChanges = false   // a push failed for lack of network — the next one that lands says so
+  let poolPulling = null       // the pool GET in flight
+  let lastPool = 0
+
+  const setPool = p => {
+    registerPool(p.items)
+    try { localStorage.setItem(POOL_KEY, JSON.stringify(p)) } catch { /* over quota: it is a cache */ }
+    set({ pool: p })
+  }
+  const clearPool = () => { localStorage.removeItem(POOL_KEY); registerPool([]); set({ pool: EMPTY_POOL }) }
+  // The pool's revision rides on the answers to /api/data and /api/data/rev (absent while nothing
+  // was ever shared, which reads as 0); when it is not the one cached here, fetch the pool.
+  const syncPool = rev => { if ((rev || 0) !== (get().pool.rev || 0)) get().pullPool(true) }
 
   const readSync = () => { try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || null } catch { return null } }
   const writeSync = (rev, ts) => localStorage.setItem(SYNC_KEY, JSON.stringify({ rev, ts: ts || 0 }))
@@ -180,8 +205,9 @@ export const useStore = create((set, get) => {
     const owed = localStorage.getItem('gym_dirty') === '1' || pushTm !== null || pushPending
     if (!sync || owed) return get().pullState()
     try {
-      const { rev } = await api('/api/data/rev')
+      const { rev, pool } = await api('/api/data/rev')
       setSync({ offline: false })
+      syncPool(pool)
       if (rev !== sync.rev) return get().pullState()
     } catch (e) {
       if (e.status === 401) return
@@ -295,7 +321,8 @@ export const useStore = create((set, get) => {
     if (!user || e.newValue === user.id) return
     clearTimeout(pushTm)
     pushTm = null
-    set({ user: null, S: e.newValue ? loadState() : clone(DEF) })
+    registerPool([])   // what the previous profile had suggested is not the next one's to see
+    set({ user: null, S: e.newValue ? loadState() : clone(DEF), pool: EMPTY_POOL })
   })
 
   // Everything a sign-out leaves behind on this device, whichever way it was triggered. The owner
@@ -307,11 +334,29 @@ export const useStore = create((set, get) => {
     localStorage.removeItem(SYNC_KEY)
     localStorage.removeItem(KEY)
     persist(clone(DEF), false)
+    clearPool()
     localStorage.removeItem('gym_owner')
   }
 
   return {
     S: (() => { const s = loadState(); registerCustom(s.customEx); return s })(),
+    // The shared exercise pool (see POOL_KEY). `mine` is what this profile suggested and how it
+    // stands — pending, approved, rejected with the moderator's note.
+    pool: (() => { const p = loadPool(); registerPool(p.items); return p })(),
+    // `force` skips the throttle: the revision moved, or the user just did something to the pool.
+    async pullPool(force = false) {
+      if (!get().user || DEMO || get().config?.pool !== true) return
+      if (!force && Date.now() - lastPool < POOL_MIN_MS) return
+      if (poolPulling) return poolPulling
+      lastPool = Date.now()
+      poolPulling = api('/api/pool')
+        .then(r => setPool({ rev: r.rev || 0, items: Array.isArray(r.items) ? r.items : [], mine: Array.isArray(r.mine) ? r.mine : [] }))
+        .catch(() => { /* offline or an older server: the cached copy stands */ })
+        .finally(() => { poolPulling = null })
+      return poolPulling
+    },
+    // After a suggest / withdraw the server answers with this profile's list; no round trip.
+    setPoolMine(mine) { setPool({ ...get().pool, mine: Array.isArray(mine) ? mine : [] }) },
     user: (() => { try { return JSON.parse(localStorage.getItem('gym_user')) || null } catch { return null } })(),
     ready: false,
     // Server sync as the banner sees it (components/SyncBanner.jsx). Only meaningful signed in.
@@ -378,6 +423,7 @@ export const useStore = create((set, get) => {
           localStorage.removeItem(SYNC_KEY)
           localStorage.removeItem(KEY)
           persist(clone(DEF), false)
+          clearPool()
         }
         localStorage.setItem('gym_owner', u.id)
         localStorage.setItem('gym_user', JSON.stringify(u)); localStorage.removeItem('gym_guest')
@@ -412,6 +458,7 @@ export const useStore = create((set, get) => {
           lastCheck = Date.now()
           setSync({ offline: false })
           const { state, rev } = res
+          syncPool(res.pool)
           const S = get().S
           // Owed to the server: a push that failed, or a change made while boot was still pulling.
           const dirty = localStorage.getItem('gym_dirty') === '1' || pushPending
