@@ -185,5 +185,26 @@ export const demoMatch = async text => {
 }
 export const demoDisclosure = () => ({
   provider: 'demo', providerLabel: t('the configured AI provider'),
-  categories: ['plan', 'training', 'bodyweight', 'profile', 'prefs'], version: 1
+  categories: ['plan', 'training', 'bodyweight', 'profile', 'prefs'], optional: ['bodyProfile', 'nutrition'], version: 1
 })
+
+// The food diary in the demo: there is no provider, so a plate "reads" as a plausible lunch and
+// a label as a plausible pack — enough to walk the draft and the form. Suggestions come back
+// empty on purpose: the sheet then shows its own arithmetic (lib/food-suggest.js), which is
+// real, instead of a script pretending to have thought about it.
+export const demoFood = async req => {
+  await new Promise(r => setTimeout(r, 1100))
+  const ru = req.lang === 'ru'
+  if (req.kind === 'label') {
+    return { food: { n: ru ? 'Творог 5 %' : 'Curd 5 %', brand: ru ? 'Демо' : 'Demo', k: 121, p: 17.2, f: 5, c: 1.8, sv: 180 }, note: '' }
+  }
+  if (req.kind === 'suggest') return { ideas: [] }
+  return {
+    items: [
+      { name: ru ? 'Куриная грудка на гриле' : 'Chicken breast, grilled', en: 'chicken breast, grilled', grams: 150, per100: { k: 151, p: 30.5, f: 3.2, c: 0 }, conf: 'medium' },
+      { name: ru ? 'Гречка варёная' : 'Buckwheat, cooked', en: 'buckwheat, cooked', grams: 200, per100: { k: 92, p: 3.4, f: 0.6, c: 19.9 }, conf: 'medium' },
+      { name: ru ? 'Масло оливковое' : 'Olive oil', en: 'olive oil', grams: 10, per100: { k: 884, p: 0, f: 100, c: 0 }, conf: 'low' }
+    ],
+    note: ru ? 'Демо: это заготовленный ответ, на фото никто не смотрел.' : 'Demo: this is a canned answer — nothing looked at the photo.'
+  }
+}

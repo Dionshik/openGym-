@@ -267,6 +267,13 @@ export default function Settings() {
         subtitle={t('Show a card on Home with your membership QR codes.')}>
         <Switch checked={S.checkIn !== false} onChange={v => update(s => { s.checkIn = v })} />
       </Row>
+      {/* The food diary (views/Nutrition.jsx); off = no Home card, no route. The diary stays. */}
+      <Row icon="utensils" iconTint="var(--orange)" title={t('Nutrition')}
+        subtitle={t('Show a card on Home with today’s calories and macros.')}>
+        <Switch checked={S.nutritionOn !== false} onChange={v => update(s => { s.nutritionOn = v })} />
+      </Row>
+      <Row icon="person" iconTint="var(--teal)" title={t('Body profile')} subtitle={t('Height, age, measurements, Apple Health.')}
+        accessory="chevron" onClick={() => nav('/body')} />
     </Section>
 
     {/* ---------- during a workout ---------- */}

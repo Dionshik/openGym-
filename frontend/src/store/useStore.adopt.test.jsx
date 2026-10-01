@@ -34,7 +34,7 @@ describe('adoptProfile — sign-in takes the server profile', () => {
     api.mockResolvedValueOnce({ state: clone(server), rev: 4 })
     const ask = vi.fn(async () => false)
     const r = await useStore.getState().adoptProfile(ask)
-    expect(ask).toHaveBeenCalledWith({ workouts: 1, bodyweight: 0, customEx: 0 })
+    expect(ask).toHaveBeenCalledWith({ workouts: 1, bodyweight: 0, customEx: 0, food: 0, measurements: 0 })
     const S = useStore.getState().S
     expect(S.unit).toBe('lb'); expect(S.restSec).toBe(60)
     expect(S.workouts.map(w => w.id)).toEqual(['w1'])

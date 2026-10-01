@@ -16,6 +16,7 @@ import { SCHEMAS } from './schemas.js';
 import { extractJSON, contractOK } from './parse.js';
 import { validatePlan, validateReview, validateDebrief } from './validate.js';
 import { validateMatch } from './match.js';
+import { FOOD_KINDS, validateFood } from './food.js';
 
 /**
  * One attempt: prompt → provider → parse → validate.
@@ -23,7 +24,12 @@ import { validateMatch } from './match.js';
  * @returns {{ ok:true, nochange?:boolean, reading?:string, result?:object }
  *        | { ok:false, errorClass:string, detail?:string, repairable?:boolean, errors?:string[], raw?:string }}
  */
-export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutMs, invokeOpts = {} }, repair) {
+export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutMs, images = null, maxTokens = null, invokeOpts = {} }, repair) {
+  // A photograph can only travel to a provider whose adapter knows how to attach one. Said here,
+  // before anything is spent, rather than letting a text-only runtime answer about a plate it
+  // never saw.
+  const pictures = Array.isArray(images) && images.length ? images : null;
+  if (pictures && adapter.images !== true) return { ok: false, errorClass: 'novision' };
   // HTTP providers get the rules/payload split (prefix caching, schema-constrained decoding);
   // the runtime-backed CLIs still get one flat prompt — they have no message roles to split over.
   const parts = buildPromptParts(kind, payload, repair);
@@ -32,6 +38,8 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
     cfg,
     prompt: split ? parts.user : parts.system + '\n\n---\n\n' + parts.user,
     ...(split ? { system: parts.system, schema: SCHEMAS[parts.task] || null } : {}),
+    ...(split && pictures ? { images: pictures } : {}),
+    ...(maxTokens ? { maxTokens } : {}),
     model: model || null, timeoutMs, ...invokeOpts
   });
 
@@ -40,7 +48,10 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
   if (r.code !== 0) {
     const err = (r.stderr || r.text || '').toLowerCase();
     const authish = /auth|unauthor|api key|credential|token|401|403|login/.test(err);
-    return { ok: false, errorClass: authish ? 'auth' : 'provider', detail: (r.stderr || r.text || '').slice(0, 300) };
+    // A model that takes no pictures says so in its own words; that is a setup matter (pick a
+    // vision model), not a failed job, and the app words it differently.
+    const blind = pictures && /image|vision|multimodal|multi-modal|mmproj/.test(err) && !authish;
+    return { ok: false, errorClass: blind ? 'novision' : authish ? 'auth' : 'provider', detail: (r.stderr || r.text || '').slice(0, 300) };
   }
 
   const parsed = extractJSON(r.text);
@@ -63,6 +74,13 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
     const m = validateMatch(parsed.value, { customIds: (payload.custom || []).map(c => c.id) });
     if (!m.ok) return { ok: false, repairable: !repair, errors: m.errors, raw: r.text, errorClass: 'unusable' };
     return { ok: true, result: { items: m.items } };
+  }
+
+  // The food diary's three questions, each with its own shape and its own validator (food.js).
+  if (FOOD_KINDS.includes(kind)) {
+    const f = validateFood(kind, parsed.value, payload);
+    if (!f.ok) return { ok: false, repairable: !repair, errors: f.errors, raw: r.text, errorClass: 'unusable' };
+    return { ok: true, result: f.result };
   }
 
   // The user's own exercises are in the library slice the model was given (flagged `custom`),

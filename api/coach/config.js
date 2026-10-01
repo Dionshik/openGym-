@@ -78,17 +78,21 @@ const DEFAULTS = {
   // a key away — the one that was pasted for Anthropic is still there when you come back.
   auth: {},                                          // instance mode: { [provider]: { type, account, data:<encrypted>, connectedAt } }
   models: {},                                        // { [provider]: model id }
+  // The model photographs go to, when it is not the one above: a local setup usually runs a
+  // text model for plans and a separate vision model for pictures. Empty = the same model.
+  visionModels: {},                                  // { [provider]: model id }
   providerOptions: {},                               // { [provider]: { baseUrl } }
   boundUid: {},                                      // instance mode: { [provider]: the profile its credential bound to }
-  // 0 = unlimited. Exercise lookups count on their own: each is a sentence, not a plan.
-  caps: { perProfileDaily: 10, instanceDaily: 0, matchPerProfileDaily: 30 },
+  // 0 = unlimited. Exercise lookups count on their own: each is a sentence, not a plan — and so
+  // do the food diary's calls (a plate read, a label read, a meal suggested).
+  caps: { perProfileDaily: 10, instanceDaily: 0, matchPerProfileDaily: 30, foodPerProfileDaily: 30 },
   daily: null,                                       // { date, count }: jobs enqueued today across every profile
   // Anonymous medians across profiles that opt in ("compare with others"). Off by default: it
   // is the one feature where one person's numbers feed into what another person sees.
   community: false,
   log: []
 };
-const PER_PROVIDER = ['auth', 'models', 'providerOptions', 'boundUid'];
+const PER_PROVIDER = ['auth', 'models', 'visionModels', 'providerOptions', 'boundUid'];
 const isPlainObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
 const LOG_MAX = 100;
 
@@ -168,6 +172,7 @@ export function reset() { cache = null; keyCache = null; }
    The only way the rest of the code reads the per-provider maps, so the shape stays here. */
 export const authFor = (cfg = load(), p = cfg.provider) => (cfg.auth && cfg.auth[p]) || null;
 export const modelFor = (cfg = load(), p = cfg.provider) => (cfg.models && cfg.models[p]) || (PROVIDERS[p] && PROVIDERS[p].defaultModel) || null;
+export const visionModelFor = (cfg = load(), p = cfg.provider) => (cfg.visionModels && cfg.visionModels[p]) || modelFor(cfg, p);
 export const optionsFor = (cfg = load(), p = cfg.provider) => (cfg.providerOptions && cfg.providerOptions[p]) || {};
 export const boundUidFor = (cfg = load(), p = cfg.provider) => (cfg.boundUid && cfg.boundUid[p]) || null;
 export function saveAuth(provider, auth) {
@@ -311,7 +316,14 @@ export function isConnected() {
 export function publicConfig() {
   if (!isEnabled() || !isConnected()) return null;
   const cfg = load();
-  return { enabled: true, provider: cfg.provider, providerLabel: providerMeta(cfg).label, authMode: cfg.authMode, community: !!cfg.community };
+  const meta = providerMeta(cfg);
+  return {
+    enabled: true, provider: cfg.provider, providerLabel: meta.label, authMode: cfg.authMode, community: !!cfg.community,
+    // The food diary's AI entry points exist on this server; `vision` says whether this provider
+    // can be sent a photograph at all (the subscription CLIs cannot), so the app offers the
+    // camera only where it can work.
+    food: true, vision: !!(meta.http || cfg.provider === 'fixture')
+  };
 }
 
 /**

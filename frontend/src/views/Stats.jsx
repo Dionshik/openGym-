@@ -8,6 +8,7 @@ import { t, exerciseNameFor, getLang } from '../lib/i18n.js'
 import { bwSheet, goalSheet, calendarSheet, workoutDetailSheet, exerciseHistorySheet, WorkoutRow, bwDeltaColor } from '../sheets.jsx'
 import LineChart from '../components/LineChart.jsx'
 import Heatmap from '../components/Heatmap.jsx'
+import NutritionStats from '../components/NutritionStats.jsx'
 import Icon from '../components/Icon.jsx'
 import BodyMap, { BodyMapLegend } from '../components/BodyMap.jsx'
 import { loadOfWorkouts, muscleBalanceWindow, rankOf, MUSCLE_NAME, musclesOf } from '../lib/muscles.js'
@@ -452,6 +453,7 @@ export default function Stats() {
 
     {workouts.length > 0 && <MuscleBalance S={S} />}
     {hasEffort(S) && <EffortCard S={S} />}
+    <NutritionStats S={S} />
 
     <div className="cols">
       <div className="card">

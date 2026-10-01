@@ -75,11 +75,12 @@ function patchUser(uid, patch) {
  *  is cancelled where the adapter can be (the HTTP ones — a spawned runtime runs to its end),
  *  and either way finishes without writing anything back (see finish). */
 export function clearUser(uid) {
-  const { daily, matchDaily } = readUser(uid);
+  const { daily, matchDaily, foodDaily } = readUser(uid);
   try { fs.unlinkSync(userFile(uid)); } catch { /* nothing to clear */ }
   const kept = {
     ...(daily?.date === todayISO() ? { daily } : {}),
-    ...(matchDaily?.date === todayISO() ? { matchDaily } : {})
+    ...(matchDaily?.date === todayISO() ? { matchDaily } : {}),
+    ...(foodDaily?.date === todayISO() ? { foodDaily } : {})
   };
   if (Object.keys(kept).length) writeUser(uid, { ...EMPTY, ...kept });
   const queued = queue.findIndex(j => j.uid === uid);
@@ -87,6 +88,17 @@ export function clearUser(uid) {
   aborts.get(uid)?.abort();
   forgetSeq.set(uid, (forgetSeq.get(uid) || 0) + 1);
   invalidateCohort();
+  for (const fn of forgetHooks) { try { fn(uid); } catch (e) { console.error('coach forget hook failed', e); } }
+}
+// Other lanes holding something for a profile in memory (food-jobs.js) drop it on a forget too.
+const forgetHooks = [];
+export function onForget(fn) { forgetHooks.push(fn); }
+
+/** The account itself was deleted: nothing of it stays, the spending record included — there is
+ *  nobody left for a cap to apply to. */
+export function dropUser(uid) {
+  clearUser(uid);
+  try { fs.unlinkSync(userFile(uid)); } catch { /* nothing left */ }
 }
 
 /** Every profile with a state file — the population a cohort is drawn from. */
@@ -146,6 +158,19 @@ export function matchCapState(uid) {
   const used = rec.matchDaily?.date === todayISO() ? rec.matchDaily.count : 0;
   return { used, limit: caps.matchPerProfileDaily || 0 };
 }
+/* The food diary's calls — a plate read, a label read, a meal suggested — count on their own for
+   the same reason: somebody logging a day asks several, and none of them is a plan. */
+export function bumpFoodDaily(uid) {
+  const rec = readUser(uid);
+  const d = todayISO();
+  patchUser(uid, { foodDaily: rec.foodDaily?.date === d ? { date: d, count: rec.foodDaily.count + 1 } : { date: d, count: 1 } });
+}
+export function foodCapState(uid) {
+  const caps = cfgStore.load().caps || {};
+  const rec = readUser(uid);
+  const used = rec.foodDaily?.date === todayISO() ? rec.foodDaily.count : 0;
+  return { used, limit: caps.foodPerProfileDaily || 0 };
+}
 // The instance-wide count is kept the same way in coach.json, not read off the job log: the
 // log keeps its last hundred entries, and a count that stops at a hundred is not a cap.
 function bumpInstanceDaily() {
@@ -153,7 +178,7 @@ function bumpInstanceDaily() {
   const d = todayISO();
   cfgStore.save({ daily: cur?.date === d ? { date: d, count: cur.count + 1 } : { date: d, count: 1 } });
 }
-function instanceUsedToday() {
+export function instanceUsedToday() {
   const daily = cfgStore.load().daily;
   return daily?.date === todayISO() ? daily.count : 0;
 }
@@ -248,7 +273,7 @@ export function enqueue(uid, opts) {
  * call takes: consent, whose account pays, and the privilege drop. Throws CoachError; returns
  * the profile's state so the caller does not read the file twice.
  */
-function admit(uid, { lookup = false } = {}) {
+export function admit(uid, { lookup = false, food = false } = {}) {
   const S = readState(uid);
   // Consent is enforced here, server-side, not by the screen that collects it: a UI-only gate
   // is not a gate (FR-08/13).
@@ -258,7 +283,13 @@ function admit(uid, { lookup = false } = {}) {
   // person's own exercises. It unlocks lookups and nothing else — a plan or a review reads the
   // training log, and still needs the Coach's full disclosure agreed to. The full one covers
   // the lookup too.
-  const agreed = S?.coach?.consent?.agreedAt || (lookup && S?.coach?.lookupConsent?.agreedAt);
+  //
+  // The food diary has a third (`foodConsent`), and there the full one does NOT stand in: it was
+  // given for the training log, and a photograph of somebody's dinner is a different thing to
+  // have agreed to send.
+  const agreed = food
+    ? S?.coach?.foodConsent?.agreedAt
+    : S?.coach?.consent?.agreedAt || (lookup && S?.coach?.lookupConsent?.agreedAt);
   if (!agreed) throw new CoachError('consent', 'the Coach needs your go-ahead first');
 
   // Whose account pays. In instance mode the credential binds to the first profile that spends
@@ -290,9 +321,22 @@ function pump() {
     running++;
     execute(job)
       .catch(e => { console.error('coach job crashed', job.id, e); finish(job, { outcome: 'failed', errorClass: 'internal' }); })
-      .finally(() => { running--; inflight.delete(job.uid); pump(); });
+      .finally(() => { running--; inflight.delete(job.uid); pump(); slotFreed(); });
   }
 }
+
+/* One budget of concurrent provider calls for the whole process, whichever lane they come
+   through: the food diary's jobs (food-jobs.js) take and return slots here, so a plate being
+   read and a plan being written cannot together put four models on a two-core box. */
+export function acquireSlot() {
+  if (running >= MAX_CONCURRENT) return false;
+  running++;
+  return true;
+}
+export function releaseSlot() { running = Math.max(0, running - 1); pump(); }
+const slotHooks = [];
+export function onSlotFree(fn) { slotHooks.push(fn); }
+function slotFreed() { for (const fn of slotHooks) { try { fn(); } catch (e) { console.error('coach slot hook failed', e); } } }
 
 function finish(job, result) {
   cfgStore.logJob({
@@ -530,6 +574,13 @@ function removeJobDir(jobDir, ids) {
   }
   try { fs.rmSync(jobDir, { recursive: true, force: true }); } catch { /* leaked, not fatal */ }
 }
+
+/** A job directory handed to the unprivileged user, and taken back: for the other lanes. */
+export function prepareJobDir(jobDir) {
+  const ids = jobDir && unprivilegedIds();
+  if (ids) shareJobDir(jobDir, ids);
+}
+export function cleanJobDir(jobDir) { if (jobDir) removeJobDir(jobDir, unprivilegedIds()); }
 
 export async function testRun() {
   const cfg = cfgStore.load();

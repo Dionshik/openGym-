@@ -10,6 +10,7 @@ import { confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import AdminCoach from './AdminCoach.jsx'
+import AdminExtras from './AdminExtras.jsx'
 import '../admin.css'
 
 // Admin-only operator dashboard (owner passkey + admin flag; guarded again server-side).
@@ -282,6 +283,9 @@ export default function Admin() {
     <AdminCoach />
 
     <InvitesCard invites={invites} reload={loadInvites} inviteOnly={inviteOnly} />
+
+    {/* Online food lookup and the Apple Health connection: off until switched on here. */}
+    <AdminExtras />
 
     {/* The shared exercise pool has a screen of its own — it is the one part of running the
         instance that moderators share with admins, so it cannot live on an admin-only page. */}

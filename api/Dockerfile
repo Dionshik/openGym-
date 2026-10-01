@@ -51,7 +51,10 @@ COPY package.json package-lock.json* ./
 # build host happened to be.
 RUN npm ci --omit=dev --omit=optional && npm cache clean --force
 
-COPY server.js push-messages.js verify-error.js ./
+# Every module server.js (or anything under coach/) imports from this directory has to be named
+# here — a file that is not copied is a container that dies at boot with ERR_MODULE_NOT_FOUND,
+# and no unit test runs inside the image. test/dockerfile.test.js holds this line to the imports.
+COPY server.js push-messages.js verify-error.js pool.js settings.js food.js healthkit.js healthkit-parse.js ./
 COPY coach ./coach
 ENV NODE_ENV=production
 ENV PORT=3000

@@ -15,6 +15,9 @@
  *   - exWeights: union by exercise, the better `w` for that exercise — larger for an ordinary
  *     lift, smaller on an assistance machine (a PR logged on the other device must not be
  *     forgotten, whichever way it runs); exNotes, barWeights: key union
+ *   - nutrition (the food diary): rows and products by id, with tombstones and the fold line —
+ *     see mergeNutrition in lib/nutrition.js; measurements: union by day like bodyweight;
+ *     bodyProfile: whichever was edited later (`t`), whatever the copies' own `_ts` say
  *   - `_ts`: the later of the two; `_rev` dropped (the server sets it); `active` left to the caller
  *
  * Known limit: with no record of what each side deleted, an entry removed on one device inside
@@ -23,6 +26,7 @@
  * would close it.
  */
 import { beatsWeight } from './exercises.js'
+import { mergeNutrition, nutritionExtras } from './nutrition.js'
 
 const clone = o => JSON.parse(JSON.stringify(o))
 const list = v => (Array.isArray(v) ? v : [])
@@ -50,8 +54,9 @@ export function unionById(newer = [], older = [], key = x => x?.id) {
 const workoutKey = w => (w?.id != null ? w.id : `${w?.d}|${w?.start}`)
 const byDayStart = (a, b) => (a.d === b.d ? (a.start || 0) - (b.start || 0) : a.d < b.d ? -1 : 1)
 
-/** One entry per day; where both have a day, the one edited later (`t`); sorted by day. */
-export function mergeBodyweight(a = [], b = []) {
+/** One entry per day; where both have a day, the one edited later (`t`); sorted by day.
+ *  Body weight and body measurements are both this kind of list. */
+export function mergeByDay(a = [], b = []) {
   const byDay = new Map()
   for (const e of [...list(a), ...list(b)]) {
     if (!e || e.d == null) continue
@@ -60,6 +65,7 @@ export function mergeBodyweight(a = [], b = []) {
   }
   return [...byDay.values()].sort((x, y) => (x.d < y.d ? -1 : 1))
 }
+export const mergeBodyweight = mergeByDay
 
 // The kept load per exercise. "The larger one wins" held while the app only ever raised it —
 // but an assistance machine progresses downwards, so there the smaller number is the newer,
@@ -94,21 +100,29 @@ export function mergeStates(a, b, { prefer } = {}) {
   for (const f of ['exNotes', 'barWeights']) {
     if (n[f] || o[f]) out[f] = clone({ ...(o[f] || {}), ...(n[f] || {}) })
   }
+  if (n.nutrition || o.nutrition) out.nutrition = clone(mergeNutrition(n.nutrition, o.nutrition))
+  if (list(n.measurements).length || list(o.measurements).length) out.measurements = mergeByDay(n.measurements, o.measurements).map(clone)
+  // Height and birth year are facts about the person, not a setting of one device: the later
+  // edit stands even when the other copy is the "newer" one overall.
+  if (n.bodyProfile || o.bodyProfile) out.bodyProfile = clone((o.bodyProfile?.t || 0) > (n.bodyProfile?.t || 0) ? o.bodyProfile : (n.bodyProfile || o.bodyProfile))
   out._ts = Math.max(a._ts || 0, b._ts || 0)
   delete out._rev
   return out
 }
 
-// What `local` holds that `server` does not: the workouts and weigh-ins a device logged while it
-// was signed out, and the custom exercises they use. Sign-in asks about these before the server's
+// What `local` holds that `server` does not: the workouts, weigh-ins, diary rows and measurements
+// a device logged while it was signed out, and the custom exercises they use. Sign-in asks about these before the server's
 // profile replaces the local copy; zero of each means there is nothing to ask about.
 export function localExtras(local, server) {
   const have = new Set(list(server?.workouts).map(workoutKey))
   const days = new Set(list(server?.bodyweight).map(e => e?.d))
   const ex = new Set(list(server?.customEx).map(e => e?.id))
+  const mdays = new Set(list(server?.measurements).map(e => e?.d))
   return {
     workouts: list(local?.workouts).filter(w => !have.has(workoutKey(w))).length,
     bodyweight: list(local?.bodyweight).filter(e => e && e.d != null && !days.has(e.d)).length,
-    customEx: list(local?.customEx).filter(e => e && !ex.has(e.id)).length
+    customEx: list(local?.customEx).filter(e => e && !ex.has(e.id)).length,
+    food: nutritionExtras(local?.nutrition, server?.nutrition),
+    measurements: list(local?.measurements).filter(e => e && e.d != null && !mdays.has(e.d)).length
   }
 }

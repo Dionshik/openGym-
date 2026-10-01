@@ -136,6 +136,24 @@ Read this before hosting openGym for anyone other than yourself.
   people, they are trusting you exactly as much as they'd trust any server operator.** With the
   activity log on, `./data/audit.log` adds everyone's sign-in times to that — worth remembering
   before an archive of `./data` goes somewhere you don't run.
+- **That now includes what people eat and what their bodies measure.** The food diary, the body
+  profile and measurements are part of `state-<uid>.json`; what an iPhone Shortcut delivers
+  from Apple Health sits in `health/<uid>.json`. Same rule as above: unencrypted, readable by
+  whoever can read the folder. The Apple Health connection is off until an admin turns it on,
+  for exactly this reason. Two things are deliberately *not* kept: a photograph sent to the AI
+  to be read is held in memory for the length of that call and never written anywhere, and a
+  Health token is stored only as a SHA-256 hash.
+- **A Health token is a bearer credential with one narrow use.** `ogh_…`, made on the Body
+  screen, sent by the Shortcut as `Authorization: Bearer`. It can add body measurements to the
+  profile it was made for and can read nothing; no route but `POST /api/healthkit/ingest`
+  accepts it, and that route accepts nothing else — not a session cookie. It does not expire;
+  it is revoked by its owner on the Body screen or by deleting the account. Anyone holding it
+  can write plausible-looking weigh-ins into that profile until then, so treat a phone lost
+  with the Shortcut on it as a reason to revoke.
+- **Online food lookup sends search terms to a third party.** Off by default. When an admin
+  turns it on, the barcodes and product names members look up are sent from the server to
+  Open Food Facts — from the server's address, with no member identity, and cached afterwards.
+  `FOOD_LOOKUP_DISABLED=1` keeps it off regardless of the dashboard.
 - **Admins can read everything.** A user listed in `ADMIN_UIDS` (or flagged `admin: true` in
   `db.json`) gets every user's full history and body weight, can disable accounts, and can create
   or revoke invite codes (`api/server.js:825-947`). Off by default — a fresh instance has no admin.

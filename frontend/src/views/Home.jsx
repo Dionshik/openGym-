@@ -10,6 +10,10 @@ import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { tappable } from '../lib/use-sheet-keyboard.js'
 import { glyphOf } from '../lib/glyphs.js'
+import { nutritionOf, dayTotals } from '../lib/nutrition.js'
+import { targetsFor } from '../lib/nutrition-targets.js'
+import MacroBars from '../components/MacroBars.jsx'
+import '../nutrition.css'
 
 // Home = what to do now + a quick glance. Deep charts & history live in Stats.
 export default function Home() {
@@ -55,6 +59,8 @@ export default function Home() {
   const wThisWeek = S.workouts.filter(w => weekKey(w.d, ws) === weekKey(todayISO(), ws)).length
   // Days scheduled, not routines — a combined day counts as 1, matching wThisWeek (one w).
   const plannedPerWeek = Object.values(S.week).filter(ids => ids?.length).length
+  const eaten = dayTotals(nutritionOf(S), todayISO())
+  const target = S.nutritionOn !== false ? targetsFor(S, todayISO()) : { kcal: null }
   const bwPoints = S.bodyweight.slice(-30).map(b => ({ t: b.t || new Date(b.d).getTime(), y: b.w, d: b.d }))
 
   // today's session shown right under the week strip
@@ -124,6 +130,24 @@ export default function Home() {
           </div>
           <Icon name="chevronRight" className="chev" />
         </div>
+      </div>
+    )}
+
+    {/* Today's food against the target; the whole card opens the diary. Before the first entry
+        it is one line, so a profile that never logs food is not handed a wall of empty bars. */}
+    {S.nutritionOn !== false && (
+      <div className="card tappable" style={{ cursor: 'pointer' }} {...tappable(() => nav('/nutrition'))}>
+        <div className="row between" style={{ marginBottom: eaten.n || target.kcal ? 10 : 0 }}>
+          <div className="row" style={{ gap: 9 }}>
+            <span className="lrow-i" style={{ background: 'var(--orange)' }}><Icon name="utensils" /></span>
+            <div>
+              <div className="lbl2">{t('Today')}</div>
+              <div className="ttl">{t('Nutrition')}</div>
+            </div>
+          </div>
+          {eaten.n || target.kcal ? <Icon name="chevronRight" className="chev" /> : <span className="tag acc">{t('Log food')}</span>}
+        </div>
+        {(eaten.n > 0 || !!target.kcal) && <MacroBars compact totals={eaten} target={target.kcal ? target : null} />}
       </div>
     )}
 

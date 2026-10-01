@@ -36,6 +36,8 @@ import Muscles from './views/Muscles.jsx'
 import Settings from './views/Settings.jsx'
 import Admin from './views/Admin.jsx'
 import Moderation from './views/Moderation.jsx'
+import Nutrition from './views/Nutrition.jsx'
+import Body from './views/Body.jsx'
 import CoachChat from './views/CoachChat.jsx'
 import CoachIntake from './views/CoachIntake.jsx'
 import CoachSetup from './views/CoachSetup.jsx'
@@ -151,6 +153,9 @@ function Shell() {
               {/* Gym check-in — switched off in Settings, the route falls through to the
                   catch-all redirect below. */}
               {S.checkIn !== false && <Route path="/checkin" element={<CheckIn />} />}
+              {/* The food diary — same shape as the check-in: a Home card, a route, a switch. */}
+              {S.nutritionOn !== false && <Route path="/nutrition" element={<Nutrition />} />}
+              <Route path="/body" element={<Body />} />
               <Route path="/plan" element={<Plan />} />
               <Route path="/plan/r/:id" element={<RoutineEdit />} />
               <Route path="/workout" element={<Workout />} />

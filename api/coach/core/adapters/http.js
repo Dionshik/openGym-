@@ -71,6 +71,9 @@ export function httpAdapter(spec) {
     // The two facts the server's job runner branches on. Stated, not inferred from absence.
     spawns: false,
     needsRuntime: false,
+    // Every HTTPS provider here can carry a picture beside the prompt (see each spec's body()).
+    // Whether the chosen *model* can read one is the provider's to say at request time.
+    images: true,
 
     baseUrl: cfg => baseUrlFor(id, cfg),
 
@@ -115,7 +118,7 @@ export function httpAdapter(spec) {
      * native HTTP and a test can hand in a fake.
      */
     async invoke(opts = {}) {
-      const { cfg, prompt, system, schema, env, model, timeoutMs = DEFAULT_TIMEOUT_MS, fetch: fetchImpl = globalThis.fetch, signal } = opts;
+      const { cfg, prompt, system, schema, images, maxTokens, env, model, timeoutMs = DEFAULT_TIMEOUT_MS, fetch: fetchImpl = globalThis.fetch, signal } = opts;
       const base = adapter.baseUrl(cfg);
       if (!base) return { code: -1, text: '', stderr: `no endpoint configured for ${id}`, spawnError: true };
       const key = keyOf(env);
@@ -123,7 +126,13 @@ export function httpAdapter(spec) {
       const chosen = model || meta.defaultModel;
       if (!chosen) return { code: 1, text: '', stderr: `no model chosen for ${id} — pick one from the list the endpoint serves` };
 
-      let body = spec.body({ model: chosen, prompt, system: system || null, schema: schema || null, maxTokens: MAX_OUTPUT_TOKENS });
+      let body = spec.body({
+        model: chosen, prompt, system: system || null, schema: schema || null,
+        maxTokens: maxTokens > 0 ? Math.min(MAX_OUTPUT_TOKENS, maxTokens) : MAX_OUTPUT_TOKENS,
+        // [{ mime, data }] — base64 without a data: prefix. Absent means the request is the
+        // text-only one every provider has always been sent, byte for byte.
+        images: Array.isArray(images) && images.length ? images : null
+      });
       let retriedWithoutJsonMode = false;
       let transientRetries = 0;
       for (;;) {

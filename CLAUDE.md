@@ -14,14 +14,14 @@ License: AGPL-3.0-or-later.
 ```
 frontend/  React 19 + Vite app (src/views, src/components, src/store, src/lib). Builds to static files.
            android/ + ios/ are the Capacitor shells for the standalone mobile app (docs/MOBILE.md).
-api/       backend — server.js (Node, no framework), deps: @simplewebauthn/server, web-push.
+api/       backend — server.js (Node, no framework), deps: @simplewebauthn/server, web-push, undici.
 web/       multi-stage Dockerfile (builds frontend → nginx) + nginx.conf.template (serves app, proxies /api).
 mcp/       optional MCP server — read-only stdio bridge exposing a user's workouts/1RM/muscle
            balance to LLM clients (Claude Desktop, Cursor…). Not part of the Docker build; only
            runs when an LLM client spawns it.
 media/     exercise img/gif, gitignored, fetched at runtime by the `media` compose service.
 website/   static marketing site (plain HTML/CSS/JS), deployed separately by .gitlab-ci.yml.
-docs/      SELF_HOSTING.md, MOBILE.md.
+docs/      SELF_HOSTING.md, MOBILE.md, AI_COACH.md, NUTRITION.md, HEALTH_SHORTCUT.md.
 ```
 
 ## Commands
@@ -80,6 +80,14 @@ signed Android APK, and deploys the demo/docs site. The Gitea and GitHub workflo
     them or `exercises-data.js` by hand, and never remove an id that shipped (`ids.lock.json`).
     A third source, the instance's shared pool (`lib/pool.js`, `api/pool.js`), is registered at
     runtime: exercises members suggested and an admin or moderator approved.
+  - `nutrition.js` (the food diary: rows, day totals, folding of old days, the two-device
+    merge), `nutrition-targets.js` / `nutrition-adaptive.js` / `nutrition-training.js` (the
+    daily target: formulas, expenditure measured from intake against the weight trend, the
+    training-day shift), `food-search.js` + generated `foods-data.js` (438 built-in foods, from
+    `scripts/build-foods.mjs` — never edit by hand), `food-suggest.js`, `food-ai.js`, `body.js`
+    (measurements), `health-apply.js` (copying Apple Health deliveries into the profile). Every
+    write to the diary or the body profile goes through `src/nutrition-actions.js`. See
+    `docs/NUTRITION.md`.
   - `api.js` — the only place that talks to the backend (`fetch` wrapper, session cookie flows).
   - CONTRIBUTING.md is explicit: **anything that decides what you lift next, or reads a logged
     session back, is a pure helper here with a unit test beside it** — not verifiable by
@@ -105,6 +113,16 @@ gated by env vars: `ADMIN_UIDS` (admin dashboard), `INVITE_ONLY` (signup needs a
 `ALLOW_GUEST` (client-only guest mode never hits the server at all), plus a rotating
 `data/audit.log` (JSONL) for sign-in/admin events. Web Push (`web-push`, VAPID keys
 auto-generated into `data/vapid.json`) drives rest-timer-over and day-reminder notifications.
+
+Beside `server.js` sit a few route modules written as factories taking its helpers (the pattern
+`coach/routes.js` set): `pool.js` (shared exercises), `settings.js` (the admin switches for the
+two features below, both off by default), `food.js` (Open Food Facts lookup with its own cache
+file) and `healthkit.js` + `healthkit-parse.js` (the Apple Health ingest: a hashed, write-only
+`ogh_` token per Shortcut, data in `health/<uid>.json`). **A new top-level module must be added
+to the `COPY` line in `api/Dockerfile`** — `test/dockerfile.test.js` fails otherwise, because
+the container would not boot. The food diary's AI calls live in `coach/core/food.js` (pure:
+payloads, validators) and `coach/food-jobs.js` (an in-memory job lane; the photo never reaches
+a disk).
 
 ### MCP server (`mcp/src`)
 

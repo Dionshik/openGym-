@@ -63,9 +63,14 @@ function ConfirmDialog({ title, message, confirmText, cancelText, danger, onConf
 // out). The profile is the truth — settings and plan come from the server either way — the
 // question is only whether these entries are added to it or dropped. Resolves true to add.
 export function askAddDeviceData(extras) {
+  // A device that only kept a food diary or took measurements while signed out has no workouts
+  // to mention; asking about "0 workouts and 0 weigh-ins" would read as nothing to keep.
+  const training = extras.workouts || extras.bodyweight || extras.customEx
   return new Promise(resolve => confirmSheet({
-    title: t('Add this device\'s workouts to your profile?'),
-    message: t('{0} workouts and {1} weigh-ins were logged on this device while signed out. Add them to your profile, or keep the profile exactly as it is on the server.', extras.workouts, extras.bodyweight),
+    title: training ? t('Add this device\'s workouts to your profile?') : t('Add this device\'s entries to your profile?'),
+    message: training
+      ? t('{0} workouts and {1} weigh-ins were logged on this device while signed out. Add them to your profile, or keep the profile exactly as it is on the server.', extras.workouts, extras.bodyweight)
+      : t('{0} food diary entries and {1} days of measurements were logged on this device while signed out. Add them to your profile, or keep the profile exactly as it is on the server.', extras.food || 0, extras.measurements || 0),
     confirmText: t('Add them'), cancelText: t('Keep profile as is'),
     onConfirm: () => resolve(true), onCancel: () => resolve(false), locked: true
   }))
@@ -213,7 +218,9 @@ function BwSheet({ required, onDone, close }) {
     update(s => {
       const iso = todayISO()
       const ex = s.bodyweight.find(b => b.d === iso)
-      if (ex) { ex.w = n; ex.t = Date.now() } else s.bodyweight.push({ d: iso, w: n, t: Date.now() })
+      // Typed by hand from here on: a reading Apple Health delivered for today (src) no longer
+      // owns the day, so a later delivery will not overwrite what was just entered.
+      if (ex) { ex.w = n; ex.t = Date.now(); delete ex.src } else s.bodyweight.push({ d: iso, w: n, t: Date.now() })
       s.bodyweight.sort((a, b) => (a.d < b.d ? -1 : 1))
     })
     close()

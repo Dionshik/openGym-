@@ -64,6 +64,8 @@ as a home-screen app, passkey sign-in, offline support, sync across your phone a
 ## Features
 
 - ⚖️ **Body-weight tracking** — interactive chart with a goal line you set, gains/losses colored by whether they move toward it
+- 🍽️ **Food diary** — log what you eat from a built-in list of 438 everyday foods (Russian and English names), your own products, or bare numbers; see the day's calories and protein / fat / carbs against a target that is computed from your body, measured from your own diary and weigh-ins once there is enough of both, and shifted a little towards the days you train. Works offline. Optional, and each off until an admin turns it on: product lookup in Open Food Facts, a photo of a plate or a label read by your own AI provider, and "what should I eat?" — see [docs/NUTRITION.md](docs/NUTRITION.md)
+- 📏 **Body profile & measurements** — height, age, activity, tape measurements and body fat over time; optionally fed from Apple Health by an iPhone Shortcut that posts to your own server ([docs/HEALTH_SHORTCUT.md](docs/HEALTH_SHORTCUT.md))
 - 🏋️ **Weekly plan** — a routine per weekday, over a library of **1,859 exercises** (searchable; 1,324 of them with animated demos), browsable **by muscle** on a body map
 - ✨ **Four starter plans** — Push/Pull/Legs, Upper/Lower, Full Body, 5×5; loaded as ordinary routines you can edit, and a routine can be copied in one tap
 - 🗓️ **Reschedule any day** — sick, missed a session, or fewer gym days this week? Move a workout to another day without touching your weekly plan

@@ -17,6 +17,9 @@ import {
 import { loadOfWorkouts, rankOf, levelsOf } from '../../frontend/src/lib/muscles.js'
 import { policyFor } from '../../frontend/src/lib/progression.js'
 import { buildSessionEntries } from '../../frontend/src/lib/session-start.js'
+import { nutritionOf, loggedDays, byMeal, MEALS } from '../../frontend/src/lib/nutrition.js'
+import { targetsFor, baseTargets, personOf, bmrOf, tdeeFormula } from '../../frontend/src/lib/nutrition-targets.js'
+import { latestMeasures, MEASURE_KEYS } from '../../frontend/src/lib/body.js'
 
 /* ---------- helpers ---------- */
 
@@ -329,6 +332,74 @@ export const getBodyweight = {
   }
 }
 
+/** get_nutrition — daily energy and macros against the target; one day's entries on request. */
+export const getNutrition = {
+  name: 'get_nutrition',
+  description: 'Get the food diary: energy (kcal) and protein / fat / carbohydrate (g) eaten per day against the daily target, plus averages over the range. Pass `date` to list what was logged that day, meal by meal. Days older than about three months are kept as daily totals only. Useful for "am I eating enough protein?" or "how does intake compare with my target this week?".',
+  schema: {
+    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Inclusive start date YYYY-MM-DD. Defaults to 14 days before `to`.'),
+    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Inclusive end date YYYY-MM-DD. Defaults to today.'),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('List the entries logged on this one day.')
+  },
+  handler: ({ from, to, date }) => {
+    const S = getState()
+    if (!S) return noState()
+    const today = todayISO()
+    const nut = nutritionOf(S)
+    const end = to || today
+    const start = from || isoMinus(end, 14)
+    const days = loggedDays(nut).filter(x => x.d >= start && x.d <= end)
+    const mean = key => (days.length ? Math.round(days.reduce((a, x) => a + x[key], 0) / days.length) : null)
+    const target = baseTargets(S, today)
+    const out = {
+      target: target.kcal
+        ? { kcal: target.kcal, protein_g: target.p, fat_g: target.f, carbs_g: target.c, basis: target.basis, estimated_expenditure_kcal: target.tdee }
+        : null,
+      range: { from: start, to: end, logged_days: days.length },
+      average: days.length ? { kcal: mean('k'), protein_g: mean('p'), fat_g: mean('f'), carbs_g: mean('c') } : null,
+      days: days.map(x => ({ date: x.d, kcal: x.k, protein_g: Math.round(x.p), fat_g: Math.round(x.f), carbs_g: Math.round(x.c), entries: x.n }))
+    }
+    if (date) {
+      const dayTarget = targetsFor(S, date, today)
+      out.day = {
+        date,
+        target_kcal: dayTarget.kcal || null,
+        meals: byMeal(nut, date).map((rows, m) => ({ meal: MEALS[m], entries: rows.map(e => ({ name: e.n, grams: e.g || null, kcal: e.k, protein_g: e.p, fat_g: e.f, carbs_g: e.c })) })).filter(x => x.entries.length)
+      }
+    }
+    return out
+  }
+}
+
+/** get_body — the body profile, the latest measurements, and what the energy formulas make of them. */
+export const getBody = {
+  name: 'get_body',
+  description: 'Get the body profile: sex, age, height, daily activity level, the latest value of each tape measurement (cm) and body-fat percentage, and the estimated resting and total daily energy expenditure. Fields the person has not filled in are null. Useful together with get_bodyweight and get_nutrition.',
+  schema: {},
+  handler: () => {
+    const S = getState()
+    if (!S) return noState()
+    const today = todayISO()
+    const p = personOf(S, today)
+    const bmr = bmrOf(p)
+    const latest = latestMeasures(S)
+    return {
+      sex: p.sex === 'm' ? 'male' : p.sex === 'f' ? 'female' : null,
+      age: p.age,
+      height_cm: p.cm,
+      daily_activity: p.activity,
+      weight_kg: p.kg,
+      body_fat_percent: p.bodyFat,
+      measurements: Object.fromEntries(MEASURE_KEYS.filter(k => latest[k]).map(k => [k, { value: latest[k].v, date: latest[k].d }])),
+      resting_expenditure_kcal: bmr ? bmr.kcal : null,
+      resting_formula: bmr ? bmr.formula : null,
+      daily_expenditure_kcal: bmr ? tdeeFormula(bmr.kcal, p.activity) : null
+    }
+  }
+}
+const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') }
+const isoMinus = (iso, n) => { const d = new Date(new Date(iso + 'T12:00:00').getTime() - n * 86400000); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') }
+
 /** estimate_1rm — best-ever 1RM for one exercise or a PR table across all reps-mode exercises. */
 export const estimate1rm = {
   name: 'estimate_1rm',
@@ -566,7 +637,8 @@ export const previewSession = {
 /* ---------- registration list ---------- */
 
 export const TOOLS = [
-  listRoutines, getRoutine, previewSession, getWeekPlan, listWorkouts, getWorkout, getBodyweight, estimate1rm, muscleBalance
+  listRoutines, getRoutine, previewSession, getWeekPlan, listWorkouts, getWorkout, getBodyweight, estimate1rm, muscleBalance,
+  getNutrition, getBody
 ]
 
 function noState() {

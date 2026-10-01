@@ -151,6 +151,26 @@ and a moderator's both land in the activity log.
 The pool lives in `./data/pool.json`. People who use the app as guests, and the standalone
 mobile app when it is not paired to a server, have no pool: there is no server to hold one.
 
+### Nutrition, online food lookup and Apple Health
+
+The food diary and the body profile need nothing from you: they are part of every profile and
+work offline. Two things around them are switches on the admin dashboard, under **Nutrition &
+Health**, both off on a fresh instance:
+
+- **Online food lookup** lets members look a product up in Open Food Facts by barcode digits or
+  by name. The request leaves from this server (so it needs outbound HTTPS to
+  `world.openfoodfacts.org` and `search.openfoodfacts.org`), carries no member identity, and is
+  cached. Give it a contact address — the database asks every client for one. To make sure it
+  stays off whatever anyone clicks, set `FOOD_LOOKUP_DISABLED=1` in `.env`.
+- **Apple Health** lets a member's iPhone post weight, body fat and waist here once a day
+  through a Shortcut, with a token made on their Body screen. Read
+  [HEALTH_SHORTCUT.md](HEALTH_SHORTCUT.md) before turning it on, and tell your members what
+  section 6 below says about `./data`.
+
+Reading a photo of a meal or a label, and "what should I eat?", go through the AI Coach's
+provider and are described in [NUTRITION.md](NUTRITION.md) and [AI_COACH.md](AI_COACH.md).
+Neither needs a proxy timeout raised: those requests are queued and polled.
+
 ### The activity log
 
 The dashboard also keeps an **activity log**: sign-ins, sign-outs, failed attempts, refused
@@ -270,8 +290,11 @@ Everything is in `./data`:
 tar czf opengym-backup-$(date +%F).tar.gz data/
 ```
 
-That archive contains all profiles, passkeys and workout history, the shared exercise pool
-(`pool.json`) — and, if the activity log is on, `audit.log` with everyone's sign-in times. Worth knowing before you ship the archive to a
+That archive contains all profiles, passkeys and workout history — and, in each profile, its
+food diary, body profile and measurements — the shared exercise pool (`pool.json`), the two
+admin switches for nutrition and Health (`settings.json`), what members' iPhones delivered from
+Apple Health (`health/`, `health-tokens.json`), the Open Food Facts cache (`off-cache.json`,
+safe to delete) — and, if the activity log is on, `audit.log` with everyone's sign-in times. Worth knowing before you ship the archive to a
 backup service you don't run. Restore by unpacking it back into the project folder. (Individual
 users can also export their own data as JSON from Settings.)
 

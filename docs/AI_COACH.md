@@ -185,6 +185,56 @@ routine built this way does not spend the Coach's own daily runs; a spent instan
 stops them all the same. They appear in the admin card's recent jobs as **Exercise lookup**,
 counts and outcomes only.
 
+### The food diary: a photo, a label, a description, a suggestion
+
+Four entry points in the nutrition section use the same provider (see
+[NUTRITION.md](NUTRITION.md) for the user's side):
+
+| Kind | Sent | Returned |
+| --- | --- | --- |
+| `meal` | a photo (1024 px JPEG) and/or a caption | foods with weights and per-100 g values — a draft the user edits |
+| `label` | a photo of a nutrition panel | the panel's values, converted to per 100 g |
+| `suggest` | what is left of today's target, up to 40 of the user's own foods (name and per-100 g values), a wish | a few meals with weights |
+
+None of them is coaching, none reads the training log, and none goes through `payload.js`:
+each has a standalone prompt (`prompts/meal.md`, `label.md`, `suggest.md`) and a payload built
+by name in `api/coach/core/food.js` from the request alone. The validators there hold a
+guessing model to what food can physically be — at most 900 kcal and 100 g of macros per
+100 g, energy replaced by what the macros add up to when the two disagree by more than a
+quarter — and only an answer with no usable shape goes to the one repair round.
+
+They differ from everything else in three ways.
+
+**A consent of their own.** `coach.foodConsent`, given on the sheet that sends, covering what
+that sheet sends. The Coach's own consent does *not* stand in for it: it was given for a
+training log.
+
+**A lane of their own** (`api/coach/food-jobs.js`). Not the Coach's queue — that holds one job
+per profile across every kind and writes into the single pending proposal — and not an awaited
+request like the exercise lookup either: a local vision model can take minutes, and proxies
+give up after sixty seconds. `POST /api/coach/food` answers `202` with a job id; the app polls
+`GET /api/coach/food/job`. The lane shares the Coach's limit of two concurrent provider calls.
+
+**Nothing on disk.** The photo, the caption and the result live in the server's memory: the
+picture for the length of the call, the result for ten minutes or until collected. The job log
+gets the kind, the outcome and the duration, as for every other call. A restart forgets a job
+in flight and the app says so.
+
+They have their own cap, `caps.foodPerProfileDaily` (30; Advanced on the card), and a spent
+instance cap stops them too.
+
+**Pictures need a provider that can carry one.** The four HTTPS adapters attach an image the
+way each API expects (Anthropic: a base64 image block before the text; OpenAI and every
+compatible server: a `data:` URL in an `image_url` part; Gemini: `inline_data`). The
+runtime-backed providers (Claude Agent SDK, Codex CLI) cannot, so `/api/config` reports
+`coach.vision: false` for them and the app offers only *Describe in words*. A model that is
+simply not a vision model answers the request with an error that the pipeline classifies as
+`novision`.
+
+For a local setup, set **Vision model** on the card (Model step → Photos) to the model that
+reads pictures — it falls back to the main model when empty — and press **Test photo
+reading**: the server sends a 64×64 red square and passes only if the answer names the colour.
+
 ### Comparing with others on the instance
 
 Off unless the admin turns it on (**Settings → Admin → AI Coach → Advanced → Let people compare
@@ -251,6 +301,20 @@ renders from, so the screen cannot drift from the payload — are:
 | `profile` | the intake answers you gave the Coach, including any limitations |
 | `cohort` (optional) | only with comparison on and your own opt-in: anonymous medians from the other people sharing — never their data, and never yours to them beyond the same medians |
 | `prefs` | unit, language, effort scale |
+
+Two more categories exist and are **not part of that consent**. Each has a switch of its own
+on the Body screen, off until the person turns it on, recorded in `coach.consent.extra`; the
+payload builder checks the switch itself (`api/coach/core/extras.js`), so a profile that agreed
+to the Coach before they existed sends exactly what it sent then.
+
+| Optional category | What it covers |
+| --- | --- |
+| `bodyProfile` | sex, age (not the birth year), height, everyday activity, body fat, and for each tape measurement its latest value and how it moved over about eight weeks |
+| `nutrition` | the daily target and the two-week averages actually eaten, the estimated expenditure. Never a food name, never a barcode, never a photo |
+
+The Coach is told to use these to judge recovery and progress — to hold volume rather than add
+it for someone eating well under what they burn — and not to write a diet, give a calorie
+figure of its own, or comment on how a body looks.
 
 A review reads a training block, not a training career: the window is capped at **12 weeks or 60
 sessions**. Your profile is identified by a stable pseudonym that is never the user id and never

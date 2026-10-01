@@ -6,10 +6,11 @@
  */
 import * as cfgStore from './config.js';
 import * as jobs from './jobs.js';
+import * as foodJobs from './food-jobs.js';
 import { computeCohort } from './cohort.js';
 import { adapterFor } from './adapters/index.js';
 import { canDropPrivileges } from './adapters/spawn.js';
-import { DATA_CATEGORIES } from './core/payload.js';
+import { DATA_CATEGORIES, OPTIONAL_CATEGORIES } from './core/payload.js';
 import { validateBaseUrl, baseUrlFor } from './core/providers.js';
 
 // Job failures the user sees, in the app's own voice. The raw provider detail never reaches
@@ -35,6 +36,19 @@ const LOOKUP_ERROR = {
   unusable: 'the Coach answered with something the app could not use'
 };
 const LOOKUP_HTTP = { empty: 400, timeout: 504, auth: 502, provider: 502, missing: 502, unusable: 502 };
+// The food diary's requests: refused before anything is spent. A job that ran and failed says
+// so on the poll, with the same class names.
+const FOOD_ERROR = {
+  kind: 'unknown request',
+  empty: 'describe the meal or add a photo first',
+  noimage: 'a photo is needed for this',
+  badimage: 'that picture could not be read — try a JPEG or PNG',
+  toolarge: 'that picture is too large',
+  novision: 'the AI provider on this instance cannot read pictures',
+  busy: 'the last one is still being read',
+  cap: 'that is enough for today — try again tomorrow'
+};
+const FOOD_HTTP = { kind: 400, empty: 400, noimage: 400, badimage: 400, toolarge: 413, novision: 409 };
 
 export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
   /** Every user route starts the same way: signed in, feature on, feature reachable. */
@@ -63,6 +77,8 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
         provider: cfg.provider,
         providerLabel: cfgStore.providerMeta(cfg).label,
         categories: DATA_CATEGORIES,
+        // Off unless the profile switches each on; never part of the consent above.
+        optional: OPTIONAL_CATEGORIES,
         version: 1
       });
     },
@@ -134,6 +150,31 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       }
     },
 
+    /* The food diary: what is on this plate, what does this label say, what could I eat next.
+       The request starts a job and returns its id; the app polls for the answer, because a
+       local vision model can outlast any proxy's patience. Nothing is stored and nothing is
+       logged in the diary — the person edits the draft and confirms it. */
+    'POST /api/coach/food': async (req, res) => {
+      const user = guard(req, res); if (!user) return;
+      const body = await readBody(req);
+      try {
+        json(res, 202, { job: foodJobs.start(user.id, { kind: body.kind, caption: body.caption, image: body.image, context: body.context, lang: body.lang }), cap: jobs.foodCapState(user.id) });
+      } catch (e) {
+        if (!(e instanceof jobs.CoachError)) throw e;
+        json(res, FOOD_HTTP[e.code] || HTTP_FOR[e.code] || 400, { error: FOOD_ERROR[e.code] || USER_ERROR[e.code] || 'the request could not be started', code: e.code });
+      }
+    },
+    'GET /api/coach/food/job': async (req, res) => {
+      const user = guard(req, res); if (!user) return;
+      json(res, 200, foodJobs.get(user.id, new URL(req.url, 'http://x').searchParams.get('id')));
+    },
+    'POST /api/coach/food/cancel': async (req, res) => {
+      const user = readSession(req);
+      if (!user) return json(res, 401, { error: 'not signed in' });
+      const body = await readBody(req);
+      json(res, 200, foodJobs.cancel(user.id, body.id));
+    },
+
     'POST /api/coach/pending/resolve': async (req, res) => {
       const user = guard(req, res); if (!user) return;
       const body = await readBody(req);
@@ -179,6 +220,9 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
         })),
         model: cfgStore.modelFor(cfg),
         models: cfg.models,
+        // The model photographs go to; null when it is the same one.
+        visionModel: (cfg.visionModels && cfg.visionModels[cfg.provider]) || null,
+        vision: adapter?.images === true,
         baseUrl: cfgStore.providerMeta(cfg).http ? baseUrlFor(cfg.provider, cfg) : null,
         knownModels: check.models || null,
         caps: cfg.caps,
@@ -230,6 +274,10 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
         patch.models = { ...current.models };
         if (body.model) patch.models[target] = String(body.model).slice(0, 80); else delete patch.models[target];
       }
+      if (body.visionModel !== undefined) {
+        patch.visionModels = { ...current.visionModels };
+        if (body.visionModel) patch.visionModels[target] = String(body.visionModel).slice(0, 80); else delete patch.visionModels[target];
+      }
       if (body.baseUrl !== undefined) {
         if (!cfgStore.PROVIDERS[target].baseUrl) return json(res, 400, { error: `${target} has a fixed endpoint` });
         const v = validateBaseUrl(body.baseUrl);
@@ -239,10 +287,11 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       if (body.community !== undefined) patch.community = !!body.community;
       if (body.caps) {
         patch.caps = {
-          // The card has no field for the lookup cap; saving the two it does have must not reset it.
+          // The card has no field for the lookup cap; saving the ones it does have must not reset it.
           ...current.caps,
           perProfileDaily: Math.max(0, Math.min(200, +body.caps.perProfileDaily || 0)),
-          instanceDaily: Math.max(0, Math.min(5000, +body.caps.instanceDaily || 0))
+          instanceDaily: Math.max(0, Math.min(5000, +body.caps.instanceDaily || 0)),
+          ...(body.caps.foodPerProfileDaily !== undefined ? { foodPerProfileDaily: Math.max(0, Math.min(500, +body.caps.foodPerProfileDaily || 0)) } : {})
         };
       }
       cfgStore.save(patch);
@@ -253,6 +302,12 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       if (!requireAdmin(req, res)) return;
       const r = await jobs.testRun();
       json(res, 200, r);
+    },
+
+    // "Can the configured model see?" — sends a red square and reads the answer (food-jobs.js).
+    'POST /api/admin/coach/test-vision': async (req, res) => {
+      if (!requireAdmin(req, res)) return;
+      json(res, 200, await foodJobs.probeVision());
     },
 
     /* The models the configured endpoint serves, so the card can offer a list rather than a

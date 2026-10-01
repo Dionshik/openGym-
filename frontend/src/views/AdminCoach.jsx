@@ -69,6 +69,14 @@ export default function AdminCoach() {
     } catch (e) { setTestResult({ ok: false, error: e.message }); toast(e.message) }
     setBusy(false)
   }
+  // "Can the vision model see?" — the server shows it a red square (api/coach/food-jobs.js).
+  const [visionResult, setVisionResult] = useState(null)
+  const testVision = async () => {
+    setBusy(true); setVisionResult({ pending: true })
+    try { setVisionResult(await api('/api/admin/coach/test-vision', { method: 'POST', body: '{}' })) }
+    catch (e) { setVisionResult({ ok: false, error: e.message }) }
+    setBusy(false)
+  }
   const disconnect = async () => {
     setBusy(true)
     try { await api('/api/admin/coach/disconnect', { method: 'POST', body: JSON.stringify({ provider: d.provider }) }); toast('Credential removed'); await load() }
@@ -227,6 +235,34 @@ export default function AdminCoach() {
           <Button size="sm" variant="tinted" icon="reset" disabled={busy} onClick={loadModels}>{models ? 'Refresh list' : 'List models'}</Button>
           {models && models.length ? <span className="dim small" style={{ alignSelf: 'center' }}>{models.length} served by the provider</span> : null}
         </div>}
+
+        {/* The food diary can send a photograph of a plate or a label. A local setup usually runs
+            a text model for plans and a separate vision model for pictures, so that one is its own
+            field — and the only way to know a model really sees is to show it something. */}
+        <div className="adm-group-t" style={{ marginTop: 14 }}>Photos (food diary)</div>
+        {d.vision ? <>
+          <div className="adm-hint">The model that reads food photos and nutrition labels. Leave it empty to use the model above. With Ollama or LM Studio this is usually a different, vision-capable model (qwen2.5vl, gemma3, llava…).</div>
+          <div className="adm-field">
+            <label>Vision model</label>
+            {models && models.length
+              ? <select className="adm-select" value={models.includes(d.visionModel) ? d.visionModel : ''} disabled={busy} onChange={e => patch({ visionModel: e.target.value })}>
+                <option value="">Same as the model above</option>
+                {d.visionModel && !models.includes(d.visionModel) && <option value={d.visionModel}>{d.visionModel} (not in the list)</option>}
+                {models.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+              : <TextField key={'v' + d.provider} defaultValue={d.visionModel || ''} placeholder="Same as the model above"
+                onBlur={e => e.target.value !== (d.visionModel || '') && patch({ visionModel: e.target.value })} />}
+          </div>
+          <div className="adm-actions">
+            <Button size="sm" variant="tinted" icon="camera" disabled={busy || !authed || !hasEndpoint} onClick={testVision}>Test photo reading</Button>
+          </div>
+          {visionResult && <div className={'adm-result ' + (visionResult.pending ? '' : visionResult.ok && visionResult.seen ? 'ok' : 'bad')}>
+            {visionResult.pending ? 'Showing the model a red square…'
+              : !visionResult.ok ? <><b>Failed</b>{visionResult.error || 'No answer from the provider.'}</>
+                : visionResult.seen ? <><b>It can see</b>{visionResult.note || `${visionResult.model || 'The model'} named the colour of the test picture.`}</>
+                  : <><b>It answered, but did not see the picture</b>{`${visionResult.model || 'The model'} said “${visionResult.answer || '…'}” about a red square. Pick a vision-capable model.`}</>}
+          </div>}
+        </> : <div className="adm-hint">This provider runs through a subscription CLI, which cannot be sent pictures. Describing a meal in words still works; for photos, use one of the API providers or a local model.</div>}
       </Step>
 
       {/* ---------- test ---------- */}
@@ -261,6 +297,10 @@ export default function AdminCoach() {
           <div className="adm-kv"><span className="k">Whole instance, per day</span>
             <span className="v"><input className="num" type="number" min="0" max="5000" defaultValue={d.caps.instanceDaily} disabled={busy}
               onBlur={e => +e.target.value !== d.caps.instanceDaily && patch({ caps: { ...d.caps, instanceDaily: +e.target.value } })} /></span></div>
+
+          <div className="adm-kv"><span className="k">Food diary requests per user, per day</span>
+            <span className="v"><input className="num" type="number" min="0" max="500" defaultValue={d.caps.foodPerProfileDaily ?? 30} disabled={busy}
+              onBlur={e => +e.target.value !== d.caps.foodPerProfileDaily && patch({ caps: { ...d.caps, foodPerProfileDaily: +e.target.value } })} /></span></div>
 
           <div className="adm-group-t" style={{ marginTop: 14 }}>Compare with others</div>
           <div className="row between" style={{ gap: 12, alignItems: 'flex-start' }}>
@@ -309,7 +349,7 @@ export default function AdminCoach() {
           <div className="adm-group-t">Recent jobs</div>
           {d.recent?.length ? <div className="adm-log">
             {d.recent.slice(0, 10).map((e, i) => <div key={i} className="adm-log-row">
-              <span>{e.kind === 'create' ? 'Plan' : e.kind === 'match' ? 'Exercise lookup' : 'Review'}{e.trigger === 'scheduled' ? ' · scheduled' : ''} · <span style={{ color: e.outcome === 'failed' ? 'var(--red)' : e.outcome === 'ready' ? 'var(--acc)' : 'var(--label-2)' }}>{e.outcome}</span>{e.ms ? ' · ' + Math.round(e.ms / 1000) + ' s' : ''}</span>
+              <span>{KIND_LABEL[e.kind] || 'Review'}{e.trigger === 'scheduled' ? ' · scheduled' : ''} · <span style={{ color: e.outcome === 'failed' ? 'var(--red)' : e.outcome === 'ready' ? 'var(--acc)' : 'var(--label-2)' }}>{e.outcome}</span>{e.ms ? ' · ' + Math.round(e.ms / 1000) + ' s' : ''}</span>
               <span className="when">{rel(e.at)}</span>
             </div>)}
           </div> : <div className="adm-empty">No jobs yet.</div>}
@@ -356,8 +396,16 @@ const credentialLabel = type => ({
   'cli-token': 'Claude Code setup token', 'chatgpt-cli': 'ChatGPT CLI login', oauth: 'legacy token', apikey: 'API key'
 }[type] || 'credential')
 
+// What each logged call was, for the recent-jobs list.
+const KIND_LABEL = {
+  create: 'Plan', review: 'Review', debrief: 'Workout debrief', match: 'Exercise lookup',
+  meal: 'Meal read', label: 'Label read', suggest: 'Meal suggestion'
+}
+
 // The failure classes jobs.js emits, in words an operator can act on.
 const failureTitle = cls => ({
+  novision: 'The model cannot read pictures — choose a vision model for photos',
+  cancelled: 'The person closed the sheet before the answer came',
   timeout: 'The provider took longer than the job budget (COACH_JOB_TIMEOUT_MS, default 5 minutes)',
   missing: 'The provider runtime or key is missing',
   auth: 'The provider rejected the credential',

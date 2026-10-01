@@ -7,6 +7,9 @@ import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
 import { guestAllowed } from '../lib/guest.js'
 import { MOBILE, initReminderSync, nativeLoad, nativeSave, onAppActive, syncReminder, writeAutoBackup } from '../lib/mobile.js'
 import { mergeStates, localExtras } from '../lib/sync-merge.js'
+import { rollUp, nutritionOf } from '../lib/nutrition.js'
+import { applyHealth, healthPending } from '../lib/health-apply.js'
+import { todayISO } from '../lib/format.js'
 import { loadRemote, chooseLocal, forgetRemote, connect } from '../lib/remote.js'
 import { loadCoachDevice, saveCoachDevice, coachDeviceSettings } from '../lib/coach-device.js'
 
@@ -30,6 +33,9 @@ const loadPool = () => {
     return p && Array.isArray(p.items) ? { rev: p.rev || 0, items: p.items, mine: Array.isArray(p.mine) ? p.mine : [] } : EMPTY_POOL
   } catch { return EMPTY_POOL }
 }
+// The revision of what the Health shortcut delivered (api/healthkit.js) that this device last
+// fetched. Only the number is kept: the readings themselves are copied into S when they arrive.
+const HEALTH_KEY = 'gym_health_rev'
 const POOL_MIN_MS = 30000    // an on-demand refresh (a screen opening) closer than this to the last one is skipped
 const CHECK_MIN_MS = 3000    // rev checks closer together than this are the same event (focus + visibility)
 const POLL_MS = 30000        // while the app is open and signed in, ask the server for its revision this often
@@ -95,6 +101,24 @@ export const DEF = {
   // the session straight away; weight can still be logged from Home/Stats. Defaults on; an
   // older profile without the key reads as on (`!== false`).
   weighIn: true,
+  // Whether the nutrition section is on at all (Settings toggle) — the Home card and the
+  // /nutrition route. Off hides both; the diary stays, like the check-in cards do.
+  nutritionOn: true,
+  // The food diary, my products and the daily target (lib/nutrition.js has the shape). null
+  // until the first thing is logged; every reader goes through nutritionOf(S), every writer
+  // through ensureNutrition(S), because loaded state is overlaid on DEF one level deep only.
+  nutrition: null,
+  // Facts about the person the energy formulas need — { sex: 'm'|'f', born: 1990, heightCm,
+  // activity, t }. Deliberately not `body` above: that one picks the figure the muscle map is
+  // drawn on and says nothing about anyone.
+  bodyProfile: null,
+  // Dated body measurements in centimetres and percent, one row per day:
+  //   [{ d, t, waist?, chest?, hips?, upperArmLeft?, thighLeft?, …, bodyFat?, leanMass?, src? }]
+  // The field names are lib/body.js's MEASURES; `src: 'hk'` marks a row Apple Health delivered.
+  measurements: [],
+  // How far the samples the Health shortcut delivered have been copied into bodyweight /
+  // measurements ({ applied: ms }), so an entry the user deleted afterwards is not put back.
+  healthSync: null,
 }
 const clone = o => JSON.parse(JSON.stringify(o))
 
@@ -106,7 +130,8 @@ function loadState() {
   return clone(DEF)
 }
 
-const hasData = st => !!((st.workouts || []).length || (st.routines || []).length || (st.bodyweight || []).length)
+const hasData = st => !!((st.workouts || []).length || (st.routines || []).length || (st.bodyweight || []).length
+  || nutritionOf(st).log.length || (st.measurements || []).length)
 
 // Decide whether a pulled account state may replace the local saved state. A local active workout
 // is deliberately carried forward: the server stores completed/saved state, while the in-progress
@@ -122,6 +147,7 @@ export const useStore = create((set, get) => {
   let pushTm = null
   let saveTm = null
   let toldTooLarge = false
+  let toldFull = false     // the device's own storage refused a write — said once per session
   let pushing = null       // the PUT in flight, so a second push waits for it instead of racing it
   let pushAgain = false    // a push asked for while one was in flight — run once more after it
   let pulling = null       // the GET in flight, so two resume signals make one request
@@ -131,6 +157,7 @@ export const useStore = create((set, get) => {
   let pollTm = null
   let offlineChanges = false   // a push failed for lack of network — the next one that lands says so
   let poolPulling = null       // the pool GET in flight
+  let healthPulling = null     // the Health GET in flight
   let lastPool = 0
 
   const setPool = p => {
@@ -142,6 +169,11 @@ export const useStore = create((set, get) => {
   // The pool's revision rides on the answers to /api/data and /api/data/rev (absent while nothing
   // was ever shared, which reads as 0); when it is not the one cached here, fetch the pool.
   const syncPool = rev => { if ((rev || 0) !== (get().pool.rev || 0)) get().pullPool(true) }
+  // The same for what the Health shortcut delivered: its revision rides on the same two answers
+  // (absent until something was ever delivered), and a new one means "fetch, and copy the new
+  // readings into the profile".
+  const syncHealth = rev => { if ((rev || 0) !== (+localStorage.getItem(HEALTH_KEY) || 0)) get().pullHealth() }
+  const clearHealth = () => { localStorage.removeItem(HEALTH_KEY); set({ health: null }) }
 
   const readSync = () => { try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || null } catch { return null } }
   const writeSync = (rev, ts) => localStorage.setItem(SYNC_KEY, JSON.stringify({ rev, ts: ts || 0 }))
@@ -167,10 +199,22 @@ export const useStore = create((set, get) => {
   // pull (restoredStateFor). A copy merely adopted from the server or the file mirror keeps the
   // stamp it came with: re-stamping a read would make an unchanged copy look newer than a real
   // change made on another device, and push it over that change.
+  // localStorage is a few megabytes and a write over the limit throws. The change must not be
+  // lost for that: the copy in memory is still set and still pushed, the diary — the one list
+  // that grows every day — is folded hard to make room, and the user is told once.
+  const store = S => { try { localStorage.setItem(KEY, JSON.stringify(S)); return true } catch { return false } }
   const persist = (S, push = true, stamp = true) => {
     if (stamp) S._ts = Date.now()
     registerCustom(S.customEx)
-    localStorage.setItem(KEY, JSON.stringify(S))
+    if (!store(S)) {
+      if (S.nutrition) { S.nutrition = rollUp(nutritionOf(S), todayISO(), { keep: 14 }); store(S) }
+      if (!toldFull) {
+        toldFull = true
+        import('./useUI.js')
+          .then(({ useUI }) => useUI.getState().toast(t('This device is out of storage space for the app. Older food diary days were folded into daily totals to make room.')))
+          .catch(() => {})
+      }
+    }
     set({ S })
     if (MOBILE) nativePersist()
     if (push && get().user) {
@@ -205,9 +249,10 @@ export const useStore = create((set, get) => {
     const owed = localStorage.getItem('gym_dirty') === '1' || pushTm !== null || pushPending
     if (!sync || owed) return get().pullState()
     try {
-      const { rev, pool } = await api('/api/data/rev')
+      const { rev, pool, health } = await api('/api/data/rev')
       setSync({ offline: false })
       syncPool(pool)
+      syncHealth(health)
       if (rev !== sync.rev) return get().pullState()
     } catch (e) {
       if (e.status === 401) return
@@ -322,7 +367,7 @@ export const useStore = create((set, get) => {
     clearTimeout(pushTm)
     pushTm = null
     registerPool([])   // what the previous profile had suggested is not the next one's to see
-    set({ user: null, S: e.newValue ? loadState() : clone(DEF), pool: EMPTY_POOL })
+    set({ user: null, S: e.newValue ? loadState() : clone(DEF), pool: EMPTY_POOL, health: null })
   })
 
   // Everything a sign-out leaves behind on this device, whichever way it was triggered. The owner
@@ -335,6 +380,7 @@ export const useStore = create((set, get) => {
     localStorage.removeItem(KEY)
     persist(clone(DEF), false)
     clearPool()
+    clearHealth()
     localStorage.removeItem('gym_owner')
   }
 
@@ -355,6 +401,26 @@ export const useStore = create((set, get) => {
         .finally(() => { poolPulling = null })
       return poolPulling
     },
+    // What the Health shortcut delivered, as the Body screen shows it: { rev, days, height,
+    // lastIngest, tokens, shortcutUrl } — null until fetched, and never persisted. Fetching it
+    // also copies any reading this profile has not seen yet into bodyweight / measurements
+    // (lib/health-apply.js), as an ordinary edit that then syncs like any other.
+    health: null,
+    async pullHealth() {
+      if (!get().user || DEMO || get().config?.health !== true) return null
+      if (healthPulling) return healthPulling
+      healthPulling = api('/api/healthkit')
+        .then(r => {
+          set({ health: r })
+          if (healthPending(get().S, r)) get().update(s => { applyHealth(s, r) })
+          localStorage.setItem(HEALTH_KEY, String(r.rev || 0))
+          return r
+        })
+        .catch(() => null)   // offline, or switched off since: nothing to copy, ask again next time
+        .finally(() => { healthPulling = null })
+      return healthPulling
+    },
+    setHealth(patch) { set({ health: { ...(get().health || {}), ...patch } }) },
     // After a suggest / withdraw the server answers with this profile's list; no round trip.
     setPoolMine(mine) { setPool({ ...get().pool, mine: Array.isArray(mine) ? mine : [] }) },
     user: (() => { try { return JSON.parse(localStorage.getItem('gym_user')) || null } catch { return null } })(),
@@ -424,6 +490,7 @@ export const useStore = create((set, get) => {
           localStorage.removeItem(KEY)
           persist(clone(DEF), false)
           clearPool()
+          clearHealth()
         }
         localStorage.setItem('gym_owner', u.id)
         localStorage.setItem('gym_user', JSON.stringify(u)); localStorage.removeItem('gym_guest')
@@ -459,6 +526,7 @@ export const useStore = create((set, get) => {
           setSync({ offline: false })
           const { state, rev } = res
           syncPool(res.pool)
+          syncHealth(res.health)
           const S = get().S
           // Owed to the server: a push that failed, or a change made while boot was still pulling.
           const dirty = localStorage.getItem('gym_dirty') === '1' || pushPending
@@ -515,7 +583,7 @@ export const useStore = create((set, get) => {
         return { adopted: false, added: false }
       }
       const extras = localExtras(S, state)
-      const keep = (extras.workouts || extras.bodyweight || extras.customEx) && typeof ask === 'function' ? await ask(extras) : false
+      const keep = (extras.workouts || extras.bodyweight || extras.customEx || extras.food || extras.measurements) && typeof ask === 'function' ? await ask(extras) : false
       const serverCopy = Object.assign(clone(DEF), state, { active: S.active || null })
       if (keep) {
         const merged = Object.assign(clone(DEF), mergeStates(state, S, { prefer: 'a' }))

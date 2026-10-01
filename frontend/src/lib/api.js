@@ -33,6 +33,12 @@ export function appBase(loc = typeof location !== 'undefined' ? location : null)
   return path.slice(0, path.lastIndexOf('/') + 1) || '/'
 }
 
+/** The absolute address of this instance's API root, for something outside the app to call —
+ *  the Health shortcut is told where to send (components/HealthConnect.jsx). */
+export function apiBase(loc = typeof location !== 'undefined' ? location : null) {
+  return remoteBase || ((loc && loc.origin) || '') + appBase(loc).replace(/\/$/, '')
+}
+
 export async function api(path, opts) {
   const headers = Object.assign({ 'Content-Type': 'application/json' }, opts && opts.headers)
   if (remoteToken) headers.Authorization = 'Bearer ' + remoteToken

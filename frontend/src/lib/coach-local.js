@@ -18,6 +18,8 @@
 import * as payloadLib from '../../../api/coach/core/payload.js'
 import { runPipeline } from '../../../api/coach/core/pipeline.js'
 import { buildMatchPayload, cleanText, resolveMatch } from '../../../api/coach/core/match.js'
+import { FOOD_KINDS, buildFoodPayload, checkImage, cleanCaption } from '../../../api/coach/core/food.js'
+import { hasFoodConsent } from './food-ai.js'
 import { withPoolRows } from '../../../api/coach/core/pool-view.js'
 import { hasLookupConsent } from './exercise-match.js'
 import { HTTP_PROVIDERS, baseUrlFor } from '../../../api/coach/core/providers.js'
@@ -113,7 +115,7 @@ export async function localDisclosure() {
   const base = d.provider ? baseUrlFor(d.provider, cfgOf(d)) : ''
   return {
     provider: d.provider, providerLabel: meta.label || t('the configured AI provider'),
-    categories: payloadLib.DATA_CATEGORIES, version: 1,
+    categories: payloadLib.DATA_CATEGORIES, optional: payloadLib.OPTIONAL_CATEGORIES, version: 1,
     // The honest difference from the self-hosted flow: it is the user's own account.
     payer: 'you', host: hostOf(base)
   }
@@ -243,3 +245,50 @@ function workoutMetaOf(S, workoutId) {
 
 // Test seam.
 export function _resetLocal() { job = null; lastError = null; last = null; matching = false }
+
+/* ---------- the food diary: a plate read, a label read, a meal suggested ----------
+   The same three core calls the server makes (api/coach/core/food.js), awaited here because a
+   phone talking straight to an API provider has no proxy to time out behind. The photograph
+   goes from memory to the provider and nowhere else; nothing is written to the device file
+   but the day's count. */
+export const LOCAL_FOOD_CAP = 30
+let fooding = false
+
+export async function localFood(S, req = {}) {
+  const fail = (code, detail) => Object.assign(new Error(code), { code, detail: detail || null })
+  const kind = String(req.kind || '')
+  if (!FOOD_KINDS.includes(kind)) throw fail('kind')
+  const caption = cleanCaption(req.caption)
+  let image = null
+  if (req.image) {
+    const img = checkImage(req.image)
+    if (!img.ok) throw fail(img.code)
+    image = img.image
+  }
+  if (kind === 'label' && !image) throw fail('noimage')
+  if (kind === 'meal' && !image && !caption) throw fail('empty')
+  if (fooding) throw fail('busy')
+  if (!hasFoodConsent(S)) throw fail('consent')
+  const d = await loadCoachDevice()
+  const adapter = ADAPTERS[d.provider]
+  if (d.mode !== 'byok' || !adapter) throw fail('off')
+  const used = d.foodDaily && d.foodDaily.d === todayISO() ? d.foodDaily.n : 0
+  if (used >= LOCAL_FOOD_CAP) throw fail('cap')
+
+  fooding = true
+  try {
+    await saveCoachDevice({ foodDaily: { d: todayISO(), n: used + 1 } })
+    const key = await getApiKey()
+    const attempt = await runPipeline({
+      adapter, cfg: cfgOf(d), kind, payload: buildFoodPayload(kind, { caption, context: req.context, lang: req.lang || S.lang || 'en', hasPhoto: !!image }),
+      model: d.model || HTTP_PROVIDERS[d.provider].defaultModel, timeoutMs: timeoutFor(d.provider),
+      images: image ? [image] : null, maxTokens: 3000,
+      invokeOpts: { env: envOf(d, key), fetch: nativeFetch }
+    })
+    if (!attempt.ok) {
+      const detail = attempt.detail || (Array.isArray(attempt.errors) ? attempt.errors.slice(0, 3).map(String).join(' · ').slice(0, 300) : null)
+      throw fail(attempt.errorClass || 'provider', detail)
+    }
+    return attempt.result
+  } finally { fooding = false }
+}

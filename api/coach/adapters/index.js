@@ -29,6 +29,9 @@ const FIXTURE = fileURLToPath(new URL('../fixture-cli.mjs', import.meta.url));
 const fixture = {
   id: 'fixture',
   spawns: true,
+  // It never looks at a picture — its answers are canned — but it must not be refused for one:
+  // it is what lets the photo flow be walked end to end before a real provider is connected.
+  images: true,
   cli: process.execPath,
   async check() { return { ok: true, version: 'fixture' }; },
   async invoke({ prompt, jobDir, env, timeoutMs }) {

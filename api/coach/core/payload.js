@@ -21,7 +21,8 @@ export const MAX_SESSIONS = 60;
 /* ---------- the data categories the consent screen names (FR-09/10) ----------
    Kept here, next to the code that acts on it, and rendered by the consent UI from the same
    list — a screen that drifts from the payload is worse than no screen. */
-export { DATA_CATEGORIES } from './categories.js';
+export { DATA_CATEGORIES, OPTIONAL_CATEGORIES } from './categories.js';
+import { extraSections } from './extras.js';
 
 /* ---------- reading a session the way the engine reads it ----------
    Duplicated from frontend/src/lib/history.js rather than shared: the two runtimes have no
@@ -431,6 +432,8 @@ export function build(S, opts = {}) {
     const said = conversation(coach, [opts.note, opts.refine]);
     if (said.length) p.conversation = said;
   }
+  // The body profile and the nutrition summary, each only when its own switch is on (extras.js).
+  Object.assign(p, extraSections(S, p.meta.today));
   return p;
 }
 

@@ -85,6 +85,39 @@ if (kind === 'match') {
   });
 }
 
+// The food diary's three questions. Canned, and shaped to exercise the validators: one item
+// with energy that contradicts its macros, one weight a model would give as text.
+if (kind === 'meal') {
+  if (MODE === 'meal-empty') out({ coach_contract: 1, items: [], note: 'No food in the picture.' });
+  if (MODE === 'meal-broken') out({ coach_contract: 1, items: [{ name: 'Rice' }] });
+  out({
+    coach_contract: 1,
+    items: [
+      { name: P.caption || 'Chicken breast, grilled', en: 'chicken breast, grilled', grams: 150, kcal100: 151, p100: 30.5, f100: 3.2, c100: 0, conf: 'medium' },
+      { name: 'Buckwheat, cooked', en: 'buckwheat, cooked', grams: '200', kcal100: 900, p100: 3.4, f100: 0.6, c100: 19.9, conf: 'certain' }
+    ],
+    note: P.photo ? 'Estimated from the photo.' : 'Estimated from the description.'
+  });
+}
+if (kind === 'label') {
+  if (MODE === 'label-none') out({ coach_contract: 1, found: false, note: 'No nutrition panel in the picture.' });
+  out({ coach_contract: 1, found: true, name: 'Fixture curd 5%', brand: 'Fixture', per: 'serving', kj: 911, protein: 31, fat: 9, carbs: 3.2, servingGrams: 180, note: '' });
+}
+if (kind === 'suggest') {
+  const mine = (P.foods || [])[0];
+  out({
+    coach_contract: 1,
+    ideas: [{
+      title: 'Fixture meal',
+      items: [
+        ...(mine ? [{ id: mine.id, name: mine.name, grams: 150 }] : []),
+        { id: 'not-yours', name: 'Tomato', grams: 120, kcal100: 18, p100: 0.9, f100: 0.2, c100: 3.9 }
+      ],
+      why: 'Fits what is left.'
+    }]
+  });
+}
+
 if (MODE === 'nochange' || (kind === 'review' && !(P.window?.workouts || []).length)) {
   out({ coach_contract: 1, nochange: true, reading: 'Not enough new training to read anything into yet — keep logging and ask again in a week.' });
 }

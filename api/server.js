@@ -16,6 +16,9 @@ import * as coachConfig from './coach/config.js';
 import * as coachJobs from './coach/jobs.js';
 import { coachRoutes } from './coach/routes.js';
 import { createPool } from './pool.js';
+import { createSettings } from './settings.js';
+import { createFood } from './food.js';
+import { createHealth } from './healthkit.js';
 import { startCadence } from './coach/cadence.js';
 import { startWarmup } from './coach/warmup.js';
 import { dayReminderPush, restTimerPush, testPush } from './push-messages.js';
@@ -96,6 +99,15 @@ const pool = createPool({ dataDir: DATA, atomicWrite });
 // learns the pool changed without a polling loop of its own. Absent while nothing was ever
 // shared: an instance that does not use the pool answers these exactly as it always did.
 const poolRev = () => (pool.rev() ? { pool: pool.rev() } : {});
+// Instance switches for the features that reach outside or take in health data (settings.js):
+// online food lookup (food.js) and the Apple Health ingest (healthkit.js). Both off by default.
+const settings = createSettings({ dataDir: DATA, atomicWrite });
+const apiVersion = (() => { try { return JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version || 'dev'; } catch { return 'dev'; } })();
+const food = createFood({ dataDir: DATA, atomicWrite, settings, version: apiVersion, origin: ORIGIN });
+const health = createHealth({ dataDir: DATA, atomicWrite, settings });
+// Like the pool's: present in the answer only when there is something, so a profile that never
+// connected Health gets byte-for-byte the answers it always did.
+const healthRev = uid => { const rev = health.enabled() ? health.rev(uid) : 0; return rev ? { health: rev } : {}; };
 const stateFile = uid => path.join(DATA, 'state-' + uid.replace(/[^a-zA-Z0-9_-]/g, '') + '.json');
 function readState(uid) {
   try { return JSON.parse(fs.readFileSync(stateFile(uid), 'utf8')); } catch { return null; }
@@ -719,7 +731,12 @@ const routes = {
     const coach = coachConfig.publicConfig();
     // `pool` tells the client this server has the shared exercise pool at all — a paired phone
     // or a newer web bundle may be talking to an older API that answers 404 to /api/pool.
-    json(res, 200, { invite_only: INVITE_ONLY, allow_guest: ALLOW_GUEST, pool: true, ...(coach ? { coach } : {}) });
+    json(res, 200, {
+      invite_only: INVITE_ONLY, allow_guest: ALLOW_GUEST, pool: true, ...(coach ? { coach } : {}),
+      // Absent unless the admin switched them on — see settings.js.
+      ...(food.enabled() ? { food: food.publicConfig() } : {}),
+      ...(health.enabled() ? { health: true } : {})
+    });
   },
 
   'GET /api/me': async (req, res) => {
@@ -925,7 +942,7 @@ const routes = {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
     const state = readState(user.id);
-    json(res, 200, { state, rev: state?._rev || 0, ...poolRev() });
+    json(res, 200, { state, rev: state?._rev || 0, ...poolRev(), ...healthRev(user.id) });
   },
   // Just the revision: the client asks this every half minute while it is open and on every
   // return to the foreground, and fetches the document only when the number moved — a signed-in
@@ -933,7 +950,7 @@ const routes = {
   'GET /api/data/rev': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    json(res, 200, { rev: readState(user.id)?._rev || 0, ...poolRev() });
+    json(res, 200, { rev: readState(user.id)?._rev || 0, ...poolRev(), ...healthRev(user.id) });
   },
 
   'PUT /api/data': async (req, res) => {
@@ -1156,8 +1173,11 @@ const routes = {
     // The training history and any Coach credential of theirs, both outside db.json.
     try { fs.unlinkSync(stateFile(u.id)); } catch { /* already gone */ }
     try { coachConfig.clearProfileAuth(u.id); } catch { /* nothing stored */ }
+    try { coachJobs.dropUser(u.id); } catch (e) { console.error('coach: could not drop', u.id, e); }
     // Suggestions of theirs still waiting go with them; exercises they shared stay, unsigned.
     try { pool.dropUser(u.id); } catch (e) { console.error('pool: could not drop', u.id, e); }
+    // What their Shortcut delivered from Apple Health, and the tokens it delivered it with.
+    try { health.dropUser(u.id); } catch (e) { console.error('health: could not drop', u.id, e); }
     saveDb();
     // Logged with the name, because the id is about to mean nothing to anyone reading this back.
     audit(req, 'admin.user.delete', { user: admin, msg: name });
@@ -1250,7 +1270,36 @@ const routes = {
 
   /* ---------- shared exercise pool ---------- */
   // Suggest / withdraw for every signed-in profile, the queue for admins and moderators.
-  ...pool.routes({ json, readBody, readSession, requireMod, audit })
+  ...pool.routes({ json, readBody, readSession, requireMod, audit }),
+
+  /* ---------- nutrition: online food lookup; body: Apple Health ingest ---------- */
+  ...food.routes({ json, readBody, readSession }),
+  ...health.routes({ json, readBody, readSession, audit, userExists: uid => db.users.some(u => u.id === uid && !u.disabled) }),
+
+  // The two switches, for the dashboard. Both decide whether personal data crosses a boundary —
+  // out to a food database, in from a phone's Health app — so they are the admin's to flip,
+  // and each flip is logged.
+  'GET /api/admin/extras': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const s = settings.get();
+    json(res, 200, {
+      food: { ...s.food, forcedOff: process.env.FOOD_LOOKUP_DISABLED === '1', cache: food.stats() },
+      health: { ...s.health, ...health.stats() }
+    });
+  },
+  'POST /api/admin/extras': async (req, res) => {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const body = await readBody(req);
+    const before = settings.get();
+    const s = settings.patch({ food: body.food, health: body.health });
+    if (body.clearFoodCache === true) food.clearCache();
+    if (s.food.lookup !== before.food.lookup) audit(req, 'admin.food.lookup', { user: admin, msg: s.food.lookup ? 'on' : 'off' });
+    if (s.health.enabled !== before.health.enabled) audit(req, 'admin.health.ingest', { user: admin, msg: s.health.enabled ? 'on' : 'off' });
+    json(res, 200, {
+      food: { ...s.food, forcedOff: process.env.FOOD_LOOKUP_DISABLED === '1', cache: food.stats() },
+      health: { ...s.health, ...health.stats() }
+    });
+  }
 };
 
 /* ---------- Coach: boot recovery, notifications, scheduled reviews ---------- */

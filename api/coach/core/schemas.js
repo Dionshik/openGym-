@@ -140,4 +140,65 @@ export const MATCH_SCHEMA = {
   required: ['coach_contract', 'items']
 };
 
-export const SCHEMAS = { review: REVIEW_SCHEMA, create: CREATE_SCHEMA, refine: CREATE_SCHEMA, debrief: DEBRIEF_SCHEMA, match: MATCH_SCHEMA };
+// The food diary's three questions (food.js). Flat on purpose, like everything here: per-100 g
+// values are four sibling numbers rather than a nested object, which a small local model fills
+// in more reliably and the grammar converter never trips over.
+const NUM = { type: 'number' };
+const FOOD_NUMBERS = { grams: NUM, kcal100: NUM, p100: NUM, f100: NUM, c100: NUM };
+export const MEAL_SCHEMA = {
+  type: 'object',
+  properties: {
+    coach_contract: { type: 'integer' },
+    items: {
+      type: 'array',
+      maxItems: 12,
+      items: {
+        type: 'object',
+        properties: { name: STR, en: STR, ...FOOD_NUMBERS, conf: STR },
+        required: ['name', 'grams', 'kcal100', 'p100', 'f100', 'c100']
+      }
+    },
+    note: STR
+  },
+  required: ['coach_contract', 'items']
+};
+export const LABEL_SCHEMA = {
+  type: 'object',
+  properties: {
+    coach_contract: { type: 'integer' },
+    found: { type: 'boolean' },
+    name: STR, brand: STR, per: STR,
+    kcal: NUM, kj: NUM, protein: NUM, fat: NUM, carbs: NUM, servingGrams: NUM,
+    note: STR
+  },
+  required: ['coach_contract', 'found']
+};
+export const SUGGEST_SCHEMA = {
+  type: 'object',
+  properties: {
+    coach_contract: { type: 'integer' },
+    ideas: {
+      type: 'array',
+      maxItems: 4,
+      items: {
+        type: 'object',
+        properties: {
+          title: STR,
+          items: {
+            type: 'array',
+            maxItems: 5,
+            items: { type: 'object', properties: { id: STR, name: STR, ...FOOD_NUMBERS }, required: ['name', 'grams'] }
+          },
+          why: STR
+        },
+        required: ['title', 'items']
+      }
+    }
+  },
+  required: ['coach_contract', 'ideas']
+};
+
+export const SCHEMAS = {
+  review: REVIEW_SCHEMA, create: CREATE_SCHEMA, refine: CREATE_SCHEMA, debrief: DEBRIEF_SCHEMA, match: MATCH_SCHEMA,
+  meal: MEAL_SCHEMA, label: LABEL_SCHEMA, suggest: SUGGEST_SCHEMA
+};

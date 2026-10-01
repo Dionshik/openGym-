@@ -3,8 +3,12 @@
  * the server under bare node and by the phone under Vite, with neither reading a file. */
 import { PROMPTS } from './prompts.js';
 
+// Tasks whose prompt stands alone: they are not coaching, read no plan and no training, and the
+// coaching rules in common.md would be forty lines about a payload they never get.
+const STANDALONE = ['match', 'meal', 'label', 'suggest'];
+
 export const taskOf = (kind, payload) =>
-  kind === 'review' ? 'review' : kind === 'debrief' ? 'debrief' : kind === 'match' ? 'match'
+  kind === 'review' ? 'review' : kind === 'debrief' ? 'debrief' : STANDALONE.includes(kind) ? kind
     : payload && payload.refine ? 'refine' : 'create';
 
 /**
@@ -17,9 +21,7 @@ export const taskOf = (kind, payload) =>
  */
 export function buildPromptParts(kind, payload, repair) {
   const task = taskOf(kind, payload);
-  // The exercise lookup is not coaching: it reads no plan and no training, so the coaching
-  // rules in common.md would be forty lines about a payload it never gets. Its prompt stands alone.
-  const system = task === 'match' ? PROMPTS.match : PROMPTS.common + '\n\n---\n\n' + PROMPTS[task];
+  const system = STANDALONE.includes(task) ? PROMPTS[task] : PROMPTS.common + '\n\n---\n\n' + PROMPTS[task];
   // Compact JSON, not pretty-printed: the indentation was ~30% of the payload's tokens and
   // a model reads either just as well.
   let user = '## Payload\n\n```json\n' + JSON.stringify(payload) + '\n```\n';

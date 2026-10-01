@@ -14,7 +14,7 @@ const FILE = 'opengym-coach.json'
 
 export const COACH_MODES = ['off', 'server', 'byok']
 
-const DEFAULTS = { mode: 'off', provider: null, model: null, baseUrl: null, handle: null, daily: null, matchDaily: null, pending: null }
+const DEFAULTS = { mode: 'off', provider: null, model: null, baseUrl: null, handle: null, daily: null, matchDaily: null, foodDaily: null, pending: null }
 
 let cache = null
 export async function loadCoachDevice() {

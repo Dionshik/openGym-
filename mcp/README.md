@@ -80,6 +80,8 @@ Nine read-only tools in v1:
 | `get_bodyweight` | Weigh-ins with the latest weight, the goal line, and deltas vs goal. |
 | `estimate_1rm` | All-time best 1RM for an exercise + the trend, or a PR table across all exercises. |
 | `muscle_balance` | Which muscles I've trained this week/month/all-time, ranked + which I've neglected. |
+| `get_nutrition` | Calories and protein / fat / carbs per day against the target, with averages over a range; `date` lists one day meal by meal. |
+| `get_body` | Sex, age, height, activity level, the latest tape measurements and body fat, and the estimated resting and daily energy expenditure. |
 
 `get_routine` and `preview_session` answer two different questions, and confusing them is the
 easiest way for a coach to give wrong advice. `get_routine` reports what the routine *stores*.

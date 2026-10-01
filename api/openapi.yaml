@@ -90,6 +90,14 @@ tags:
     description: >-
       The shared exercise pool — exercises members suggested and an admin or a moderator
       approved, served to every profile on the instance
+  - name: nutrition
+    description: >-
+      Online food lookup through Open Food Facts, asked from the server and cached. Off until an
+      admin turns it on. The food diary itself is part of the synced state (`/api/data`)
+  - name: health
+    description: >-
+      Body data delivered by an iOS Shortcut from Apple Health, with a write-only token of its
+      own. Off until an admin turns it on
 
 security:
   - cookieAuth: []
@@ -1169,6 +1177,206 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: No such shared exercise., content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
+  /api/food/barcode:
+    post:
+      tags: [nutrition]
+      operationId: foodBarcode
+      summary: Look a product up in Open Food Facts by its barcode
+      description: >-
+        Asked from this server on the member's behalf and answered from its cache when possible
+        (a found product for 90 days, a miss for 7). Off unless an admin switched online lookup
+        on; `FOOD_LOOKUP_DISABLED=1` keeps it off regardless. What leaves the server is the
+        barcode — never who asked. POST rather than GET so that what somebody eats does not end
+        up in a URL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, description: '8–14 digits; spaces and dashes are ignored.' }
+                lang: { type: string, description: 'Preferred language of the product name (`ru` or anything else for English).' }
+      responses:
+        '200':
+          description: The product, per 100 g.
+          content: { application/json: { schema: { type: object, properties: { food: { $ref: '#/components/schemas/FoodRow' }, cached: { type: boolean } } } } }
+        '400': { description: 'Not a barcode (`badcode`).', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: 'Online lookup is switched off (`disabled`).', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { description: 'Not in the database (`notfound`).', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { description: 'The database has the product but no nutrition values for it (`nonutrition`).', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 'The per-member or instance-wide lookup limit was reached (`throttled`).', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '502': { description: 'Open Food Facts did not answer (`unreachable`). Not cached.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/food/search:
+    post:
+      tags: [nutrition]
+      operationId: foodSearch
+      summary: Search Open Food Facts by product name
+      description: >-
+        Up to 20 products that have nutrition values. Meant to be asked on a button, never per
+        keystroke — the database limits searches per address. Results are cached for a day.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [q]
+              properties:
+                q: { type: string, minLength: 3, maxLength: 60 }
+                lang: { type: string }
+      responses:
+        '200':
+          description: Matching products, per 100 g.
+          content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/FoodRow' } }, cached: { type: boolean } } } } }
+        '400': { description: 'Fewer than three characters (`short`).', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: 'Online lookup is switched off (`disabled`).', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 'Lookup limit reached (`throttled`).', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '502': { description: 'Open Food Facts did not answer (`unreachable`).', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/healthkit:
+    get:
+      tags: [health]
+      operationId: healthGet
+      summary: What the caller's Health shortcut delivered, and their tokens
+      description: >-
+        The readings by day, in kilograms, percent and centimetres, each with the time the
+        server received it; the profile's tokens by id (never the tokens themselves); and the
+        instance's shared Shortcut link, if the admin set one. `rev` is also carried on
+        `GET /api/data` and `GET /api/data/rev` as `health` once anything was delivered.
+      responses:
+        '200': { description: 'The deliveries.', content: { application/json: { schema: { $ref: '#/components/schemas/HealthData' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: 'The Apple Health connection is switched off on this instance (`disabled`).', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/healthkit/token:
+    post:
+      tags: [health]
+      operationId: healthTokenCreate
+      summary: Make a token for a Health shortcut
+      description: >-
+        Returns the token once — the server keeps only its SHA-256 hash. At most three per
+        profile. The token can add body measurements to this profile through
+        `POST /api/healthkit/ingest` and can read nothing; no other route accepts it.
+      responses:
+        '200':
+          description: The token, shown this once.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string, example: 'ogh_3q2-7wEjX…' }
+                  id: { type: string }
+                  created: { type: integer }
+                  tokens: { type: array, items: { $ref: '#/components/schemas/HealthToken' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: 'Switched off on this instance.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'Three tokens already exist (`cap`).', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/healthkit/token/revoke:
+    post:
+      tags: [health]
+      operationId: healthTokenRevoke
+      summary: Revoke one of the caller's Health tokens
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [id], properties: { id: { type: string } } } } }
+      responses:
+        '200': { description: 'Revoked; the remaining tokens.', content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, tokens: { type: array, items: { $ref: '#/components/schemas/HealthToken' } } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: 'No such token of the caller''s.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/healthkit/clear:
+    post:
+      tags: [health]
+      operationId: healthClear
+      summary: Forget what the caller's Health shortcut delivered
+      description: Removes the delivered readings from the server and keeps the tokens. What the app already copied into the profile is the profile's.
+      responses:
+        '200': { description: 'Forgotten.', content: { application/json: { schema: { type: object, properties: { ok: { type: boolean } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/healthkit/ingest:
+    post:
+      tags: [health]
+      operationId: healthIngest
+      summary: A delivery from an iOS Shortcut
+      description: >-
+        Authenticated by a Health token (`Authorization: Bearer ogh_…`) and by nothing else — a
+        session cookie or a session bearer token is refused, so this route never acts on a
+        browser's ambient authority. Reads generously (decimal commas, units, the fraction
+        Health stores body fat as, dates the way the phone writes them, field names in English
+        or Russian) and then drops anything a human body cannot be. The answer says what was
+        understood and never what is stored. At most 64 KB; 30 deliveries an hour per token.
+        See docs/HEALTH_SHORTCUT.md.
+      security:
+        - healthToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                date: { type: string, description: 'When the Shortcut ran, in any common format. Defaults to the day the request arrived.' }
+                unit: { type: string, description: 'A unit for values sent without one (`lb`, `in`, `m`).' }
+                weight: { type: string }
+                bodyFat: { type: string }
+                leanMass: { type: string }
+                height: { type: string }
+                waist: { type: string }
+            example: { date: "2026-10-01T08:15:00+03:00", weight: "80,5 кг", bodyFat: "18 %" }
+      responses:
+        '200':
+          description: Read.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  accepted: { type: array, items: { type: object, properties: { metric: { type: string }, d: { type: string }, v: { type: number } } } }
+                  ignored: { type: array, items: { type: string }, description: 'Fields this endpoint has no use for.' }
+                  warnings: { type: array, items: { type: string } }
+        '401': { description: 'Wrong, revoked or missing token.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { description: 'Switched off on this instance.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '413': { description: 'Body over 64 KB.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 'Too many deliveries from this token, or too many bad tokens instance-wide.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /api/admin/extras:
+    get:
+      tags: [admin]
+      operationId: adminExtras
+      summary: The switches for online food lookup and the Apple Health connection
+      responses:
+        '200': { description: 'Current settings and counts.', content: { application/json: { schema: { $ref: '#/components/schemas/AdminExtras' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin]
+      operationId: adminExtrasSet
+      summary: Change those switches
+      description: Both are off on a fresh instance. Each flip of `food.lookup` or `health.enabled` is recorded in the audit log.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                food: { type: object, properties: { lookup: { type: boolean }, contact: { type: string, maxLength: 120, description: 'Sent to Open Food Facts in the User-Agent.' } } }
+                health: { type: object, properties: { enabled: { type: boolean }, shortcutUrl: { type: string, description: 'An https link to the owner''s shared Shortcut; anything else is dropped.' } } }
+                clearFoodCache: { type: boolean }
+      responses:
+        '200': { description: 'The settings after the change.', content: { application/json: { schema: { $ref: '#/components/schemas/AdminExtras' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /api/admin/invites:
     get:
       tags: [admin]
@@ -1357,6 +1565,13 @@ components:
         The same signed session token, carried as `Authorization: Bearer <token>` by
         the paired mobile app (obtained from `POST /api/pair/redeem`). Bearer requests
         skip the CSRF origin check — a browser never attaches this header on its own.
+    healthToken:
+      type: http
+      scheme: bearer
+      description: >-
+        A Health token (`ogh_…`), made by `POST /api/healthkit/token` and carried by an iOS
+        Shortcut. Accepted by `POST /api/healthkit/ingest` only; it is not a session and reads
+        nothing.
 
   responses:
     Unauthorized:
@@ -1395,6 +1610,59 @@ components:
         admin: { type: boolean }
         mod: { type: boolean, description: May moderate the shared exercise pool — true for a moderator and for every admin. }
       example: { id: "Zk3q9XyPbA2LmN0v", name: "Ada", admin: false, mod: false }
+
+    FoodRow:
+      type: object
+      description: A product per 100 g, as the food diary stores one.
+      required: [n, k, p, f, c]
+      properties:
+        code: { type: string, description: 'The barcode.' }
+        n: { type: string, maxLength: 80 }
+        brand: { type: string }
+        k: { type: integer, description: 'Energy, kcal per 100 g.' }
+        p: { type: number, description: 'Protein, g per 100 g.' }
+        f: { type: number, description: 'Fat, g per 100 g.' }
+        c: { type: number, description: 'Carbohydrate, g per 100 g.' }
+        sv: { type: integer, description: 'A serving in grams or millilitres, when the database states one.' }
+
+    HealthToken:
+      type: object
+      description: A Health token by id. The token itself is returned once, on creation.
+      properties:
+        id: { type: string }
+        created: { type: integer }
+        lastUsed: { type: integer, description: '0 until the first delivery.' }
+
+    HealthData:
+      type: object
+      properties:
+        rev: { type: integer }
+        days:
+          type: object
+          description: 'Keyed by `YYYY-MM-DD`; each metric is `{ v, at }` — the value in kg / % / cm and when the server received it.'
+          additionalProperties: { type: object }
+        height: { type: object, nullable: true, properties: { v: { type: number }, at: { type: integer } } }
+        lastIngest: { type: integer }
+        tokens: { type: array, items: { $ref: '#/components/schemas/HealthToken' } }
+        shortcutUrl: { type: string }
+
+    AdminExtras:
+      type: object
+      properties:
+        food:
+          type: object
+          properties:
+            lookup: { type: boolean }
+            contact: { type: string }
+            forcedOff: { type: boolean, description: 'True when `FOOD_LOOKUP_DISABLED=1` overrides the switch.' }
+            cache: { type: object, properties: { products: { type: integer }, searches: { type: integer } } }
+        health:
+          type: object
+          properties:
+            enabled: { type: boolean }
+            shortcutUrl: { type: string }
+            users: { type: integer, description: 'Members with at least one token.' }
+            tokens: { type: integer }
 
     PoolExercise:
       type: object

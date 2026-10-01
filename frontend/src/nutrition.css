@@ -1,0 +1,94 @@
+/* Nutrition and body screens. Loaded with them, not with the app shell. */
+
+/* ---- the day's summary: one energy bar, three macro bars ---- */
+.nt-kc{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.nt-kc b{font-size:30px;font-weight:600;letter-spacing:-.026em;line-height:1.1;font-variant-numeric:tabular-nums}
+.nt-kc span{color:var(--label-2);font-size:15px}
+.nt-left{margin-left:auto;font-size:14px;font-weight:500;color:var(--acc)}
+.nt-left.over{color:var(--red)}
+.nt-bar{height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden;margin-top:8px}
+.nt-bar>i{display:block;height:100%;border-radius:4px;background:var(--acc);transition:width .25s ease}
+.nt-bar.over>i{background:var(--red)}
+.nt-macros{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.nt-macro .l{font-size:12px;color:var(--label-2)}
+.nt-macro .v{font-size:14px;font-weight:500;margin-top:1px;font-variant-numeric:tabular-nums}
+.nt-macro .v span{color:var(--label-2);font-weight:400}
+.nt-macro .nt-bar{height:6px;margin-top:5px}
+.nt-macro.p .nt-bar>i{background:var(--blue)}
+.nt-macro.f .nt-bar>i{background:var(--yellow)}
+.nt-macro.c .nt-bar>i{background:var(--orange)}
+.nt-macro .nt-bar.over>i{background:var(--red)}
+.nt-note{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:13px;color:var(--label-2)}
+.nt-note .icn{flex:none;font-size:14px}
+
+/* compact variant on Home */
+.nt-mini .nt-kc b{font-size:22px}
+.nt-mini .nt-macros{margin-top:10px}
+
+/* ---- day navigation ---- */
+.nt-date{display:flex;align-items:center;justify-content:space-between;margin:-6px 0 12px}
+.nt-date .d{font-size:15px;font-weight:500}
+.nt-date .iconbtn{width:34px;height:34px;font-size:16px}
+
+/* ---- meals ---- */
+.nt-meal-h{display:flex;align-items:center;justify-content:space-between;margin:20px 2px 8px}
+.nt-meal-h h2{font-size:17px;font-weight:600;margin:0;letter-spacing:-.015em}
+.nt-meal-h .k{color:var(--label-2);font-size:14px;margin-left:8px;font-weight:400;font-variant-numeric:tabular-nums}
+.nt-rows{display:flex;flex-direction:column;gap:6px}
+/* No radius of its own: SwipeToDelete's wrapper rounds and clips, and a rounded row on top of it
+   lets the delete button behind show through at the corners. */
+.nt-row{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer}
+.nt-row .grow{flex:1;min-width:0}
+.nt-row .tt{font-size:16px;letter-spacing:-.009em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nt-row .ss{font-size:13px;color:var(--label-2);margin-top:1px}
+.nt-row .kc{font-variant-numeric:tabular-nums;font-weight:500;flex:none}
+.nt-add{display:flex;align-items:center;gap:8px;width:100%;padding:11px 14px;border-radius:var(--r-card);background:var(--surface);color:var(--acc);font-size:15px}
+.nt-add:active{background:var(--surface-2)}
+
+/* ---- sheets ---- */
+.nt-now{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 14px;text-align:center}
+.nt-now>div{background:var(--surface-2);border-radius:var(--r);padding:9px 4px}
+.nt-now b{display:block;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.nt-now span{display:block;font-size:11px;color:var(--label-2);margin-top:1px}
+.nt-fields{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.nt-fields.two{grid-template-columns:repeat(2,1fr)}
+.nt-fields.three{grid-template-columns:repeat(3,1fr)}
+.nt-fields.one{grid-template-columns:1fr}
+.nt-field{display:block;min-width:0}
+.nt-field>span{display:block;font-size:12px;color:var(--label-2);margin:0 0 4px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nt-field .input{width:100%;text-align:center;padding-left:6px;padding-right:6px}
+.nt-fields.one .nt-field .input{text-align:left;padding-left:14px}
+.nt-warn{gap:7px;align-items:flex-start;margin-top:10px;color:var(--orange);line-height:1.4}
+.nt-warn .icn{flex:none;margin-top:2px}
+.nt-result{background:var(--surface-2);border-radius:var(--r);padding:12px 14px;margin-top:14px}
+.nt-result .nt-now{margin:0 0 10px}
+.nt-result .nt-now>div{background:var(--surface)}
+.nt-chips .chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;text-transform:none}
+.nt-chips .chip .icn{font-size:15px;flex:none}
+
+/* ---- body screen ---- */
+.bd-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.bd-last{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:14px}
+.bd-last b{font-weight:600;font-variant-numeric:tabular-nums}
+.bd-last span{color:var(--label-2)}
+.bd-steps{margin:10px 0 0;padding-left:20px;font-size:14px;line-height:1.5;color:var(--label-2)}
+.bd-steps li{margin-bottom:6px}
+.bd-steps code,.bd-token{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;background:var(--surface-2);border-radius:6px;padding:1px 5px;color:var(--label);overflow-wrap:anywhere}
+.bd-token{display:block;padding:10px 12px;margin:8px 0;user-select:all;-webkit-user-select:all}
+
+/* Two classes deep on purpose: index.css's `.input{width:100%}` may load after this file. */
+.lrow .input.bd-num{width:96px;flex:none;text-align:right;padding:9px 12px}
+.lrow .seg-inline{flex:none}
+
+/* ---- AI sheets ---- */
+.nt-pic{display:block;width:100%;max-height:240px;object-fit:cover;border-radius:var(--r);margin-bottom:10px;background:var(--surface-2)}
+.nt-busy{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;color:var(--acc);font-weight:500}
+.nt-busy .icn{animation:nt-pulse 1.4s ease-in-out infinite}
+@keyframes nt-pulse{0%,100%{opacity:.35}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.nt-busy .icn{animation:none}}
+.nt-draft{background:var(--surface);border-radius:var(--r-card);padding:11px 12px;display:flex;flex-direction:column;gap:8px}
+.nt-draft .tt{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nt-draft .ss{font-size:13px;color:var(--label-2);margin-top:1px}
+.nt-est{color:var(--orange)}
+.nt-idea{background:var(--surface);border-radius:var(--r-card);padding:12px 14px}
+.nt-idea .ss{font-size:13px;color:var(--label-2)}

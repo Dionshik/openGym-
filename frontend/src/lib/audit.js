@@ -36,6 +36,14 @@ const LABELS = {
   'admin.pool.edit': 'Edited a shared exercise',
   'admin.pool.retire': 'Retired a shared exercise',
   'admin.pool.restore': 'Restored a shared exercise',
+  // The two switches under "Nutrition & Health" on the dashboard, and what a member does with
+  // the Apple Health connection (api/healthkit.js). Filed under `auth`: a Health token is a
+  // credential, and making or revoking one is the same kind of event as pairing a phone.
+  'admin.food.lookup': 'Switched online food lookup',
+  'admin.health.ingest': 'Switched the Apple Health connection',
+  'auth.health.token': 'Created an Apple Health token',
+  'auth.health.revoke': 'Revoked an Apple Health token',
+  'auth.health.clear': 'Cleared delivered Health data',
   'admin.invite.create': 'Created an invite code',
   'admin.invite.revoke': 'Revoked an invite code',
   'admin.audit.clear': 'Cleared the activity log',

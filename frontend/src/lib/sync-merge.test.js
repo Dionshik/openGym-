@@ -136,9 +136,9 @@ describe('sign-in adoption helpers', () => {
   const server = { _ts: 100, unit: 'lb', restSec: 60, workouts: [{ id: 'w1', d: '2026-09-01' }], bodyweight: [{ d: '2026-09-01', w: 80, t: 1 }], routines: [{ id: 'r1', name: 'A' }], week: { 1: ['r1'] } }
   const local = { _ts: 900, unit: 'kg', restSec: 90, workouts: [{ id: 'w9', d: '2026-09-11' }], bodyweight: [{ d: '2026-09-11', w: 81, t: 2 }, { d: '2026-09-01', w: 79, t: 9 }], routines: [{ id: 'rg', name: 'Guest' }], customEx: [{ id: 'c1', name: 'x' }], week: { 2: ['rg'] } }
   it('localExtras counts what the device has that the server does not', () => {
-    expect(localExtras(local, server)).toEqual({ workouts: 1, bodyweight: 1, customEx: 1 })
-    expect(localExtras(server, server)).toEqual({ workouts: 0, bodyweight: 0, customEx: 0 })
-    expect(localExtras(null, server)).toEqual({ workouts: 0, bodyweight: 0, customEx: 0 })
+    expect(localExtras(local, server)).toEqual({ workouts: 1, bodyweight: 1, customEx: 1, food: 0, measurements: 0 })
+    expect(localExtras(server, server)).toEqual({ workouts: 0, bodyweight: 0, customEx: 0, food: 0, measurements: 0 })
+    expect(localExtras(null, server)).toEqual({ workouts: 0, bodyweight: 0, customEx: 0, food: 0, measurements: 0 })
   })
   it('mergeStates with prefer keeps the preferred side\'s settings and plan although the other is newer', () => {
     const m = mergeStates(server, local, { prefer: 'a' })
@@ -149,5 +149,42 @@ describe('sign-in adoption helpers', () => {
     // the weigh-in both sides have for the same day: the later `t` wins, as between devices
     expect(m.bodyweight.find(e => e.d === '2026-09-01').w).toBe(79)
     expect(mergeStates(server, local).unit).toBe('kg')   // without prefer the newer copy decides
+  })
+})
+
+describe('the diary, measurements and the body profile between two devices', () => {
+  const row = (id, d, t = 1) => ({ id, d, m: 1, n: 'x', g: 100, k: 100, p: 10, f: 2, c: 8, t })
+  const diary = (log, extra = {}) => ({ v: 1, targets: null, log, days: {}, rolledTo: null, foods: [], del: {}, ...extra })
+
+  it('both phones logged food in the same window: every row survives', () => {
+    const a = { _ts: 10, nutrition: diary([row('a', '2026-10-01')]) }
+    const b = { _ts: 20, nutrition: diary([row('b', '2026-10-01')]) }
+    expect(mergeStates(a, b).nutrition.log.map(e => e.id).sort()).toEqual(['a', 'b'])
+  })
+  it('a row deleted on the older copy stays deleted in the merge', () => {
+    const a = { _ts: 10, nutrition: diary([], { del: { x: 50 } }) }
+    const b = { _ts: 20, nutrition: diary([row('x', '2026-10-01', 5)]) }
+    expect(mergeStates(a, b).nutrition.log).toEqual([])
+  })
+  it('a copy that never had a diary takes the other one, and two without stay without', () => {
+    expect(mergeStates({ _ts: 10 }, { _ts: 5, nutrition: diary([row('a', '2026-10-01')]) }).nutrition.log).toHaveLength(1)
+    expect('nutrition' in mergeStates({ _ts: 10 }, { _ts: 5 })).toBe(false)
+  })
+  it('measurements union by day, the later edit of a shared day', () => {
+    const a = { _ts: 10, measurements: [{ d: '2026-09-01', waist: 90, t: 1 }, { d: '2026-09-08', waist: 89, t: 1 }] }
+    const b = { _ts: 20, measurements: [{ d: '2026-09-01', waist: 91, t: 5 }] }
+    const m = mergeStates(a, b).measurements
+    expect(m.map(e => [e.d, e.waist])).toEqual([['2026-09-01', 91], ['2026-09-08', 89]])
+  })
+  it('the body profile edited later stands, even on the copy that is older overall', () => {
+    const a = { _ts: 10, bodyProfile: { heightCm: 181, t: 9 } }
+    const b = { _ts: 20, bodyProfile: { heightCm: 180, t: 3 } }
+    expect(mergeStates(a, b).bodyProfile.heightCm).toBe(181)
+    expect(mergeStates({ _ts: 10 }, b).bodyProfile.heightCm).toBe(180)
+  })
+  it('sign-in counts diary rows and measurement days the profile lacks', () => {
+    const local = { nutrition: diary([row('a', '2026-10-01'), row('b', '2026-10-01')]), measurements: [{ d: '2026-09-01', waist: 90 }] }
+    const server = { nutrition: diary([row('a', '2026-10-01')]) }
+    expect(localExtras(local, server)).toMatchObject({ food: 1, measurements: 1 })
   })
 })

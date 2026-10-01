@@ -68,6 +68,14 @@ export const CATEGORY_TEXT = {
   profile: ['What you tell the Coach', 'Your intake answers, including any limitations or injuries you describe.'],
   prefs: ['A few preferences', 'Your unit, your language and which effort scale you log.']
 }
+// The optional ones (api/coach/core/categories.js OPTIONAL_CATEGORIES): each has a switch of
+// its own on the Body screen and is off until turned on.
+export const OPTIONAL_TEXT = {
+  bodyProfile: ['Your body profile', 'Sex, age, height, how active your days are, body fat, and how your measurements moved.'],
+  nutrition: ['A nutrition summary', 'Your daily target and what you averaged over the last two weeks. Never what you ate, and never a photo.']
+}
+/** Which optional categories this profile switched on. */
+export const sharedExtras = S => Object.keys(OPTIONAL_TEXT).filter(k => !!S?.coach?.consent?.agreedAt && !!S?.coach?.consent?.extra?.[k])
 export const hasConsent = S => !!S?.coach?.consent?.agreedAt && S.coach.consent.version === CONSENT_VERSION
 
 /* ============================ plan fingerprint ============================ */

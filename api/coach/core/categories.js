@@ -11,3 +11,11 @@ export const DATA_CATEGORIES = Object.freeze([
   'profile',     // the intake answers you gave the Coach, including any limitations
   'prefs'        // unit, language, effort scale
 ]);
+
+/* What the Coach may additionally be shown, each behind a switch of its own that is off until
+ * the person turns it on (S.coach.consent.extra) — the Coach's consent does not cover them, so a
+ * profile that agreed before they existed sends exactly what it sent then. extras.js builds them. */
+export const OPTIONAL_CATEGORIES = Object.freeze([
+  'bodyProfile', // sex, age, height, daily activity, body fat, and how the measurements moved
+  'nutrition'    // the daily target and two-week averages actually eaten — never what was eaten
+]);
