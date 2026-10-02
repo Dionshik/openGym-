@@ -171,13 +171,21 @@ test('the cache is its own file, survives a restart, and the admin can empty it'
   assert.equal(fs.existsSync(file), false);
 });
 
-test('settings: unknown fields are ignored, the shortcut link must be https, defaults are off', t => {
+test('settings: unknown fields are ignored, the shortcut link must be https, defaults are off, photo limits are bounded', t => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gym-set-'));
   t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
   const s = createSettings({ dataDir, atomicWrite });
-  assert.deepEqual(s.get(), { food: { lookup: false, contact: '' }, health: { enabled: false, shortcutUrl: '' } });
+  const PHOTOS = { enabled: false, quotaMb: 500, mealDays: 0 };
+  assert.deepEqual(s.get(), { food: { lookup: false, contact: '' }, health: { enabled: false, shortcutUrl: '' }, photos: PHOTOS });
   s.patch({ food: { lookup: 'yes', admin: true }, health: { enabled: true, shortcutUrl: 'javascript:alert(1)' }, other: 1 });
-  assert.deepEqual(s.get(), { food: { lookup: false, contact: '' }, health: { enabled: true, shortcutUrl: '' } });
+  assert.deepEqual(s.get(), { food: { lookup: false, contact: '' }, health: { enabled: true, shortcutUrl: '' }, photos: PHOTOS });
+  // the photo store: a switch that must be exactly `true`, and two numbers that must be sane
+  s.patch({ photos: { enabled: 1, quotaMb: '9000', mealDays: 2.5, path: '/etc' } });
+  assert.deepEqual(s.get().photos, PHOTOS);
+  s.patch({ photos: { enabled: true, quotaMb: 2000, mealDays: 180 } });
+  assert.deepEqual(createSettings({ dataDir, atomicWrite }).get().photos, { enabled: true, quotaMb: 2000, mealDays: 180 });
+  s.patch({ photos: { quotaMb: 5, mealDays: 99999 } });
+  assert.deepEqual(s.get().photos, { enabled: true, quotaMb: 2000, mealDays: 180 });
   s.patch({ health: { shortcutUrl: 'https://www.icloud.com/shortcuts/abc' } });
   assert.equal(createSettings({ dataDir, atomicWrite }).get().health.shortcutUrl, 'https://www.icloud.com/shortcuts/abc');
 });

@@ -9,15 +9,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
-vi.mock('../lib/api.js', () => ({ api: vi.fn(() => Promise.reject(Object.assign(new Error('offline'), {}))), apiBase: () => 'https://gym.example' }))
+vi.mock('../lib/api.js', () => ({ api: vi.fn(() => Promise.reject(Object.assign(new Error('offline'), {}))), apiBlob: vi.fn(() => Promise.reject(new Error('offline'))), apiBase: () => 'https://gym.example' }))
 const nav = vi.fn()
-vi.mock('react-router-dom', () => ({ useNavigate: () => nav }))
+const route = { pathname: '/body', search: '' }
+vi.mock('react-router-dom', () => ({ useNavigate: () => nav, useLocation: () => route }))
 
 import { DEF, useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { todayISO } from '../lib/format.js'
 import { dayBefore } from '../lib/nutrition.js'
-import { logFood, logQuick, setTargets, saveBodyProfile, saveMeasurement } from '../nutrition-actions.js'
+import { logFood, logQuick, setTargets, saveBodyProfile, saveMeasurement, setMeasureGoal } from '../nutrition-actions.js'
 import Nutrition from './Nutrition.jsx'
 import Body from './Body.jsx'
 import MacroBars from '../components/MacroBars.jsx'
@@ -40,7 +41,8 @@ beforeEach(() => {
   localStorage.clear()
   document.body.innerHTML = ''
   nav.mockReset()
-  useStore.setState({ S: clone(DEF), user: null, ready: true, config: null, health: null, coachLocal: null })
+  route.search = ''
+  useStore.setState({ S: clone(DEF), user: null, ready: true, config: null, health: null, coachLocal: null, photos: null, photosKept: 0 })
   useUI.setState({ sheets: [] })
 })
 afterEach(() => { mounted.splice(0).forEach(r => act(() => r.unmount())); localStorage.clear() })
@@ -154,4 +156,183 @@ describe('the Body screen', () => {
     act(() => sw.click())
     expect(Object.keys(useStore.getState().S.coach.consent.extra)).toEqual(['nutrition'])
   })
+
+  it('a measurement with too little history says what a trend needs, and sets no forecast', () => {
+    saveMeasurement(dayBefore(today, 30), { upperArmFlexedLeft: 38 })
+    saveMeasurement(today, { upperArmFlexedLeft: 38.4 })
+    const host = render(<Body />)
+    expect(host.textContent).toContain('A trend needs at least 5 measurements — you have 2.')
+    expect(host.querySelector('.cfc')).toBeNull()
+    // the tape's own error is stated either way
+    expect(host.textContent).toContain('can differ by 0.7 cm on their own')
+  })
+
+  it('a steady series shows the trend as a range, draws it, and counts the weeks to a goal inside it', () => {
+    ;[84, 70, 56, 42, 28, 14, 0].forEach((ago, i) => saveMeasurement(dayBefore(today, ago), { upperArmFlexedLeft: 38 + 0.25 * i }))
+    setMeasureGoal('upperArmFlexedLeft', 40)
+    const host = render(<Body />)
+    expect(host.textContent).toContain('Trend: +0.5 cm a month (between +0.2 and +0.9)')
+    expect(host.textContent).toMatch(/In 12 weeks a reading will most likely be between \d+(\.\d)? and \d+(\.\d)? cm\./)
+    expect(host.textContent).toContain('At this rate the goal is about 4 weeks away.')
+    expect(host.textContent).toContain('Goal: 40 cm')
+    expect(host.querySelector('.cfc')).toBeTruthy()
+  })
+
+  it('body fat is charted but gets no tape trend', () => {
+    ;[84, 70, 56, 42, 28, 14, 0].forEach((ago, i) => saveMeasurement(dayBefore(today, ago), { bodyFat: 22 - 0.3 * i }))
+    const host = render(<Body />)
+    expect(host.textContent).not.toContain('Trend:')
+    expect(host.textContent).not.toContain('A tape measures')
+    expect(host.textContent).not.toContain('How to measure')
+  })
+
+  it('the measurement sheet offers the new sites, keeps wrist and ankle behind a button, and explains each site', () => {
+    const host = render(<Body />)
+    act(() => button(host, 'Add').click())
+    const sheet = useUI.getState().sheets.at(-1)
+    const el = render(sheet.render(() => {}))
+    expect(el.textContent).toContain('Left arm, flexed')
+    expect(el.textContent).toContain('Left forearm')
+    expect(el.textContent).toContain('Abdomen')
+    expect(el.textContent).not.toContain('Left wrist')
+    act(() => button(el, 'More measurements').click())
+    expect(el.textContent).toContain('Left wrist')
+    expect(el.textContent).toContain('Right ankle')
+    // every tape field has its help button; body fat and lean mass have none
+    expect(el.querySelectorAll('.bd-fh .helpbtn')).toHaveLength(20)
+  })
 })
+
+// Stored photos exist only where the instance keeps them and somebody is signed in to it; the
+// pictures themselves need the server, which this test does not have — what is checked is where
+// the entry points are, and that a picture is asked for by its own id through the session.
+describe('stored photos on the two screens', () => {
+  const mealPhoto = { id: 'a'.repeat(24), kind: 'meal', d: today, m: 1, mime: 'image/webp', w: 960, h: 1280, bytes: 90000, at: 1, thumb: true }
+  const bodyPhoto = (id, d) => ({ id: id.repeat(24), kind: 'body', pose: 'front', d, mime: 'image/jpeg', w: 1200, h: 1600, bytes: 300000, at: 1, thumb: true })
+  const signedIn = (photos = null) => useStore.setState({ user: { id: 'u1' }, config: { photos: true }, photos })
+
+  it('a guest, and an instance that keeps no photos, see nothing of them', () => {
+    let host = render(<Body />)
+    expect(host.textContent).not.toContain('Progress photos')
+    host = render(<Nutrition />)
+    expect(host.querySelectorAll('[aria-label^="Photo of the meal"]')).toHaveLength(0)
+    useStore.setState({ user: { id: 'u1' }, config: { health: true } })
+    expect(render(<Body />).textContent).not.toContain('Progress photos')
+    useStore.setState({ user: null, config: { photos: true } })
+    expect(render(<Body />).textContent).not.toContain('Progress photos')
+  })
+
+  // The admin switched the store off again; the member's pictures are still on the server. They
+  // cannot be shown any more, but they must still be the member's to remove.
+  it('photos left on a server that switched storage off can still be deleted from the Body screen', () => {
+    useStore.setState({ user: { id: 'u1' }, config: {}, photosKept: 3 })
+    const host = render(<Body />)
+    expect(host.textContent).toContain('Photo storage is switched off on this server, but 3 of your photos are still kept there.')
+    expect(button(host, 'Delete them')).toBeTruthy()
+    expect(button(host, 'Front view')).toBeUndefined()
+    // nothing of the kind for a member with none left, or for a guest
+    useStore.setState({ photosKept: 0 })
+    expect(render(<Body />).textContent).not.toContain('Progress photos')
+    useStore.setState({ user: null, photosKept: 3 })
+    expect(render(<Body />).textContent).not.toContain('Progress photos')
+  })
+
+  it('the Body screen offers the four poses, says where the photos are kept, and compares once there are two', () => {
+    signedIn({ rev: 1, items: [], used: 0, quota: 500 * 1024 * 1024 })
+    let host = render(<Body />)
+    expect(host.textContent).toContain('Progress photos')
+    for (const pose of ['Front view', 'Side view', 'Back view', 'Flexed']) expect(button(host, pose)).toBeTruthy()
+    expect(host.textContent).toContain('not encrypted')
+    expect(button(host, 'Compare')).toBeUndefined()
+
+    signedIn({ rev: 3, items: [bodyPhoto('b', dayBefore(today, 40)), bodyPhoto('c', today)], used: 600000, quota: 500 * 1024 * 1024 })
+    host = render(<Body />)
+    expect(host.querySelectorAll('.ph-cell')).toHaveLength(2)
+    expect(button(host, 'Compare')).toBeTruthy()
+    expect(host.textContent).toContain('0.6 MB of 500 MB used.')
+    // another pose has none of its own
+    act(() => button(host, 'Side view').click())
+    expect(host.querySelectorAll('.ph-cell')).toHaveLength(0)
+  })
+
+  it('a picture is fetched through the session by its id, never linked to directly', async () => {
+    const { apiBlob } = await import('../lib/api.js')
+    apiBlob.mockClear()
+    signedIn({ rev: 1, items: [bodyPhoto('b', today)], used: 1, quota: 10 })
+    const host = render(<Body />)
+    await act(async () => { await Promise.resolve() })
+    expect(apiBlob).toHaveBeenCalledWith('/api/photo?id=' + 'b'.repeat(24) + '&thumb=1')
+    expect(host.querySelector('img[src*="api/photo"]')).toBeNull()
+  })
+
+  it('each meal gets a camera button, and its photos sit above its rows', () => {
+    signedIn({ rev: 1, items: [mealPhoto], used: 1, quota: 10 })
+    logFood(chicken, 200, { d: today, m: 1 })
+    const host = render(<Nutrition />)
+    expect(host.querySelectorAll('[aria-label^="Photo of the meal"]')).toHaveLength(4)
+    expect(host.querySelectorAll('.ph-meal')).toHaveLength(1)
+    expect(host.querySelectorAll('.ph-meal .ph-thumb')).toHaveLength(1)
+    act(() => button(host, 'Photo of the meal: lunch').click())
+    expect(useUI.getState().sheets).toHaveLength(1)
+  })
+})
+
+describe('left and right on the Body screen', () => {
+  it('nothing is said until a site was measured on both sides', () => {
+    saveMeasurement(today, { waist: 90, upperArmLeft: 38 })
+    expect(render(<Body />).textContent).not.toContain('Left and right')
+  })
+
+  it('sets the two sides against each other, and calls a difference under the tape\'s error what it is', () => {
+    saveMeasurement(dayBefore(today, 30), { upperArmLeft: 37.6, upperArmRight: 38.2 })
+    saveMeasurement(today, { upperArmLeft: 38, upperArmRight: 38.4, thighLeft: 58, thighRight: 59.5 })
+    const host = render(<Body />)
+    const rows = [...host.querySelectorAll('.bd-side')].map(r => r.textContent)
+    expect(host.textContent).toContain('Left and right')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toContain('Upper arm, relaxed')
+    expect(rows[0]).toContain('L 38 · R 38.4 cm')
+    expect(rows[0]).toContain('Difference 0.4 cm — within the error of a tape measure.')
+    expect(rows[1]).toContain('Difference 1.5 cm — the right is bigger.')
+    // the chart of one arm carries the other as a second line, and says so
+    expect(host.querySelector('.csec')).toBeTruthy()
+    expect(host.textContent).toContain('Thin grey line: right upper arm.')
+  })
+
+  it('sides measured on different days, weeks apart, are not compared', () => {
+    saveMeasurement(dayBefore(today, 40), { calfLeft: 38 })
+    saveMeasurement(today, { calfRight: 38.9 })
+    const host = render(<Body />)
+    expect(host.querySelector('.bd-side').textContent).toContain('Measured 40 days apart')
+    expect(host.textContent).not.toContain('the right is bigger')
+  })
+})
+
+describe('adding a progress photo', () => {
+  const open = () => {
+    useStore.setState({ user: { id: 'u1' }, config: { photos: true }, photos: { rev: 1, items: [{ id: 'b'.repeat(24), kind: 'body', pose: 'front', d: dayBefore(today, 30), w: 1200, h: 1600, thumb: true }], used: 1, quota: 10 } })
+    const host = render(<Body />)
+    const card = [...host.querySelectorAll('.card')].find(c => c.textContent.includes('Progress photos'))
+    act(() => [...card.querySelectorAll('button')].find(b => b.textContent.trim() === 'Add').click())
+    return render(useUI.getState().sheets.at(-1).render(() => {}))
+  }
+  afterEach(() => { delete navigator.mediaDevices })
+
+  it('where the browser can open a camera into the page, lining up with the last photo comes first', () => {
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: () => new Promise(() => {}) } })
+    const el = open()
+    const labels = [...el.querySelectorAll('button.btn')].map(b => b.textContent.trim())
+    expect(labels).toEqual(['Line up with the last photo', 'Take a photo', 'Choose from library'])
+    act(() => button(el, 'Line up with the last photo').click())
+    expect(useUI.getState().sheets).toHaveLength(2)
+    // a pose with no photo yet has nothing to line up with — the camera still has its timer
+    act(() => button(el, 'Back view').click())
+    expect([...el.querySelectorAll('button.btn')].map(b => b.textContent.trim())[0]).toBe('Camera with a self-timer')
+  })
+
+  it('where it cannot (plain http, an old browser), the sheet is what it was', () => {
+    const el = open()
+    expect([...el.querySelectorAll('button.btn')].map(b => b.textContent.trim())).toEqual(['Take a photo', 'Choose from library'])
+  })
+})
+

@@ -78,7 +78,7 @@ LABEL maintainer="Duarte Santos https://gitlab.com/DuarteSantos8" \
 # here — a file that is not copied is a container that dies at boot with ERR_MODULE_NOT_FOUND,
 # and no unit test runs inside the image. test/dockerfile.test.js holds this list to the imports.
 FROM scratch AS app
-COPY server.js push-messages.js verify-error.js pool.js settings.js food.js healthkit.js healthkit-parse.js /app/
+COPY server.js push-messages.js verify-error.js pool.js settings.js food.js healthkit.js healthkit-parse.js reminders.js photos.js /app/
 COPY coach /app/coach
 
 # ---------------------------------------------------------------------------------------------

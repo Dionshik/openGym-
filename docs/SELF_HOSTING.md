@@ -296,10 +296,18 @@ tar czf opengym-backup-$(date +%F).tar.gz data/
 ```
 
 That archive contains all profiles, passkeys and workout history — and, in each profile, its
-food diary, body profile and measurements — the shared exercise pool (`pool.json`), the two
-admin switches for nutrition and Health (`settings.json`), what members' iPhones delivered from
-Apple Health (`health/`, `health-tokens.json`), the Open Food Facts cache (`off-cache.json`,
-safe to delete) — and, if the activity log is on, `audit.log` with everyone's sign-in times. Worth knowing before you ship the archive to a
+food diary, body profile, measurements and reminders — the shared exercise pool (`pool.json`),
+the admin switches for nutrition, Health and photos (`settings.json`), what members' iPhones
+delivered from Apple Health (`health/`, `health-tokens.json`), the Open Food Facts cache
+(`off-cache.json`, safe to delete), which reminders went out today (`reminder-log.json`, safe to
+delete) — and, if the activity log is on, `audit.log` with everyone's sign-in times.
+
+If you switched **stored photos** on (dashboard → Nutrition & Health → Stored photos), it also
+contains `photos/`: every member's progress and meal photos, as ordinary JPEG and WebP files
+that open in any image viewer. That changes two things about this archive. It is no longer
+small — figure up to the per-member quota (500 MB by default) times the number of members, and
+roughly 200 MB a year for one person who photographs every meal. And it now holds pictures of
+people's bodies, unencrypted: where the archive goes matters more than it did. Worth knowing before you ship the archive to a
 backup service you don't run. Restore by unpacking it back into the project folder. (Individual
 users can also export their own data as JSON from Settings.)
 
@@ -316,10 +324,19 @@ in this archive — and unreadable without the secret next to them, like everyth
 
 ## 7. Notifications
 
-openGym can push two kinds of alert to your phone/desktop, even when the app isn't open:
-rest-timer-over, and a reminder on days you have a workout planned but haven't logged one yet.
-Turn it on per-profile in **Settings → Notifications** (requires a signed-in passkey profile and
-HTTPS — see section 3).
+openGym can push three kinds of alert to your phone/desktop, even when the app isn't open:
+rest-timer-over, a reminder on days you have a workout planned but haven't logged one yet, and
+reminders people write for themselves. Turn it on per-profile in **Settings → Notifications**
+(requires a signed-in passkey profile and HTTPS — see section 3).
+
+**My reminders** (the card below it) is the third kind: a text, a time, and the weekdays it rings
+on — "log your food" at 13:00 on weekdays. A reminder can point at a section (the food diary,
+body weight, measurements, progress photos); a tap on the notification then opens that section,
+and it can be told to stay quiet on a day that section already has an entry. They are part of
+the profile, so they sync and are in its backup; the server reads them on the same tick as the
+workout reminder and keeps what it sent today in `./data/reminder-log.json`. The 15-minute
+catch-up below applies to them too, with one difference: a reminder written, switched on or
+moved *after* its time has passed is for the next day, not sent at once.
 
 No setup needed server-side, and nothing to configure per timezone: VAPID keys are generated on
 first run and saved to `./data/vapid.json`, and each user's browser reports its own timezone
@@ -328,7 +345,8 @@ they travel, regardless of what timezone the server itself runs in.
 
 Where it works: any desktop browser, Android Chrome, and on iOS only the app **added to the Home
 Screen** (Safari in a tab has no Web Push). The Android APK does not use Web Push at all — its
-day reminder is a local notification scheduled on the phone, and rest-timer alerts there only
+day reminder and a person's own reminders are local notifications scheduled on the phone (the
+next two weeks of them, rebuilt whenever the app is opened), and rest-timer alerts there only
 sound while the app is in the foreground. A reminder that was due while the server was down or
 restarting is still sent up to 15 minutes late, once; the browser re-registers its subscription
 with the server on every signed-in start, so a subscription the server lost heals itself.

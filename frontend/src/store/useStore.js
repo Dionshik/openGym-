@@ -9,6 +9,8 @@ import { MOBILE, initReminderSync, nativeLoad, nativeSave, onAppActive, syncRemi
 import { mergeStates, localExtras } from '../lib/sync-merge.js'
 import { rollUp, nutritionOf } from '../lib/nutrition.js'
 import { applyHealth, healthPending } from '../lib/health-apply.js'
+import { activeReminders } from '../lib/reminders.js'
+import { releaseAll as releasePhotoUrls } from '../lib/photo-urls.js'
 import { todayISO } from '../lib/format.js'
 import { loadRemote, chooseLocal, forgetRemote, connect } from '../lib/remote.js'
 import { loadCoachDevice, saveCoachDevice, coachDeviceSettings } from '../lib/coach-device.js'
@@ -116,6 +118,12 @@ export const DEF = {
   //   [{ d, t, waist?, chest?, hips?, upperArmLeft?, thighLeft?, …, bodyFat?, leanMass?, src? }]
   // The field names are lib/body.js's MEASURES; `src: 'hk'` marks a row Apple Health delivered.
   measurements: [],
+  // A goal per measurement, in the stored unit: { waist: { v: 85, t }, … }. `v: null` is a goal
+  // that was removed — kept, so the other device's older goal does not come back in a merge.
+  measureGoals: {},
+  // Reminders the person wrote themselves — "log your food" at 13:00 on weekdays. The shape and
+  // the rules are in lib/reminders.js; the server reads the list to send them (api/reminders.js).
+  reminders: [],
   // How far the samples the Health shortcut delivered have been copied into bodyweight /
   // measurements ({ applied: ms }), so an entry the user deleted afterwards is not put back.
   healthSync: null,
@@ -158,6 +166,7 @@ export const useStore = create((set, get) => {
   let offlineChanges = false   // a push failed for lack of network — the next one that lands says so
   let poolPulling = null       // the pool GET in flight
   let healthPulling = null     // the Health GET in flight
+  let photosPulling = null     // the photo list GET in flight
   let lastPool = 0
 
   const setPool = p => {
@@ -174,6 +183,12 @@ export const useStore = create((set, get) => {
   // readings into the profile".
   const syncHealth = rev => { if ((rev || 0) !== (+localStorage.getItem(HEALTH_KEY) || 0)) get().pullHealth() }
   const clearHealth = () => { localStorage.removeItem(HEALTH_KEY); set({ health: null }) }
+  // The list of stored photos (api/photos.js) is fetched by the screens that show it. Its
+  // revision rides on the same two answers; once a list is loaded, a different revision — a
+  // photo added or deleted on another device — means "fetch it again". Nothing of it is kept
+  // on this device: not the list, and the pictures themselves only as object URLs in memory.
+  const syncPhotos = rev => { if (get().photos && (rev || 0) !== (get().photos.rev || 0)) get().pullPhotos() }
+  const clearPhotos = () => { releasePhotoUrls(); set({ photos: null, photosKept: 0 }) }
 
   const readSync = () => { try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || null } catch { return null } }
   const writeSync = (rev, ts) => localStorage.setItem(SYNC_KEY, JSON.stringify({ rev, ts: ts || 0 }))
@@ -249,10 +264,11 @@ export const useStore = create((set, get) => {
     const owed = localStorage.getItem('gym_dirty') === '1' || pushTm !== null || pushPending
     if (!sync || owed) return get().pullState()
     try {
-      const { rev, pool, health } = await api('/api/data/rev')
+      const { rev, pool, health, photos } = await api('/api/data/rev')
       setSync({ offline: false })
       syncPool(pool)
       syncHealth(health)
+      syncPhotos(photos)
       if (rev !== sync.rev) return get().pullState()
     } catch (e) {
       if (e.status === 401) return
@@ -367,7 +383,8 @@ export const useStore = create((set, get) => {
     clearTimeout(pushTm)
     pushTm = null
     registerPool([])   // what the previous profile had suggested is not the next one's to see
-    set({ user: null, S: e.newValue ? loadState() : clone(DEF), pool: EMPTY_POOL, health: null })
+    releasePhotoUrls()
+    set({ user: null, S: e.newValue ? loadState() : clone(DEF), pool: EMPTY_POOL, health: null, photos: null, photosKept: 0 })
   })
 
   // Everything a sign-out leaves behind on this device, whichever way it was triggered. The owner
@@ -381,6 +398,7 @@ export const useStore = create((set, get) => {
     persist(clone(DEF), false)
     clearPool()
     clearHealth()
+    clearPhotos()
     localStorage.removeItem('gym_owner')
   }
 
@@ -421,6 +439,33 @@ export const useStore = create((set, get) => {
       return healthPulling
     },
     setHealth(patch) { set({ health: { ...(get().health || {}), ...patch } }) },
+    // The member's stored photos as the server lists them: { rev, items, used, quota, maxBytes }
+    // — null until a screen that shows them asks. Only where the instance keeps photos and
+    // somebody is signed in to it; a guest, the demo and the stand-alone app have none.
+    photos: null,
+    async pullPhotos() {
+      if (!get().user || DEMO || get().config?.photos !== true) return null
+      if (photosPulling) return photosPulling
+      const asked = get().user.id
+      photosPulling = api('/api/photos')
+        .then(r => {
+          // An answer that arrives after a sign-out is the previous member's list, and must not
+          // become the next one's.
+          if (get().user?.id !== asked) return null
+          set({ photos: { rev: r.rev || 0, items: Array.isArray(r.items) ? r.items : [], used: r.used || 0, quota: r.quota || 0, maxBytes: r.maxBytes || 0 } })
+          return get().photos
+        })
+        .catch(() => null)   // offline, or switched off since: the screen shows what it has
+        .finally(() => { photosPulling = null })
+      return photosPulling
+    },
+    /** After this device added or removed one: the list changes at once, without a round trip. */
+    setPhotos(fn) { const cur = get().photos || { rev: 0, items: [], used: 0, quota: 0, maxBytes: 0 }; set({ photos: { ...cur, ...fn(cur) } }) },
+    clearPhotos,
+    // How many photos this member still has on a server whose photo store was switched off
+    // again (api/server.js photosLeft) — the Body screen then offers to delete them. 0 otherwise.
+    photosKept: 0,
+    setPhotosKept(n) { set({ photosKept: n || 0 }) },
     // After a suggest / withdraw the server answers with this profile's list; no round trip.
     setPoolMine(mine) { setPool({ ...get().pool, mine: Array.isArray(mine) ? mine : [] }) },
     user: (() => { try { return JSON.parse(localStorage.getItem('gym_user')) || null } catch { return null } })(),
@@ -491,6 +536,7 @@ export const useStore = create((set, get) => {
           persist(clone(DEF), false)
           clearPool()
           clearHealth()
+          clearPhotos()
         }
         localStorage.setItem('gym_owner', u.id)
         localStorage.setItem('gym_user', JSON.stringify(u)); localStorage.removeItem('gym_guest')
@@ -527,6 +573,8 @@ export const useStore = create((set, get) => {
           const { state, rev } = res
           syncPool(res.pool)
           syncHealth(res.health)
+          syncPhotos(res.photos)
+          if ((res.photosKept || 0) !== get().photosKept) set({ photosKept: res.photosKept || 0 })
           const S = get().S
           // Owed to the server: a push that failed, or a change made while boot was still pulling.
           const dirty = localStorage.getItem('gym_dirty') === '1' || pushPending
@@ -715,9 +763,11 @@ export const useStore = create((set, get) => {
         await get().pullState()
         // Re-stamp the reminder's timezone on every load — keeps it correct if you're travelling,
         // without needing to revisit Settings.
+        // A person's own reminders (lib/reminders.js) ring by the same zone, so they keep it
+        // current too, whether or not the workout-day reminder is on.
         const tz = localTZ()
-        if (get().S.reminder?.on && get().S.reminder.tz !== tz) {
-          get().update(s => { s.reminder = { ...s.reminder, tz } })
+        if ((get().S.reminder?.on || activeReminders(get().S).length) && get().S.reminder?.tz !== tz) {
+          get().update(s => { s.reminder = { ...(s.reminder || DEF.reminder), tz } })
         }
       } catch (e) {
         if (e.status === 401) get().setUser(null)

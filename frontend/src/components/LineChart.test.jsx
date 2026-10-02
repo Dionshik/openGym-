@@ -82,6 +82,94 @@ describe('LineChart hover date', () => {
   })
 })
 
+describe('LineChart forecast', () => {
+  const pts = [point(2026, 8, 1, 38), point(2026, 9, 1, 38.5), point(2026, 10, 1, 39)]
+  const ahead = [
+    { t: pts[2].t, y: 39, lo: 38.2, hi: 39.8 },
+    { t: new Date(2026, 10, 1, 12).getTime(), y: 39.5, lo: 38.4, hi: 40.6 },
+    { t: new Date(2026, 11, 1, 12).getTime(), y: 40, lo: 38.6, hi: 41.4 }
+  ]
+  const xs = el => el.getAttribute('points').split(' ').map(p => +p.split(',')[0])
+  const draw = forecast => act(() => root.render(<LineChart points={pts} axes={false} unit="cm" forecast={forecast} />))
+
+  it('without one the chart is drawn exactly as before', () => {
+    renderChart(pts)
+    const plain = container.innerHTML
+    draw(null)
+    expect(container.querySelector('.cfc')).toBeNull()
+    draw([])
+    expect(container.querySelector('.cfc')).toBeNull()
+    act(() => root.render(<LineChart points={pts} axes={false} unit="kg" />))
+    expect(container.innerHTML).toBe(plain)
+  })
+
+  it('draws a band and a dashed line past the last point, and makes room for them', () => {
+    draw(null)
+    const lineBefore = xs(container.querySelector('svg > polyline'))
+    draw(ahead)
+    const g = container.querySelector('.cfc')
+    expect(g.querySelector('polygon').getAttribute('points').split(' ')).toHaveLength(6)
+    expect(g.querySelector('polyline').getAttribute('stroke-dasharray')).toBeTruthy()
+    const lineAfter = xs(container.querySelector('svg > polyline'))
+    // The measured curve no longer reaches the right edge: the forecast takes that space.
+    expect(lineAfter.at(-1)).toBeLessThan(lineBefore.at(-1))
+    expect(xs(g.querySelector('polyline'))[0]).toBeCloseTo(lineAfter.at(-1), 1)
+    expect(xs(g.querySelector('polyline')).at(-1)).toBeCloseTo(lineBefore.at(-1), 1)
+  })
+
+  it('the tooltip still reports measured points only', () => {
+    draw(ahead)
+    expect(hoverAt(340)).toBe(`${fmtDate(pts[2].d, true)} · 39 cm`)
+  })
+
+  it('ignores a forecast that starts before the last point or has holes in it', () => {
+    draw([{ t: pts[0].t, y: 38, lo: 37, hi: 39 }, { t: pts[1].t, y: 38.5, lo: 37, hi: 40 }])
+    expect(container.querySelector('.cfc')).toBeNull()
+    draw([{ t: ahead[0].t, y: 39 }, { t: ahead[1].t, y: NaN, lo: 1, hi: 2 }])
+    expect(container.querySelector('.cfc')).toBeNull()
+  })
+})
+
+describe('LineChart second series', () => {
+  const left = [point(2026, 8, 1, 38), point(2026, 9, 1, 38.4), point(2026, 10, 1, 38.8)]
+  const right = [point(2026, 7, 1, 39.6), point(2026, 9, 1, 39.9), point(2026, 10, 15, 40.4)]
+  const xs = el => el.getAttribute('points').split(' ').map(p => +p.split(',')[0])
+  const ys = el => el.getAttribute('points').split(' ').map(p => +p.split(',')[1])
+  const draw = second => act(() => root.render(<LineChart points={left} axes={false} unit="cm" second={second} />))
+
+  it('without one, or with a single point, the chart is drawn exactly as before', () => {
+    act(() => root.render(<LineChart points={left} axes={false} unit="cm" />))
+    const plain = container.innerHTML
+    for (const s of [null, [], [right[0]], [{ t: NaN, y: 1 }, { t: 2, y: NaN }]]) {
+      draw(s)
+      expect(container.querySelector('.csec'), JSON.stringify(s)).toBeNull()
+      expect(container.innerHTML).toBe(plain)
+    }
+  })
+
+  it('draws the other series on the same axes, which stretch to hold both in time and in value', () => {
+    draw(null)
+    const alone = container.querySelector('svg > polyline:not(.csec)')
+    const aloneX = xs(alone), aloneY = ys(alone)
+    draw(right)
+    const main = container.querySelector('svg > polyline:not(.csec)'), sec = container.querySelector('.csec')
+    expect(sec.getAttribute('points').split(' ')).toHaveLength(3)
+    // the other side starts earlier and ends later: the main curve no longer spans the full width
+    expect(xs(main)[0]).toBeGreaterThan(aloneX[0])
+    expect(xs(main).at(-1)).toBeLessThan(aloneX.at(-1))
+    expect(xs(sec)[0]).toBeCloseTo(aloneX[0], 1)
+    expect(xs(sec).at(-1)).toBeCloseTo(aloneX.at(-1), 1)
+    // and it is the higher one: drawn above, with the main curve pushed down the scale
+    expect(Math.max(...ys(sec))).toBeLessThan(Math.min(...ys(main)))
+    expect(ys(main)[0]).toBeGreaterThanOrEqual(aloneY[0])
+  })
+
+  it('the tooltip stays with the main series', () => {
+    draw(right)
+    expect(hoverAt(340)).toBe(`${fmtDate(left[2].d, true)} · 38.8 cm`)
+  })
+})
+
 describe('LineChart hover state', () => {
   it('clears the tooltip and hover markers when points are replaced, then allows hovering again', () => {
     renderChart(firstPoints)

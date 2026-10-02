@@ -4,6 +4,8 @@
    `CACHE` carries the build hash (vite.config.js rewrites it), so every deploy is a new worker
    with its own cache and the previous build's files are dropped on activate. */
 const CACHE = 'opengym-rt-__BUILD__'
+// Where this instance's API lives, as a path: '/api/' at the root, '/gym/api/' under a subpath.
+const API_PATH = new URL('api/', self.registration.scope).pathname
 
 // What the shell needs to boot without a network: index.html plus every script/style/icon it
 // references. Read from the served index.html so the list follows the build, not a hand-kept
@@ -40,21 +42,43 @@ self.addEventListener('push', e => {
     // the previous notification with the same tag is closed by hand first.
     const tag = data.tag || 'opengym'
     try { for (const n of await self.registration.getNotifications({ tag })) n.close() } catch {}
-    await self.registration.showNotification(data.title || 'openGym', {
+    const options = {
       body: data.body || '',
       icon: 'icon-512.png',
       badge: 'icon-180.png',
       tag,
       renotify: true
-    })
+    }
+    // Where a tap should land: an in-app address only ('#/nutrition'). The page checks it again
+    // against the routes a notification may open (lib/deeplink.js) before going anywhere.
+    if (typeof data.url === 'string' && data.url.startsWith('#/') && data.url.length <= 80) options.data = { url: data.url }
+    await self.registration.showNotification(data.title || 'openGym', options)
   })())
 })
+// A tap that had to open the app carries its address in the URL it opens; this is the same
+// address kept for the page to ask for (`opengym:ready`), in case the browser opened the app at
+// its start page instead. Short-lived on purpose — a worker's globals do not outlast it anyway.
+let pending = null
 self.addEventListener('notificationclick', e => {
+  const url = e.notification.data && typeof e.notification.data.url === 'string' ? e.notification.data.url : null
   e.notification.close()
-  e.waitUntil(self.clients.matchAll({ type: 'window' }).then(clients => {
+  e.waitUntil(self.clients.matchAll({ type: 'window' }).then(async clients => {
     const c = clients.find(c => 'focus' in c)
-    return c ? c.focus() : self.clients.openWindow('./')
+    if (!c) {
+      if (url) pending = { url, at: Date.now() }
+      return self.clients.openWindow(url ? './' + url : './')
+    }
+    if (url) c.postMessage({ type: 'opengym:navigate', url })
+    return c.focus()
   }))
+})
+self.addEventListener('message', e => {
+  if (!e.data || e.data.type !== 'opengym:ready' || !pending) return
+  const p = pending
+  pending = null
+  // `replay`: the page may already be there — it was opened at this very address — and then
+  // ignores this copy rather than act on the tap twice.
+  if (Date.now() - p.at < 30000 && e.source) e.source.postMessage({ type: 'opengym:navigate', url: p.url, replay: true })
 })
 // The push service rotated the subscription (key change, expiry): subscribe again with the same
 // server key and tell the server, so the row it holds keeps pointing at this browser.
@@ -71,7 +95,10 @@ self.addEventListener('pushsubscriptionchange', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url)
   if (e.request.method !== 'GET' || url.origin !== location.origin) return
-  if (url.pathname.startsWith('/api/')) return    // never cache auth/data
+  // Never cache auth/data. The API sits beside the app, so under a subpath deployment it is
+  // '/gym/api/', not '/api/': a guard on the root path alone let every API answer of such an
+  // instance fall through to the cache below — profile data, and now private photos.
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith(API_PATH)) return
 
   const isMedia = url.pathname.includes('/img/') || url.pathname.includes('/gif/')
   if (isMedia) {

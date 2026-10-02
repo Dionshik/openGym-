@@ -182,6 +182,13 @@ describe('the diary, measurements and the body profile between two devices', () 
     expect(mergeStates(a, b).bodyProfile.heightCm).toBe(181)
     expect(mergeStates({ _ts: 10 }, b).bodyProfile.heightCm).toBe(180)
   })
+  it('measurement goals: per measurement, the one set or cleared later', () => {
+    const a = { _ts: 10, measureGoals: { waist: { v: 85, t: 9 }, chest: { v: 110, t: 1 }, neck: { v: null, t: 7 } } }
+    const b = { _ts: 20, measureGoals: { waist: { v: 88, t: 3 }, chest: { v: 112, t: 4 }, neck: { v: 40, t: 2 }, hips: { v: 100, t: 1 } } }
+    expect(mergeStates(a, b).measureGoals).toEqual({ waist: { v: 85, t: 9 }, chest: { v: 112, t: 4 }, neck: { v: null, t: 7 }, hips: { v: 100, t: 1 } })
+    expect(mergeStates({ _ts: 30 }, b).measureGoals.hips.v).toBe(100)
+    expect('measureGoals' in mergeStates({ _ts: 10 }, { _ts: 5 })).toBe(false)
+  })
   it('sign-in counts diary rows and measurement days the profile lacks', () => {
     const local = { nutrition: diary([row('a', '2026-10-01'), row('b', '2026-10-01')]), measurements: [{ d: '2026-09-01', waist: 90 }] }
     const server = { nutrition: diary([row('a', '2026-10-01')]) }

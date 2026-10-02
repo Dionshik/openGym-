@@ -12,6 +12,7 @@ import { useWakeLock } from './lib/wakelock.js'
 import { installViewportGuard } from './lib/viewport-guard.js'
 import { installChipDrag } from './lib/hchips.js'
 import { syncPushSubscription } from './lib/push.js'
+import { safeRoute, isRepeat } from './lib/deeplink.js'
 import { MOBILE } from './lib/mobile.js'
 import { startFlow } from './sheets.jsx'
 import Icon from './components/Icon.jsx'
@@ -44,6 +45,9 @@ import CoachSetup from './views/CoachSetup.jsx'
 
 // last known scrollY per route, so back-navigation can put the page where it was
 const scrollPositions = new Map()
+// The address the app was started at, before the router or any screen rewrote it — what a tapped
+// notification asked for when it had to open the app (see the `opengym:navigate` listener).
+const BOOT_HASH = typeof location !== 'undefined' ? location.hash : ''
 
 bindUI(useUI)   // lets the shared controls open sheets without importing the store at module scope
 
@@ -103,6 +107,33 @@ function Shell() {
     if (MOBILE || !user || !ready) return
     syncPushSubscription().catch(() => {})
   }, [user?.id, ready])
+  // A tapped notification says where to go — "log your food" opens the diary. The service worker
+  // posts the address to the open window; the native shell raises it as an event (lib/mobile.js).
+  // Either way it is only followed if it is one of the routes a notification may open. Asking the
+  // worker (`opengym:ready`) covers the tap that had to start the app first: the worker opens the
+  // app at the address and also keeps it, in case the browser started the app at its front page
+  // instead. When the app did start at that address (BOOT_HASH), the kept copy is a repeat and is
+  // dropped — following it would open the same sheet a second time.
+  useEffect(() => {
+    const go = url => {
+      const to = safeRoute(url)
+      if (to && to !== loc.pathname + loc.search) navigate(to)
+    }
+    const onMessage = e => {
+      if (e.data?.type !== 'opengym:navigate') return
+      if (isRepeat(e.data, BOOT_HASH)) return
+      go(e.data.url)
+    }
+    const onEvent = e => go(e.detail?.url)
+    const sw = MOBILE ? null : navigator.serviceWorker
+    sw?.addEventListener('message', onMessage)
+    window.addEventListener('opengym:navigate', onEvent)
+    return () => { sw?.removeEventListener('message', onMessage); window.removeEventListener('opengym:navigate', onEvent) }
+  }, [navigate, loc.pathname, loc.search])
+  useEffect(() => {
+    if (MOBILE || !ready || !navigator.serviceWorker) return
+    navigator.serviceWorker.ready.then(reg => reg.active?.postMessage({ type: 'opengym:ready' })).catch(() => {})
+  }, [ready])
   useEffect(() => {
     const onScroll = () => {
       // Modals pins the body while a sheet is open; scrollY is 0 then, not a position.

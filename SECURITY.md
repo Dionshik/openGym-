@@ -141,8 +141,21 @@ Read this before hosting openGym for anyone other than yourself.
   from Apple Health sits in `health/<uid>.json`. Same rule as above: unencrypted, readable by
   whoever can read the folder. The Apple Health connection is off until an admin turns it on,
   for exactly this reason. Two things are deliberately *not* kept: a photograph sent to the AI
-  to be read is held in memory for the length of that call and never written anywhere, and a
-  Health token is stored only as a SHA-256 hash.
+  to be read is held in memory for the length of that call and never written anywhere (keeping
+  it is a separate, explicit act — next point), and a Health token is stored only as a SHA-256
+  hash.
+- **Stored photos are plain image files.** Off until an admin turns it on. Then members can keep
+  photos of their body and of their meals: JPEG or WebP files under `./data/photos/<uid>/`,
+  shrunk and re-encoded on the phone, with EXIF/XMP/IPTC — the GPS position included — cut out
+  again by the server before anything is written. They are **not encrypted**: whoever can read
+  `./data`, or a backup of it, can open them with any image viewer, and a picture of someone's
+  body is a different order of exposure from a workout log. What the application does enforce:
+  every read is scoped to the caller's own uid (another member's photo id is a 404, and so is
+  an admin's), the dashboard shows a count and a size and nothing else, uploads are sniffed by
+  content and anything that is not a JPEG or WebP is refused, and a member can delete their
+  photos even after the feature was switched off again. None of that protects against someone
+  who has the disk. Pictures are shown from in-memory object URLs fetched with the session, are
+  answered `Cache-Control: private, no-cache`, and are not put in the service worker's cache.
 - **A Health token is a bearer credential with one narrow use.** `ogh_…`, made on the Body
   screen, sent by the Shortcut as `Authorization: Bearer`. It can add body measurements to the
   profile it was made for and can read nothing; no route but `POST /api/healthkit/ingest`
@@ -156,7 +169,8 @@ Read this before hosting openGym for anyone other than yourself.
   `FOOD_LOOKUP_DISABLED=1` keeps it off regardless of the dashboard.
 - **Admins can read everything.** A user listed in `ADMIN_UIDS` (or flagged `admin: true` in
   `db.json`) gets every user's full history and body weight, can disable accounts, and can create
-  or revoke invite codes (`api/server.js:825-947`). Off by default — a fresh instance has no admin.
+  or revoke invite codes — stored photos are the exception: no admin screen or route shows them
+  (though an admin with access to the host has the files) (`api/server.js:825-947`). Off by default — a fresh instance has no admin.
 - **Sessions can't be revoked one device at a time.** Revocation is per *account*, not per
   session: `POST /api/logout/all` kills all of them at once and there is no device list to pick
   from. `POST /api/logout` on its own only clears the cookie in that one browser

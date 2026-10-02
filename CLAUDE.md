@@ -88,6 +88,17 @@ signed Android APK, and deploys the demo/docs site. The Gitea and GitHub workflo
     (measurements), `health-apply.js` (copying Apple Health deliveries into the profile). Every
     write to the diary or the body profile goes through `src/nutrition-actions.js`. See
     `docs/NUTRITION.md`.
+  - `body-trend.js` (where a tape measurement is heading: a least-squares line with a
+    prediction interval, refusing when the readings are too few, too close or too old — never a
+    single number, and nothing about training is multiplied into it), `measure-guide.js` (how to
+    take each measurement), `reminders.js` (the person's own reminders; `reminders-parity.test.js`
+    holds it to `api/reminders.js`), `photos.js` / `photo-urls.js` / `image-prep.js` (stored
+    photos: the list, object URLs fetched with the session, and the on-device encoder — which
+    must check `blob.type`, because Safari returns a PNG when asked for WebP), `ghost.js` (the
+    in-app viewfinder that lays the last progress photo over the live camera: frame shape,
+    crop and mirroring), `deeplink.js`
+    (the only routes a tapped notification may open). Writes go through `src/reminder-actions.js`
+    and `src/photo-actions.js`.
   - `api.js` — the only place that talks to the backend (`fetch` wrapper, session cookie flows).
   - CONTRIBUTING.md is explicit: **anything that decides what you lift next, or reads a logged
     session back, is a pure helper here with a unit test beside it** — not verifiable by
@@ -112,17 +123,25 @@ WebAuthn passkeys (`@simplewebauthn/server`) plus a signed session cookie (HMAC'
 gated by env vars: `ADMIN_UIDS` (admin dashboard), `INVITE_ONLY` (signup needs a code),
 `ALLOW_GUEST` (client-only guest mode never hits the server at all), plus a rotating
 `data/audit.log` (JSONL) for sign-in/admin events. Web Push (`web-push`, VAPID keys
-auto-generated into `data/vapid.json`) drives rest-timer-over and day-reminder notifications.
+auto-generated into `data/vapid.json`) drives rest-timer-over, day-reminder and the members' own
+reminder notifications — all three off one tick in `server.js`; the workout-day block there is
+pinned by `test/server-reminder.test.js` down to its log lines, so new reminder logic goes
+beside it (`tickCustomReminders`), not into it.
 
 Beside `server.js` sit a few route modules written as factories taking its helpers (the pattern
 `coach/routes.js` set): `pool.js` (shared exercises), `settings.js` (the admin switches for the
 two features below, both off by default), `food.js` (Open Food Facts lookup with its own cache
 file) and `healthkit.js` + `healthkit-parse.js` (the Apple Health ingest: a hashed, write-only
-`ogh_` token per Shortcut, data in `health/<uid>.json`). **A new top-level module must be added
+`ogh_` token per Shortcut, data in `health/<uid>.json`), `reminders.js` (the pure half of the
+members' own reminders — reading `S.reminders` defensively, what is due, the sent-marker file
+`reminder-log.json`) and `photos.js` (stored photos: files under `photos/<uid>/` with an index,
+never profile data; JPEG/WebP only, metadata stripped, every read scoped to the caller's uid —
+there is deliberately no admin route to a member's photo). **A new top-level module must be added
 to the `COPY` line in `api/Dockerfile`** — `test/dockerfile.test.js` fails otherwise, because
 the container would not boot. The food diary's AI calls live in `coach/core/food.js` (pure:
 payloads, validators) and `coach/food-jobs.js` (an in-memory job lane; the photo never reaches
-a disk).
+a disk — keeping one is a separate, explicit upload from the app to `photos.js`, and the two
+must stay separate code paths: `test/food-ai.test.js` walks the data directory for the bytes).
 
 ### MCP server (`mcp/src`)
 

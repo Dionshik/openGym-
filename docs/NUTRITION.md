@@ -130,6 +130,12 @@ Nothing else from the diary, and nothing from the training log. The photo is hel
 server's memory for the length of the call and is not written to disk, to the profile, or to
 the log (`api/test/food-ai.test.js` asserts that).
 
+Where the instance stores photos (see *Stored photos* below), the draft has a switch, **Save
+the photo with this entry**, off by default. Switched on, the phone uploads the picture a
+second time, to the photo store — a different route, a different module, and only on that
+say-so. The AI lane still writes nothing; `frontend/src/nutrition-ai.keep.test.jsx` holds the
+app to "not unless asked".
+
 It has **its own consent** — agreeing to the Coach does not cover it — and its own daily cap
 (30 requests per profile by default; dashboard → AI Coach → Advanced).
 
@@ -166,8 +172,9 @@ Body screen (Home → Nutrition → *Open body profile*, or Settings → **Body 
 
 - sex, year of birth, height, everyday activity — each optional, each used only for the
   energy estimate. "Not set" for sex puts the estimate between the two formulas.
-- measurements by date (waist, chest, hips, arms, thighs, calves, body fat), in centimetres
-  or inches after the profile's unit, charted over time.
+- measurements by date, in centimetres or inches after the profile's unit, charted over time —
+  see *Measurements* below.
+- progress photos, where the instance stores them — see *Stored photos* below.
 - the Apple Health connection — see [HEALTH_SHORTCUT.md](HEALTH_SHORTCUT.md).
 - **Share with the Coach** — two switches, off by default. With the Coach's ordinary consent
   it sees neither. Switched on, it receives a *summary*: age (not birth year), sex, height,
@@ -178,15 +185,127 @@ Body screen (Home → Nutrition → *Open body profile*, or Settings → **Body 
 The figure the muscle map is drawn on (Settings → Appearance) is a drawing preference and is
 never read as anyone's sex.
 
+## Measurements
+
+Tape sites: waist, abdomen (at the navel), chest, hips, shoulders, neck, upper arm relaxed and
+upper arm flexed (left and right), forearm, thigh, calf — plus wrist and ankle behind *More
+measurements*, since training barely moves them — and body fat and lean mass. The field names
+are the ones upstream's body-measurements work uses; the flexed arm and lean mass are this
+fork's additions.
+
+**How to measure.** Every tape field has an (i). It opens the steps for that site — where the
+tape goes, in what posture — with the muscles under the tape shaded on the body map, and the
+rules that hold everywhere: in the morning before training, tape flat and snug without denting
+the skin, twice and averaged, the same spot and side each time, every two weeks or so. The
+sites follow the anthropometry manuals (NHANES for the arm, waist and hip; WHO for the waist;
+ISAK's definitions for the flexed arm, forearm, chest, neck, thigh and calf). The texts are
+`frontend/src/lib/measure-guide.js`.
+
+**A goal** can be set per measurement; it is drawn as a line on the chart.
+
+**Left and right.** Where a site was measured on both sides, the card sets the two latest
+readings against each other, and the chart of one side carries the other as a thin grey line.
+It is as blunt about this as the tape is: a difference under about 0.7 cm is reported as
+"within the error of a tape measure" — nearly everybody is a few millimetres asymmetric, and a
+tape cannot show it — and two sides measured more than two weeks apart are not compared at all
+(`sidePairs` in `frontend/src/lib/body.js`).
+
+**The trend.** A tape is a blunt instrument for a slow process: the same person measuring the
+same arm twice lands about 2.6 mm apart (Ulijaszek & Kerr, 1999), so two single readings must
+differ by about 0.7 cm before the difference means anything — while a trained lifter's arm
+gains a millimetre or two a month. So the app does not compare the last reading with the one
+before; it fits a straight line through the readings of the last six months
+(`frontend/src/lib/body-trend.js`) and says:
+
+- the slope per month with its 95 % interval;
+- if that interval excludes zero, where a reading some weeks ahead will most likely fall —
+  as a **range**, drawn on the chart as a band, never as one number, and never further ahead
+  than the readings reach back (twelve weeks at most);
+- if a goal lies inside that range, roughly how many weeks away it is.
+
+It refuses, and says what it needs, with fewer than five readings, with readings covering less
+than eight weeks, with readings bunched at one end, or when the last one is over 45 days old.
+When the line cannot be told apart from flat, it says exactly that.
+
+Beside the trend it shows what bears on muscle size, as plain figures and without multiplying
+any of them into the forecast: sets a week for the muscles under the tape — done over the last
+four weeks, and what the weekly plan would give — the body-weight trend, and protein per
+kilogram where the diary has enough days. For the flexed arm it adds, for scale, what a pooled
+set of trials measured (Gentil et al., 2020: about 1.3–1.5 cm in 10–12 weeks for beginners,
+about 0.4 cm for trained lifters) — group averages, labelled as such.
+
+What it deliberately does not do: predict a size on a date, or turn "your plan has six more
+sets" into centimetres. The published dose-response effects are smaller than the tape's own
+error, and a tape measures muscle and fat together.
+
+## Stored photos
+
+Off unless the admin turns it on (dashboard → Nutrition & Health → **Stored photos**). Then:
+
+- **Progress photos** on the Body screen, by pose — front, side, back, flexed — because a
+  change only shows between two pictures taken the same way. A timeline per pose, and
+  *Compare*: two pictures side by side, the first and the latest to begin with, each side
+  steppable, with the days between them and the body weight nearest each.
+- **Line up with the last photo.** A viewfinder inside the app: the previous picture of the
+  pose lies over the live camera, half transparent (a slider sets how much), so you can stand
+  exactly as you did then. The frame takes the previous photo's shape and the shot is cut to
+  what was on screen, so the two stay comparable; with the front camera the preview and the
+  overlay are mirrored together, and the picture that is kept is not. A self-timer (3 or 10 s)
+  covers the walk back into the frame. It needs a browser that can open a camera into the
+  page — HTTPS, which a passkey instance has anyway; where it cannot, the sheet offers the
+  system camera and the library as before. A frame from a live camera is smaller than a still
+  from the system camera — one to two thousand pixels on the long edge, which is what a stored
+  photo is scaled to in any case (`frontend/src/lib/ghost.js`).
+- **Meal photos** in the diary: a camera button on each meal, and the switch on an AI draft
+  described above. A meal photo belongs to a day and a meal, not to a diary row, so it survives
+  the three-month fold of the diary.
+
+**What happens to a picture.** On the phone it is redrawn at 1600 px (body) or 1280 px (meal)
+on its long edge with a 320 px thumbnail, and encoded as WebP where the browser really
+produces one, JPEG otherwise. "Really" matters: Safari — every browser on an iPhone — answers
+a request for WebP with a PNG and no error, so the app checks the type of what it got back
+rather than what it asked for. **iPhones therefore store JPEG.** Redrawing is also what drops
+the camera's metadata. The server then takes nothing on trust: it accepts JPEG and WebP by
+their own first bytes, refuses anything else (a PNG included), and cuts EXIF, XMP and IPTC out
+of whatever arrived — wherever in the file they sit, and with anything a phone appended after
+the end of the image (a motion photo, a depth map) dropped — so a photo taken at home does not
+carry that home's coordinates into a backup.
+
+**Where it lives.** `./data/photos/<uid>/` — the image files and an `index.json`. Not in the
+profile: nothing in `state-<uid>.json` points at a file, so an imported backup cannot leave a
+pointer to nothing, and the JSON export from Settings **does not contain photos**.
+
+**Who can see it.** The member, through their own session. Every read is scoped to the caller's
+uid: another member's id is a 404, and so is an admin's — there is no route that serves a
+member's photo to anyone else, and the dashboard shows a count and a size. But the files are
+not encrypted, and whoever can read the server's disk or a backup of `./data` can open them
+with any image viewer. The app says so on the card.
+
+**Limits.** 2 MB a photo, 500 MB a member by default (the admin sets it), 120 uploads an hour.
+The admin can have meal photos deleted after a number of days (a meal photo for a day already
+older than that is refused rather than saved and then removed); body photos are never deleted
+by age. A member can delete their photos at any time. If the admin switches the feature off
+again, the pictures stay on the server but can no longer be shown — the Body screen then says
+how many are left and offers to delete them. *Reset everything* deletes them with the rest; if
+the server cannot be reached at that moment it says the photos are still there. Deleting an
+account deletes its directory.
+
+Uploading needs the server at that moment — there is no offline queue. A guest, the demo and
+the stand-alone phone app have no stored photos.
+
 ## What is stored where
 
 | Data | Where | In a backup of `./data` |
 |---|---|---|
-| diary, my products, targets, body profile, measurements | the profile (`state-<uid>.json`) | yes |
+| diary, my products, targets, body profile, measurements and their goals, your own reminders | the profile (`state-<uid>.json`) | yes |
 | Open Food Facts cache | `off-cache.json` | yes — safe to delete |
-| the two admin switches | `settings.json` | yes |
+| the admin switches | `settings.json` | yes |
+| which reminders were sent today | `reminder-log.json` | yes — safe to delete |
+| stored photos, where the admin turned them on | `photos/<uid>/` — image files and an index | yes — and the largest part of it |
 | Apple Health deliveries and token hashes | `health/<uid>.json`, `health-tokens.json` | yes |
-| photos | nowhere | — |
+| a photo sent to the AI to be read | nowhere | — |
 
 Nothing in `./data` is encrypted and an admin can read every profile — see
-[SECURITY.md](../SECURITY.md). That now includes what somebody eats and what they weigh.
+[SECURITY.md](../SECURITY.md). That now includes what somebody eats and what they weigh — and,
+where photos are stored, what they look like. An admin has no screen or API route that shows a
+member's photos, but an admin with the host has the files.

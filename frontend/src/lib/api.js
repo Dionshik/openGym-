@@ -52,6 +52,21 @@ export async function api(path, opts) {
   return data
 }
 
+/**
+ * The same request for an answer that is not JSON — a stored photo. A Blob, because the picture
+ * needs the session to be fetched at all: the web app has a cookie an <img> would send, but a
+ * paired phone authenticates with a header an <img> cannot carry, so both go through fetch and
+ * show the result from an object URL (lib/photo-urls.js).
+ */
+export async function apiBlob(path) {
+  const headers = {}
+  if (remoteToken) headers.Authorization = 'Bearer ' + remoteToken
+  const url = remoteBase ? remoteBase + path : appBase().replace(/\/$/, '') + path
+  const r = await fetch(url, { headers })
+  if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e }
+  return r.blob()
+}
+
 // Bootstraps the connection itself: the base isn't configured yet (that's what this call decides),
 // so it talks straight to the server the user typed in, no Authorization header.
 export async function pairRedeem(serverBase, code) {

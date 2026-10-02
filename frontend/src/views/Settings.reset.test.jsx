@@ -11,7 +11,8 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 // reaches every device that syncs with it — and the Coach's own files have to go too: the
 // per-profile one on the server, and the device one when the Coach runs with the phone's own key.
 const mocks = vi.hoisted(() => {
-  const state = { S: null, user: null, coachLocal: null }
+  const state = { S: null, user: null, coachLocal: null, config: null }
+  state.clearPhotos = vi.fn()
   state.replaceState = vi.fn()
   state.confirmSheet = vi.fn()
   state.forgetCoach = vi.fn(() => Promise.resolve({ ok: true }))
@@ -21,6 +22,8 @@ const mocks = vi.hoisted(() => {
     S: state.S,
     user: state.user,
     coachLocal: state.coachLocal,
+    config: state.config,
+    clearPhotos: state.clearPhotos,
     update: mut => {
       const next = structuredClone(state.S)
       mut(next)
@@ -66,6 +69,8 @@ beforeEach(() => {
   }
   mocks.user = null
   mocks.coachLocal = null
+  mocks.config = null
+  mocks.clearPhotos.mockClear()
   mocks.replaceState.mockClear()
   mocks.confirmSheet.mockClear()
   mocks.forgetCoach.mockClear()
@@ -88,6 +93,7 @@ const openDialog = () => {
   return mocks.confirmSheet.mock.calls[0][0]
 }
 const serverForgetCalls = () => mocks.api.mock.calls.filter(([path]) => path === '/api/coach/forget')
+const photoClearCalls = () => mocks.api.mock.calls.filter(([path]) => path === '/api/photos/clear')
 
 describe('Settings — reset everything', () => {
   it('guest: says the wipe is local, resets to the defaults, never calls the Coach', () => {
@@ -115,6 +121,59 @@ describe('Settings — reset everything', () => {
     expect(mocks.replaceState).toHaveBeenCalledTimes(1)
     expect(mocks.replaceState.mock.calls[0][1]).toBe(true)
     expect(mocks.toast).toHaveBeenCalledWith('All data reset')
+    // This instance keeps no photos, so the dialog said nothing about them — but the server is
+    // still asked: pictures may be left from a time the store was on, and the route answers
+    // (or is a 404 on an older server) either way.
+    expect(photoClearCalls()).toHaveLength(1)
+  })
+
+  // Stored photos are files on the server, outside the profile's state: the empty state pushed
+  // by the reset would leave every one of them behind.
+  it('signed in where photos are kept: says so, and deletes them from the server and from this screen', async () => {
+    mocks.user = { uid: 'u1', name: 'Ana' }
+    mocks.config = { photos: true }
+    mount()
+    const dialog = openDialog()
+    expect(dialog.message).toBe('Deletes your plan, workouts, body weight and stored photos from your profile on this server and on every signed-in device. This cannot be undone.')
+    await act(async () => { dialog.onConfirm(); await Promise.resolve(); await Promise.resolve() })
+    expect(photoClearCalls()).toHaveLength(1)
+    expect(photoClearCalls()[0][1]).toEqual({ method: 'POST', body: '{}' })
+    expect(mocks.clearPhotos).toHaveBeenCalledTimes(1)
+    expect(mocks.replaceState).toHaveBeenCalledTimes(1)
+  })
+
+  // The profile reset is pushed again until it lands; the photo call is made once. Promised gone
+  // and not reached, the photos are still there — and the person has to be told.
+  it('photos promised gone but the server not reached: the reset goes ahead and says the photos are still there', async () => {
+    mocks.user = { uid: 'u1', name: 'Ana' }
+    mocks.config = { photos: true }
+    mocks.api.mockImplementation(path => (path === '/api/photos/clear' ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve({ ok: true })))
+    mount()
+    const dialog = openDialog()
+    await act(async () => { dialog.onConfirm(); await Promise.resolve(); await Promise.resolve() })
+    expect(mocks.replaceState).toHaveBeenCalledTimes(1)
+    expect(mocks.clearPhotos).not.toHaveBeenCalled()
+    expect(mocks.toast.mock.calls.map(c => c[0]).some(m => /stored photos could not be deleted/.test(m))).toBe(true)
+    mocks.api.mockImplementation(() => Promise.resolve({ ok: true }))
+  })
+
+  it('an older server without the photo route is not an error worth a word', async () => {
+    mocks.user = { uid: 'u1', name: 'Ana' }
+    mocks.api.mockImplementation(path => (path === '/api/photos/clear' ? Promise.reject(Object.assign(new Error('not found'), { status: 404 })) : Promise.resolve({ ok: true })))
+    mount()
+    const dialog = openDialog()
+    await act(async () => { dialog.onConfirm(); await Promise.resolve(); await Promise.resolve() })
+    expect(mocks.toast.mock.calls.map(c => c[0])).toEqual(['All data reset'])
+    mocks.api.mockImplementation(() => Promise.resolve({ ok: true }))
+  })
+
+  it('a guest on an instance that keeps photos has none there to delete', () => {
+    mocks.config = { photos: true }
+    mount()
+    const dialog = openDialog()
+    expect(dialog.message).toBe('Deletes your plan, workouts and body weight on this device. This cannot be undone.')
+    act(() => { dialog.onConfirm() })
+    expect(photoClearCalls()).toHaveLength(0)
   })
 
   it('signed in: a failing Coach call does not block the reset', async () => {

@@ -18,6 +18,8 @@ import { forgetCoach } from '../lib/coach-api.js'
 import { ConnectSheet } from './MobileOnboarding.jsx'
 import { starterPlanSheet, confirmSheet, importFromApp, importFromHevy, equipmentProfileSheet, menuSheet, askAddDeviceData } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
+import RemindersCard from '../components/RemindersCard.jsx'
+import { LINKS } from '../lib/reminders.js'
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField } from '../components/ui.jsx'
 
 export default function Settings() {
@@ -25,6 +27,7 @@ export default function Settings() {
   const S = useStore(s => s.S)
   const user = useStore(s => s.user)
   const coachLocal = useStore(s => s.coachLocal)
+  const photosOn = useStore(s => !!s.user && s.config?.photos === true)
   const { update, replaceState, setUser, pullState, pushState, adoptProfile, signOut, signOutAll, resetDemo, disconnectServer } = useStore()
   const toast = useUI(s => s.toast)
   const fileRef = useRef(null)
@@ -168,12 +171,25 @@ export default function Settings() {
   // not stop the reset.
   const resetEverything = () => confirmSheet({
     title: t('Reset everything?'),
-    message: user
-      ? t('Deletes your plan, workouts and body weight from your profile on this server and on every signed-in device. This cannot be undone.')
-      : t('Deletes your plan, workouts and body weight on this device. This cannot be undone.'),
+    // Stored photos are files on the server, outside S (api/photos.js): they go by a call of
+    // their own, and where the instance keeps them the dialog names them.
+    message: !user
+      ? t('Deletes your plan, workouts and body weight on this device. This cannot be undone.')
+      : photosOn
+        ? t('Deletes your plan, workouts, body weight and stored photos from your profile on this server and on every signed-in device. This cannot be undone.')
+        : t('Deletes your plan, workouts and body weight from your profile on this server and on every signed-in device. This cannot be undone.'),
     confirmText: t('Delete everything'), danger: true,
     onConfirm: () => {
       if (user) api('/api/coach/forget', { method: 'POST', body: '{}' }).catch(() => {})
+      // Asked of the server whenever someone is signed in — also where the store is switched off
+      // (the route still answers, and pictures may be left from when it was on) and against an
+      // older server (a 404, ignored). The profile reset is retried until it lands; this call is
+      // not, so where photos were promised gone and the server could not be reached, say so.
+      if (user) {
+        api('/api/photos/clear', { method: 'POST', body: '{}' })
+          .then(() => useStore.getState().clearPhotos?.())
+          .catch(e => { if (photosOn && !e?.status) toast(t('Your stored photos could not be deleted: no connection. Delete them from the Body screen once you are back online.')) })
+      }
       if (coachLocal?.mode === 'byok') forgetCoach().catch(() => {})
       replaceState(JSON.parse(JSON.stringify(DEF)), true)
       nav('/home'); toast(t('All data reset'))
@@ -352,6 +368,9 @@ export default function Settings() {
     </Section>
 
     {(user || MOBILE) && <NotificationsCard S={S} update={update} toast={toast} />}
+    {/* The person's own reminders. A reminder about progress photos is offered only where the
+        instance stores photos; nutrition, only while that section is switched on. */}
+    {(user || MOBILE) && <RemindersCard S={S} links={LINKS.filter(l => (l !== 'photos' || photosOn) && (l !== 'nutrition' || S.nutritionOn !== false))} />}
 
     {/* ---------- equipment ---------- */}
     <EquipmentCard S={S} update={update} />

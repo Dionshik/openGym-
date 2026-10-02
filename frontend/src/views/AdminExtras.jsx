@@ -4,9 +4,10 @@ import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { Button, Switch, TextField } from '../components/ui.jsx'
 
-/* Two switches on the admin dashboard, for the two features that move personal data across a
- * boundary: online food lookup (out, to Open Food Facts) and the Apple Health connection (in,
- * from members' phones). Both are off on a fresh instance and stay off until flipped here.
+/* The switches on the admin dashboard for the features that move personal data across a
+ * boundary: online food lookup (out, to Open Food Facts), the Apple Health connection (in, from
+ * members' phones) and stored photos (onto this server's disk). All are off on a fresh instance
+ * and stay off until flipped here.
  *
  * English-only like the rest of this screen (see the header of Admin.jsx).
  */
@@ -67,5 +68,35 @@ export default function AdminExtras() {
       <div className="adm-hint">Build the Shortcut once (docs/HEALTH_SHORTCUT.md), share it from your iPhone, and paste the iCloud link here — members then install it instead of building their own.</div>
       <div className="adm-kv"><span className="k">Connected</span><span className="v">{d.health.users} members · {d.health.tokens} tokens</span></div>
     </>}
+
+    {/* Absent against an older API that has no photo store. */}
+    {d.photos && <>
+      <div className="adm-group-t" style={{ marginTop: 16 }}>Stored photos</div>
+      <div className="row between" style={{ gap: 12, alignItems: 'flex-start' }}>
+        <div className="adm-hint" style={{ margin: 0 }}>
+          <b>Let members keep photos of their body and their meals.</b> Progress photos by pose, and a picture beside a diary entry. They are shrunk on the phone, stripped of location data, and stored as files under <code>./data/photos</code>. No screen here shows them, and no API route serves a member's photo to anyone else.
+        </div>
+        <Switch checked={!!d.photos.enabled} disabled={busy} onChange={v => patch({ photos: { enabled: v } })} />
+      </div>
+      {(d.photos.enabled || d.photos.files > 0) && <>
+        <div className="adm-hint" style={{ color: 'var(--orange)' }}>The files are not encrypted: anyone who can read this server's disk, or a backup of ./data, can open them. Tell members so before they use it.</div>
+        <div className="adm-kv"><span className="k">Stored</span><span className="v">{d.photos.files} photos · {mb(d.photos.bytes)} · {d.photos.users} members</span></div>
+      </>}
+      {d.photos.enabled && <>
+        <div className="adm-field" style={{ marginTop: 8 }}>
+          <label>Storage per member, MB</label>
+          <TextField key={'q' + d.photos.quotaMb} inputMode="numeric" defaultValue={d.photos.quotaMb}
+            onBlur={e => +e.target.value !== d.photos.quotaMb && patch({ photos: { quotaMb: Math.round(+e.target.value) } })} />
+        </div>
+        <div className="adm-field" style={{ marginTop: 8 }}>
+          <label>Delete meal photos after, days (0 keeps them)</label>
+          <TextField key={'m' + d.photos.mealDays} inputMode="numeric" defaultValue={d.photos.mealDays}
+            onBlur={e => +e.target.value !== d.photos.mealDays && patch({ photos: { mealDays: Math.round(+e.target.value) } })} />
+        </div>
+        <div className="adm-hint">Meal photos are most of the volume — roughly 200 MB a year for someone who photographs every meal. Body photos are never deleted by age. The whole of ./data/photos is in your backup.</div>
+      </>}
+      {!d.photos.enabled && d.photos.files > 0 && <div className="adm-hint">Switching this off hides the photos and stops uploads; the files stay on disk until each member deletes theirs or the account is removed.</div>}
+    </>}
   </div>
 }
+const mb = bytes => (bytes >= 1024 * 1024 * 1024 ? (bytes / 1024 / 1024 / 1024).toFixed(1) + ' GB' : (bytes / 1024 / 1024).toFixed(1) + ' MB')

@@ -16,6 +16,10 @@
  * minutes to be collected and is gone. It is not written to the profile's Coach file, not to
  * the job log (which gets the kind, the outcome and the time, as for every other call), and a
  * restart forgets it — the app is told so, and the person takes the picture again.
+ *
+ * (An instance may let members keep photos — ../photos.js. That is a different module reached by
+ * a different request, sent only when the person asks for the picture to be kept. Nothing here
+ * calls it, and test/food-ai.test.js still walks the data directory for the bytes.)
  */
 import fs from 'node:fs';
 import os from 'node:os';

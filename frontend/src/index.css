@@ -607,6 +607,14 @@ body.chips-dragging *{cursor:inherit}
 .timef::-webkit-calendar-picker-indicator{filter:invert(.5)}
 :root[data-theme="light"] .timef::-webkit-calendar-picker-indicator{filter:none}
 
+/* weekday picker: seven toggles in the profile's own week order (a reminder's days) */
+.wd-row{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.wd{
+  padding:10px 0 9px;border-radius:var(--r);background:var(--surface-2);text-align:center;
+  font-size:13px;font-weight:600;color:var(--label-2);border:1.5px solid transparent;transition:all var(--fast)
+}
+.wd.on{color:var(--acc);border-color:var(--acc);background:var(--acc-soft)}
+
 /* --- stepper --- */
 .stp-w{display:flex;flex-direction:column;gap:6px;min-width:0}
 .stp-l{font-size:13px;color:var(--label-2);text-align:center}

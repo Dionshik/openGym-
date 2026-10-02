@@ -12,6 +12,7 @@
 import { t } from './i18n-core.js'
 import { isoOf, todayISO } from './format.js'
 import { effectiveRoutineIds } from './history.js'
+import { activeReminders, ringsOn, loggedOn, LINK_URL } from './reminders.js'
 
 export const MOBILE = import.meta.env.VITE_MOBILE === '1'
 
@@ -125,23 +126,65 @@ export function buildReminderNotifications(S, now = new Date()) {
   return notifications
 }
 
-// (Re)schedule the workout-day reminder: one one-off notification per future calendar date in
-// the bounded window. Cheap enough to run after any state change — the plan or the reminder time
-// may just have been edited. `interactive` gates the OS permission prompt to the Settings toggle;
-// a background resync never pops a dialog.
+// The person's own reminders (lib/reminders.js), as the phone delivers them: one-off local
+// notifications for the next two weeks, the nearest CUSTOM_REMINDER_MAX of them. One-off rather
+// than a weekly repeat, because "skip if already logged" is a fact about one particular day — a
+// repeat would ring regardless — and the whole batch is rebuilt after every change anyway.
+// Their own id range, apart from the workout reminder's 100–106 and 1000–1059.
+export const CUSTOM_REMINDER_DAYS = 14
+export const CUSTOM_REMINDER_MAX = 30
+const CUSTOM_REMINDER_ID_BASE = 2000
+// iOS keeps at most 64 pending local notifications per app; the two kinds share that, the
+// person's own reminders first.
+const PENDING_BUDGET = 60
+
+export function buildCustomReminderNotifications(S, now = new Date()) {
+  const list = activeReminders(S)
+  if (!list.length) return []
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12)
+  const out = []
+  for (let offset = 0; offset < CUSTOM_REMINDER_DAYS; offset++) {
+    const day = new Date(date)
+    day.setDate(date.getDate() + offset)
+    const iso = isoOf(day)
+    for (const r of list) {
+      if (!ringsOn(r, day.getDay())) continue
+      // Only today can already have its entry; a photo store lives on a server this build has none of.
+      if (offset === 0 && r.skipIfLogged && loggedOn(S, r.link, iso)) continue
+      const [hour, minute] = r.time.split(':').map(Number)
+      const at = new Date(day)
+      at.setHours(hour, minute, 0, 0)
+      if (at <= now) continue
+      out.push({ at, r })
+    }
+  }
+  return out.sort((a, b) => a.at - b.at).slice(0, CUSTOM_REMINDER_MAX).map(({ at, r }, i) => ({
+    id: CUSTOM_REMINDER_ID_BASE + i,
+    title: r.text || t('Reminder'),
+    body: '',
+    schedule: { at, allowWhileIdle: true },
+    extra: LINK_URL[r.link] ? { url: LINK_URL[r.link] } : {},
+  }))
+}
+
+// (Re)schedule both kinds of reminder: the workout-day one — a one-off notification per future
+// calendar date in its window — and the person's own. Cheap enough to run after any state change
+// — the plan, a time or a reminder may just have been edited. `interactive` gates the OS
+// permission prompt to the Settings controls; a background resync never pops a dialog.
 export async function syncReminder(S, interactive = false) {
   try {
     const { LocalNotifications } = await import('@capacitor/local-notifications')
     await LocalNotifications.cancel({ notifications: [
       ...LEGACY_REMINDER_IDS,
       ...Array.from({ length: REMINDER_WINDOW_DAYS }, (_, d) => ({ id: REMINDER_ID_BASE + d })),
+      ...Array.from({ length: CUSTOM_REMINDER_MAX }, (_, i) => ({ id: CUSTOM_REMINDER_ID_BASE + i })),
     ] }).catch(() => {})
-    const r = S.reminder
-    if (!r?.on) return true
+    const custom = buildCustomReminderNotifications(S)
+    if (!S.reminder?.on && !custom.length) return true
     let perm = await LocalNotifications.checkPermissions()
     if (perm.display !== 'granted' && interactive) perm = await LocalNotifications.requestPermissions()
     if (perm.display !== 'granted') return false
-    const notifications = buildReminderNotifications(S)
+    const notifications = [...custom, ...buildReminderNotifications(S).slice(0, PENDING_BUDGET - custom.length)]
     if (notifications.length) await LocalNotifications.schedule({ notifications })
     return true
   } catch (e) { return false }
@@ -160,6 +203,14 @@ export function initReminderSync(getState) {
   document.addEventListener('visibilitychange', resync)
   import('@capacitor/app').then(({ App }) => {
     App.addListener('appStateChange', ({ isActive }) => { if (isActive) resync() })
+  }).catch(() => {})
+  // A tapped reminder that points at a section opens it: the address travels as the same event
+  // the web build gets from its service worker, and App.jsx checks it before following it.
+  import('@capacitor/local-notifications').then(({ LocalNotifications }) => {
+    LocalNotifications.addListener('localNotificationActionPerformed', ({ notification }) => {
+      const url = notification?.extra?.url
+      if (url) window.dispatchEvent(new CustomEvent('opengym:navigate', { detail: { url } }))
+    })
   }).catch(() => {})
 }
 

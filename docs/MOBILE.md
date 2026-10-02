@@ -7,7 +7,8 @@ openGym ships in two flavors from the same codebase:
 | Runs | in any browser, against your own server | natively on iPhone / Android (Capacitor shell) |
 | Accounts | passkey sign-in, one profile per person | none — the phone *is* the account |
 | Data | synced to your server, readable on desktop | stays on the device (file in the app's private storage) |
-| Reminders | Web Push from your server | native local notifications, no server involved |
+| Reminders | Web Push from your server | native local notifications, no server involved — the workout-day reminder and your own |
+| Stored photos | on your server, where the admin turned them on | none — there is no server to keep them |
 | Exercise media | served by your server (`img/`, `gif/`) | loaded from the jsDelivr CDN |
 
 The mobile flavor never talks to a backend by default: no sign-in screen, no sync, no
@@ -161,5 +162,5 @@ membership, the distribution certificate and profile as protected file variables
   service. `NOTICE.md` carries an app-store exception (an additional permission under
   AGPL §7) granted by the copyright holder — relevant only if store distribution ever happens.
 - The app requests notification permission only when the workout-day reminder is switched
-  on, and (on Android) declares `SCHEDULE_EXACT_ALARM` so the reminder fires to the minute
+  on or a reminder of your own is added or switched on, and (on Android) declares `SCHEDULE_EXACT_ALARM` so the reminder fires to the minute
   where the user allows it.

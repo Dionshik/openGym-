@@ -26,6 +26,9 @@ test('payload never carries identity, credentials or device data', () => {
     // realistically present in a live state blob.
     theme: 'dark', accent: 'lime', body: 'male', gifSize: 'full',
     reminder: { on: true, time: '08:00', tz: 'Europe/Lisbon' },
+    // A member's own reminders and measurement goals: their words and their plans, not coaching input.
+    reminders: [{ id: 'rmq7x', text: 'call the physio zq7', time: '13:00', days: [1], on: true, link: 'nutrition', skipIfLogged: true, t: 1 }],
+    measureGoals: { waist: { v: 83.713, t: 1 } },
     _ts: Date.now()
   });
   const p = payload.build(S, { handle: handleFor('user-abc-123'), kind: 'review' });
@@ -33,7 +36,7 @@ test('payload never carries identity, credentials or device data', () => {
 
   assert.ok(!json.includes('user-abc-123'), 'the uid must never appear');
   assert.equal(p.meta.profile.length, 16, 'an opaque handle stands in for the uid');
-  for (const forbidden of ['theme', 'accent', 'gifSize', 'reminder', 'Europe/Lisbon', 'passkey', 'credential', 'subscription', 'invite']) {
+  for (const forbidden of ['theme', 'accent', 'gifSize', 'reminder', 'Europe/Lisbon', 'passkey', 'credential', 'subscription', 'invite', 'physio zq7', 'rmq7x', 'measureGoals', '83.713']) {
     assert.ok(!json.includes(forbidden), `payload leaked ${forbidden}`);
   }
 });

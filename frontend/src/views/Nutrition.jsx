@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
@@ -10,6 +10,9 @@ import { deleteEntry, logMany } from '../nutrition-actions.js'
 import { addFoodSheet, entrySheet, targetsSheet, myFoodsSheet, mealName, mealNow, fmt1 } from '../nutrition-sheets.jsx'
 import { foodAiChips, suggestSheet, foodAiAvailable } from '../nutrition-ai.jsx'
 import { tappable } from '../lib/use-sheet-keyboard.js'
+import { DEMO } from '../lib/demo.js'
+import { photosAvailable } from '../lib/photos.js'
+import { MealPhotoStrip, mealPhotoSheet } from '../components/MealPhotos.jsx'
 import MacroBars from '../components/MacroBars.jsx'
 import SwipeToDelete from '../components/SwipeToDelete.jsx'
 import Icon from '../components/Icon.jsx'
@@ -34,6 +37,10 @@ export default function Nutrition() {
   const meals = byMeal(nut, d)
   const folded = !!nut.rolledTo && d < nut.rolledTo
   const ai = foodAiAvailable({ config, user, coachLocal })
+  // Pictures kept beside the meals — only where the instance stores photos (api/photos.js).
+  const photos = photosAvailable({ config, user, demo: DEMO })
+  const pullPhotos = useStore(s => s.pullPhotos)
+  useEffect(() => { if (photos) pullPhotos() }, [photos])
   const yesterday = dayBefore(d, 1)
   const canCopy = !totals.n && !folded && dayTotals(nut, yesterday).n > 0
 
@@ -70,6 +77,7 @@ export default function Nutrition() {
       {totals.n
         ? t('Days older than three months are kept as daily totals only: {0} entries were logged that day.', totals.n)
         : t('Nothing was logged that day.')}
+      {photos && <div style={{ marginTop: 10 }}><MealPhotoStrip d={d} /></div>}
     </div> : <>
       {MEALS.map((key, m) => {
         const rows = meals[m]
@@ -77,8 +85,12 @@ export default function Nutrition() {
         return <div key={key}>
           <div className="nt-meal-h">
             <h2>{mealName(m)}{!!rows.length && <span className="k">{kcal} {t('kcal')}</span>}</h2>
-            <button className="iconbtn" onClick={() => add(m)} aria-label={t('Add to {0}', mealName(m).toLowerCase())}><Icon name="plus" /></button>
+            <div className="row" style={{ gap: 4 }}>
+              {photos && <button className="iconbtn" onClick={() => mealPhotoSheet({ d, m, title: mealName(m) })} aria-label={t('Photo of the meal') + ': ' + mealName(m).toLowerCase()}><Icon name="camera" /></button>}
+              <button className="iconbtn" onClick={() => add(m)} aria-label={t('Add to {0}', mealName(m).toLowerCase())}><Icon name="plus" /></button>
+            </div>
           </div>
+          {photos && <MealPhotoStrip d={d} m={m} title={mealName(m)} />}
           <div className="nt-rows">
             {rows.map(e => <SwipeToDelete key={e.id} className="nt-row" onDelete={() => deleteEntry(e.id)} onClick={() => entrySheet(e)}>
               <div className="grow">

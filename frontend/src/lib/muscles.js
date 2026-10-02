@@ -287,6 +287,43 @@ export function muscleBalanceWindow(workouts, win, now = Date.now(), today = tod
 export const loadOfRoutine = routine =>
   loadOf((routine?.ex || []).map(c => ({ id: c.id, ex: c, sets: c.sets || 1 })))
 
+/**
+ * Effective sets per muscle per week, averaged over the `weeks` ending on `today` (inclusive).
+ * The same counting as the balance map: a supporting muscle gets SECONDARY of a set. Studies of
+ * training volume usually count an indirect set as half; 0.4 is this app's figure everywhere,
+ * and a second weighting for one number would make two screens disagree about the same week.
+ */
+export function weeklySetsDone(workouts, { today = todayISO(), weeks = 4 } = {}) {
+  const from = new Date(today + 'T12:00:00').getTime() - weeks * 7 * 86400000
+  const inWindow = (workouts || []).filter(w => {
+    if (!w || !w.d || w.d > today) return false
+    return new Date(w.d + 'T12:00:00').getTime() > from
+  })
+  const load = loadOfWorkouts(inWindow)
+  for (const slug in load) load[slug] = Math.round(load[slug] / weeks * 10) / 10
+  return load
+}
+
+/**
+ * Effective sets per muscle the weekly plan would produce if every planned day were trained:
+ * each weekday's routines (a day can hold several) through loadOfRoutine. Day overrides are
+ * one-off and not part of "the plan".
+ */
+export function plannedWeeklySets(S) {
+  const load = {}
+  const routines = Array.isArray(S?.routines) ? S.routines : []
+  for (let wd = 0; wd < 7; wd++) {
+    for (const id of [].concat(S?.week?.[wd] || [])) {
+      const routine = routines.find(r => r && r.id === id)
+      if (!routine) continue
+      const one = loadOfRoutine(routine)
+      for (const slug in one) load[slug] = (load[slug] || 0) + one[slug]
+    }
+  }
+  for (const slug in load) load[slug] = Math.round(load[slug] * 10) / 10
+  return load
+}
+
 /** Load for a workout still in progress — the sets ticked so far. */
 export const loadOfActive = active =>
   loadOf((active?.entries || []).map(e => ({ id: e.id, ex: e.exercise || e, sets: (e.sets || []).filter(s => s.done && !isWarmupRow(s)).length })))

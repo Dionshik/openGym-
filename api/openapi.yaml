@@ -90,6 +90,11 @@ tags:
     description: >-
       The shared exercise pool — exercises members suggested and an admin or a moderator
       approved, served to every profile on the instance
+  - name: photos
+    description: >-
+      Stored photos — a member's own pictures of their body and their meals, as files on the
+      server. Off until an admin turns it on. Every route is scoped to the caller; none serves
+      one member's photos to another, or to an admin
   - name: nutrition
     description: >-
       Online food lookup through Open Food Facts, asked from the server and cached. Off until an
@@ -153,6 +158,9 @@ paths:
                   pool:
                     type: boolean
                     description: This server has the shared exercise pool (`/api/pool`).
+                  photos:
+                    type: boolean
+                    description: Present (true) only where an admin switched stored photos on (`/api/photos`).
               example: { invite_only: true, allow_guest: false }
 
   /api/me:
@@ -512,6 +520,15 @@ paths:
                   rev:
                     type: integer
                     description: Server revision of the stored document; 0 when there is none.
+                  photos:
+                    type: integer
+                    description: Revision of the caller's stored photos (`GET /api/photos`). Absent while photo storage is off or the caller keeps none.
+                  photosKept:
+                    type: integer
+                    description: >-
+                      How many photos of the caller's are still on the server although photo storage
+                      has been switched off again — the app then offers to delete them
+                      (`POST /api/photos/clear`). Absent otherwise.
         '401': { $ref: '#/components/responses/Unauthorized' }
     put:
       tags: [data]
@@ -607,6 +624,9 @@ paths:
                   pool:
                     type: integer
                     description: Revision of the shared exercise pool (`GET /api/pool`). Absent while nothing was ever shared.
+                  photos:
+                    type: integer
+                    description: Revision of the caller's stored photos (`GET /api/photos`). Absent while photo storage is off or the caller keeps none.
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /api/push/public-key:
@@ -1348,11 +1368,174 @@ paths:
         '413': { description: 'Body over 64 KB.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '429': { description: 'Too many deliveries from this token, or too many bad tokens instance-wide.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
+  /api/photos:
+    get:
+      tags: [photos]
+      operationId: photosList
+      summary: The caller's stored photos
+      description: |
+        The list, not the pictures. Only the caller's own: there is no route that lists or serves
+        another member's photos, for an admin either. Meal photos older than the instance's
+        retention, if it has one, are removed on the way.
+      responses:
+        '200':
+          description: The photos and how full the caller's store is.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PhotoList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Photo storage is switched off on this instance.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      tags: [photos]
+      operationId: photosAdd
+      summary: Keep a photo
+      description: |
+        The picture travels as base64 inside the JSON body. It must be a JPEG or a WebP — judged by
+        the file's own first bytes, so a PNG is refused whatever it is called. EXIF, XMP and IPTC
+        are removed before anything is written. The thumbnail is optional and is simply not kept
+        when it does not pass the same check.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, d, image]
+              properties:
+                kind: { type: string, enum: [body, meal] }
+                d: { type: string, description: 'The day the photo is filed under, `YYYY-MM-DD`; not later than tomorrow.' }
+                pose: { type: string, enum: [front, side, back, flex], description: 'For `body`; defaults to `front`.' }
+                m: { type: integer, minimum: 0, maximum: 3, description: 'For `meal`: the meal of the day, as in the food diary.' }
+                image: { type: string, description: 'Base64 of a JPEG or WebP, at most 2 MB decoded.' }
+                thumb: { type: string, description: 'Base64 of a small JPEG or WebP, at most 80 KB decoded.' }
+                w: { type: integer }
+                h: { type: integer }
+      responses:
+        '200':
+          description: Stored.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  photo: { $ref: '#/components/schemas/Photo' }
+                  rev: { type: integer }
+                  used: { type: integer }
+                  quota: { type: integer }
+        '400':
+          description: 'Not a JPEG or WebP (`badimage`), an unknown `kind` (`bad-kind`), a day that does not parse (`bad-date`), or a meal photo for a day older than the instance keeps meal photos (`expired`, with `days`).'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Photo storage is switched off on this instance.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: 'The caller''s store is full (`quota`).'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '413':
+          description: 'The picture is over 2 MB (`toolarge`).'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: More than 120 uploads in an hour.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/photo:
+    get:
+      tags: [photos]
+      operationId: photoGet
+      summary: One of the caller's photos, as an image
+      description: |
+        The only route in this API that does not answer JSON. Scoped to the caller: an id that
+        belongs to someone else is a 404, whoever asks. Answered `Cache-Control: private, no-cache`
+        with an `ETag`, so a browser may keep a copy but must ask before showing it.
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: string, pattern: '^[a-f0-9]{24}$' } }
+        - { name: thumb, in: query, required: false, schema: { type: string, enum: ['1'] }, description: 'The thumbnail, where one was stored; otherwise the picture itself.' }
+      responses:
+        '200':
+          description: The picture.
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        '304': { description: 'Unchanged since the `If-None-Match` the caller sent.' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Photo storage is switched off on this instance.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No such photo of the caller's.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/photos/delete:
+    post:
+      tags: [photos]
+      operationId: photosDelete
+      summary: Delete some of the caller's photos
+      description: Works while photo storage is switched off too — a member's way to take their pictures back. Ids that are not the caller's are ignored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, maxItems: 100, items: { type: string } }
+      responses:
+        '200':
+          description: How many were removed, and the store afterwards.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  removed: { type: integer }
+                  rev: { type: integer }
+                  used: { type: integer }
+                  quota: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/photos/clear:
+    post:
+      tags: [photos]
+      operationId: photosClear
+      summary: Delete all of the caller's photos
+      description: Removes every photo of the caller's. The revision carries on from where it was rather than restarting. Recorded in the audit log. Works while photo storage is switched off.
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   /api/admin/extras:
     get:
       tags: [admin]
       operationId: adminExtras
-      summary: The switches for online food lookup and the Apple Health connection
+      summary: The switches for online food lookup, the Apple Health connection and stored photos
       responses:
         '200': { description: 'Current settings and counts.', content: { application/json: { schema: { $ref: '#/components/schemas/AdminExtras' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -1361,7 +1544,7 @@ paths:
       tags: [admin]
       operationId: adminExtrasSet
       summary: Change those switches
-      description: Both are off on a fresh instance. Each flip of `food.lookup` or `health.enabled` is recorded in the audit log.
+      description: All are off on a fresh instance. Each flip of `food.lookup`, `health.enabled` or `photos.enabled` is recorded in the audit log.
       requestBody:
         required: true
         content:
@@ -1371,6 +1554,12 @@ paths:
               properties:
                 food: { type: object, properties: { lookup: { type: boolean }, contact: { type: string, maxLength: 120, description: 'Sent to Open Food Facts in the User-Agent.' } } }
                 health: { type: object, properties: { enabled: { type: boolean }, shortcutUrl: { type: string, description: 'An https link to the owner''s shared Shortcut; anything else is dropped.' } } }
+                photos:
+                  type: object
+                  properties:
+                    enabled: { type: boolean }
+                    quotaMb: { type: integer, minimum: 10, maximum: 100000, description: 'The most one member may keep.' }
+                    mealDays: { type: integer, minimum: 0, maximum: 3650, description: 'Delete meal photos older than this many days; 0 keeps them.' }
                 clearFoodCache: { type: boolean }
       responses:
         '200': { description: 'The settings after the change.', content: { application/json: { schema: { $ref: '#/components/schemas/AdminExtras' } } } }
@@ -1663,6 +1852,41 @@ components:
             shortcutUrl: { type: string }
             users: { type: integer, description: 'Members with at least one token.' }
             tokens: { type: integer }
+        photos:
+          type: object
+          description: 'Counts and a size only: no route gives an admin a member''s photos or their ids.'
+          properties:
+            enabled: { type: boolean }
+            quotaMb: { type: integer }
+            mealDays: { type: integer }
+            users: { type: integer, description: 'Members who keep at least one photo.' }
+            files: { type: integer }
+            bytes: { type: integer }
+
+    Photo:
+      type: object
+      description: One stored photo. `pose` on a body photo, `m` on a meal photo.
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [body, meal] }
+        d: { type: string, description: '`YYYY-MM-DD`' }
+        pose: { type: string, enum: [front, side, back, flex] }
+        m: { type: integer }
+        mime: { type: string, enum: [image/jpeg, image/webp] }
+        w: { type: integer }
+        h: { type: integer }
+        bytes: { type: integer }
+        at: { type: integer, description: 'When it was stored, ms.' }
+        thumb: { type: boolean, description: 'Whether a thumbnail was stored with it.' }
+
+    PhotoList:
+      type: object
+      properties:
+        rev: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/Photo' } }
+        used: { type: integer, description: 'Bytes the caller''s photos and thumbnails take.' }
+        quota: { type: integer, description: 'Bytes the caller may use.' }
+        maxBytes: { type: integer, description: 'The largest single photo accepted.' }
 
     PoolExercise:
       type: object
@@ -1857,6 +2081,30 @@ components:
             tz:
               oneOf: [{ type: string }, { type: 'null' }]
               description: IANA zone ("Europe/Zurich"); the user's own clock.
+        reminders:
+          type: array
+          description: >-
+            Reminders the user wrote. The server reads this list on the same tick as `reminder`
+            and sends a push for each one that is due, in `reminder.tz`; a row it cannot fully
+            read is skipped. A deleted reminder stays as `{ id, x: true, t }` for a while so a
+            second device does not bring it back.
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              text: { type: string, maxLength: 120 }
+              time: { type: string, example: "13:00" }
+              days: { type: array, items: { type: integer, minimum: 0, maximum: 6 }, description: 'getDay() indices; empty means every day.' }
+              'on': { type: boolean }
+              link:
+                oneOf: [{ type: string, enum: [nutrition, weight, body, photos] }, { type: 'null' }]
+                description: The section the reminder is about; a tap on the notification opens it.
+              skipIfLogged: { type: boolean, description: 'Send nothing on a day that section already has an entry.' }
+              t: { type: integer }
+        measureGoals:
+          type: object
+          description: 'A goal per body measurement, in the stored unit: key → `{ v, t }`; `v: null` is a goal that was removed.'
+          additionalProperties: { type: object, additionalProperties: true }
         restSec: { type: number, description: Default rest-timer seconds. }
         effort:
           oneOf: [{ type: string, enum: [none, rir, rpe] }, { type: 'null' }]

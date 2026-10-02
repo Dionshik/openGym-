@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { isoOf } from './format.js'
-import { buildReminderNotifications } from './mobile.js'
+import { buildReminderNotifications, buildCustomReminderNotifications, CUSTOM_REMINDER_MAX } from './mobile.js'
 
 const push = { id: 'push', name: 'Push' }
 const pull = { id: 'pull', name: 'Pull' }
@@ -73,5 +73,56 @@ describe('buildReminderNotifications', () => {
     const now = new Date(2026, 5, 1, 7, 0)
     const n = buildReminderNotifications(state({ week: { 1: ['push', 'pull', 'legs'] } }), now)[0]
     expect(n.body).toContain('3 routines')
+  })
+})
+
+describe('buildCustomReminderNotifications', () => {
+  const rem = (id, time, over = {}) => ({ id, text: 'Log food', time, days: [], on: true, link: null, skipIfLogged: false, t: 1, ...over })
+  const S = (reminders, over = {}) => ({ reminders, ...over })
+  const monday7 = new Date(2026, 5, 1, 7, 0)
+
+  it('schedules each ringing day of the next two weeks as a dated one-off, nearest first', () => {
+    const n = buildCustomReminderNotifications(S([rem('a', '13:00', { days: [1, 4] })]), monday7)
+    expect(n.map(x => iso(x.schedule.at))).toEqual([iso(monday7), iso(new Date(2026, 5, 4)), iso(new Date(2026, 5, 8)), iso(new Date(2026, 5, 11))])
+    expect(n[0].schedule.at.getHours()).toBe(13)
+    expect(n[0].schedule.allowWhileIdle).toBe(true)
+    expect(n[0].title).toBe('Log food')
+    expect(n.map(x => x.id)).toEqual([2000, 2001, 2002, 2003])
+  })
+
+  it('every day when no weekday is picked, and not at a time already past', () => {
+    const n = buildCustomReminderNotifications(S([rem('a', '06:30')]), monday7)
+    expect(n).toHaveLength(13)
+    expect(iso(n[0].schedule.at)).toBe(iso(new Date(2026, 5, 2)))
+  })
+
+  it('carries the section address for the tap, and none for a plain reminder', () => {
+    const n = buildCustomReminderNotifications(S([rem('a', '13:00', { link: 'nutrition' }), rem('b', '14:00')]), monday7)
+    expect(n[0].extra).toEqual({ url: '#/nutrition' })
+    expect(n[1].extra).toEqual({})
+  })
+
+  it('"skip if already logged" drops today when today has an entry, and only today', () => {
+    const logged = { nutrition: { log: [{ id: 'e', d: iso(monday7) }], days: {} } }
+    const n = buildCustomReminderNotifications(S([rem('a', '13:00', { link: 'nutrition', skipIfLogged: true })], logged), monday7)
+    expect(iso(n[0].schedule.at)).toBe(iso(new Date(2026, 5, 2)))
+    const plain = buildCustomReminderNotifications(S([rem('a', '13:00', { link: 'nutrition' })], logged), monday7)
+    expect(iso(plain[0].schedule.at)).toBe(iso(monday7))
+  })
+
+  it('leaves out reminders that are off, deleted or unreadable, and never exceeds its share', () => {
+    expect(buildCustomReminderNotifications(S([rem('a', '13:00', { on: false }), { id: 'b', x: true, t: 1 }, rem('c', 'noon'), null]), monday7)).toEqual([])
+    expect(buildCustomReminderNotifications({}, monday7)).toEqual([])
+    const many = Array.from({ length: 6 }, (_, i) => rem('r' + i, `1${i}:00`))
+    const n = buildCustomReminderNotifications(S(many), monday7)
+    expect(n).toHaveLength(CUSTOM_REMINDER_MAX)
+    expect(new Set(n.map(x => x.id)).size).toBe(CUSTOM_REMINDER_MAX)
+    expect(n.at(-1).id).toBe(2000 + CUSTOM_REMINDER_MAX - 1)
+    // the nearest are kept: nothing scheduled is later than something left out
+    expect(iso(n.at(-1).schedule.at)).toBe(iso(new Date(2026, 5, 5)))
+  })
+
+  it('a reminder with no words of its own still has a title', () => {
+    expect(buildCustomReminderNotifications(S([rem('a', '13:00', { text: '' })]), monday7)[0].title).toBe('Reminder')
   })
 })

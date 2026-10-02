@@ -63,6 +63,6 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Used to scan your gym membership QR code so you can check in from the app.</string>
+	<string>Used to scan your gym membership QR code, and to take the meal and progress photos you choose to add.</string>
 </dict>
 </plist>

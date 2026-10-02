@@ -25,11 +25,13 @@ import { suggestFromOwn } from './lib/food-suggest.js'
 import { foodAiState, hasFoodConsent, draftFromMeal, suggestContext, ideasFromAi, FOOD_CONSENT_VERSION } from './lib/food-ai.js'
 import { runFood, foodErrorText } from './lib/food-api.js'
 import { fileToJpeg } from './lib/image-prep.js'
+import { photosAvailable } from './lib/photos.js'
 import { logMany } from './nutrition-actions.js'
+import { addPhoto, photoError } from './photo-actions.js'
 import { foodFormSheet, amountSheet, mealName, mealNow, macroLine, fmt1, MEAL_NAME } from './nutrition-sheets.jsx'
 import { useSheetKeyboard } from './lib/use-sheet-keyboard.js'
 import Icon from './components/Icon.jsx'
-import { Button, Segmented, Stepper } from './components/ui.jsx'
+import { Button, Segmented, Stepper, Switch } from './components/ui.jsx'
 
 const ui = () => useUI.getState()
 const toast = m => ui().toast(m)
@@ -80,6 +82,13 @@ function ReadSheet({ mode, d, m, onLogged, close }) {
   const S = useStore(s => s.S)
   const provider = useProvider()
   const [pic, setPic] = useState(null)             // { data, url, bytes }
+  // The file as the camera gave it, for the one case it is kept: the person ticks "save the
+  // photo" on the draft. That is a second, separate upload to the photo store (photo-actions.js)
+  // — what went to the AI was a smaller copy the server held in memory and dropped.
+  const [original, setOriginal] = useState(null)
+  const [keep, setKeep] = useState(false)
+  const config = useStore(s => s.config), user = useStore(s => s.user)
+  const canKeep = mode === 'photo' && photosAvailable({ config, user, demo: DEMO })
   const [caption, setCaption] = useState('')
   const [phase, setPhase] = useState('input')       // input | busy | draft
   const [waited, setWaited] = useState(0)
@@ -101,7 +110,7 @@ function ReadSheet({ mode, d, m, onLogged, close }) {
     ev.target.value = ''
     if (!file) return
     setError('')
-    try { setPic(await fileToJpeg(file)) } catch { setError(t('That picture could not be read — try another one.')) }
+    try { setPic(await fileToJpeg(file)); setOriginal(file) } catch { setError(t('That picture could not be read — try another one.')) }
   }
 
   const send = async () => {
@@ -139,11 +148,17 @@ function ReadSheet({ mode, d, m, onLogged, close }) {
   const what = mode === 'describe' ? t('what you typed') : mode === 'label' ? t('the photo') : t('the photo and what you typed')
   const fine = DEMO
     ? t('Demo: nothing leaves this browser — the answer is canned.')
-    : provider.own
-      ? t('Sent straight to {0} with your own API key: {1}. Nothing from your diary or your training log. The photo is not stored anywhere.', provider.name, what)
-      : t('Sent to {0}: {1}. Nothing from your diary or your training log. The photo is not stored anywhere.', provider.name, what)
+    : canKeep
+      // Where photos can be kept, "not stored anywhere" would be one switch away from false.
+      ? (provider.own
+        ? t('Sent straight to {0} with your own API key: {1}. Nothing from your diary or your training log. The photo is kept only if you choose to save it with the entry.', provider.name, what)
+        : t('Sent to {0}: {1}. Nothing from your diary or your training log. The photo is kept only if you choose to save it with the entry.', provider.name, what))
+      : provider.own
+        ? t('Sent straight to {0} with your own API key: {1}. Nothing from your diary or your training log. The photo is not stored anywhere.', provider.name, what)
+        : t('Sent to {0}: {1}. Nothing from your diary or your training log. The photo is not stored anywhere.', provider.name, what)
 
-  if (phase === 'draft') return <Draft draft={draft} setDraft={setDraft} meal={meal} setMeal={setMeal} d={d} close={() => { close(); onLogged?.() }} back={() => setPhase('input')} />
+  if (phase === 'draft') return <Draft draft={draft} setDraft={setDraft} meal={meal} setMeal={setMeal} d={d} close={() => { close(); onLogged?.() }} back={() => setPhase('input')}
+    keep={canKeep && original ? { on: keep, set: setKeep, file: original } : null} />
 
   return <>
     <h3>{title}</h3>
@@ -184,7 +199,7 @@ function ReadSheet({ mode, d, m, onLogged, close }) {
 
 // What the model made of the plate: every row can be renamed in spirit (removed), re-weighed,
 // and nothing is in the diary until Add. The total moves as the weights do.
-function Draft({ draft, setDraft, meal, setMeal, d, close, back }) {
+export function Draft({ draft, setDraft, meal, setMeal, d, close, back, keep }) {
   const rows = draft.rows
   const set = (key, patch) => setDraft(x => ({ ...x, rows: x.rows.map(r => (r.key === key ? { ...r, ...patch } : r)) }))
   const drop = key => setDraft(x => ({ ...x, rows: x.rows.filter(r => r.key !== key) }))
@@ -193,6 +208,9 @@ function Draft({ draft, setDraft, meal, setMeal, d, close, back }) {
     const good = rows.filter(r => r.g > 0)
     if (!good.length) { toast(t('Nothing to add')); return }
     logMany(good.map(r => ({ item: { n: r.n, per100: r.per100, ref: r.ref }, grams: r.g })), { d, m: meal })
+    // Only on the person's say-so, and after the entry is in: a photo that fails to save must
+    // not cost them the meal they just corrected.
+    if (keep?.on) addPhoto(keep.file, { kind: 'meal', d, m: meal }).catch(e => toast(photoError(e)))
     close()
     toast(t('Added'))
   }
@@ -225,6 +243,13 @@ function Draft({ draft, setDraft, meal, setMeal, d, close, back }) {
       <div><b>{fmt1(total.c)}</b><span>{t('Carbs')}</span></div>
     </div>
     <Segmented options={MEALS.map((k, i) => ({ value: i, label: MEAL_NAME[k]() }))} value={meal} onChange={setMeal} />
+    {keep && <div className="row between" style={{ marginTop: 12, gap: 12 }}>
+      <div>
+        <div>{t('Save the photo with this entry')}</div>
+        <div className="dim small">{t('Kept on this server as a file, not encrypted. Off: the photo is gone once this sheet closes.')}</div>
+      </div>
+      <Switch checked={keep.on} onChange={keep.set} />
+    </div>}
     <div style={{ height: 14 }} />
     <Button variant="primary" onClick={add}>{t('Add to {0}', mealName(meal).toLowerCase())}</Button>
     <div style={{ height: 8 }} />

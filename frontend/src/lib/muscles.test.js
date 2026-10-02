@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { EXIDX, EXDB, smOf } from './exercises.js'
 import {
   MUSCLE_NAME, exerciseMuscleSnapshot, hasExplicitMuscleMetadata, levelsOf, loadOf,
-  loadOfWorkouts, matchesMuscleGroups, muscleBalanceWindow, muscleGroupsOf, musclesOf, rankOf
+  loadOfWorkouts, matchesMuscleGroups, muscleBalanceWindow, muscleGroupsOf, musclesOf, rankOf,
+  weeklySetsDone, plannedWeeklySets
 } from './muscles.js'
 
 describe('multi-muscle exercise metadata', () => {
@@ -208,6 +209,39 @@ describe('muscle balance windows and ranking', () => {
     const deleted = { id: 'deleted', muscleSnapshot: { muscleWeights: { chest: 1 } }, sets: [{ done: true }] }
     expect(loadOfWorkouts([{ entries: [known] }])).toEqual({ chest: 1, triceps: 0.4, deltoids: 0.4, biceps: 0.4 })
     expect(loadOfWorkouts([{ entries: [deleted] }])).toEqual({ chest: 1 })
+  })
+})
+
+describe('sets a week per muscle: done and planned', () => {
+  const set = { done: true }
+  const curl = sets => ({ id: 'curl', exercise: { muscleWeights: { biceps: 1, forearm: 0.4 } }, sets })
+  const workout = (d, entries) => ({ id: d, d, entries })
+
+  it('averages the weeks ending today; a warm-up or an unticked set is not a set', () => {
+    const workouts = [
+      workout('2026-10-01', [curl([set, set, set, { done: false }, { done: true, warmup: true }])]),
+      workout('2026-09-20', [curl([set, set, set])]),
+      workout('2026-09-04', [curl([set, set])]),      // 27 days back: inside four weeks
+      workout('2026-09-03', [curl([set, set, set, set])]),   // 28 days back: outside
+      workout('2026-10-02', [curl([set])])                   // tomorrow: not yet
+    ]
+    expect(weeklySetsDone(workouts, { today: '2026-10-01', weeks: 4 })).toEqual({ biceps: 2, forearm: 0.8 })
+    expect(weeklySetsDone(workouts, { today: '2026-10-01', weeks: 1 })).toEqual({ biceps: 3, forearm: 1.2 })
+    expect(weeklySetsDone(undefined, { today: '2026-10-01' })).toEqual({})
+    expect(weeklySetsDone([null, {}], { today: '2026-10-01' })).toEqual({})
+  })
+
+  it('the plan: every routine of every weekday, a combined day counting each of its routines', () => {
+    const S = {
+      routines: [
+        { id: 'arms', ex: [{ id: 'curl', muscleWeights: { biceps: 1, forearm: 0.4 }, sets: 3 }] },
+        { id: 'pull', ex: [{ id: 'row', muscleWeights: { 'upper-back': 1, biceps: 0.4 }, sets: 4 }] }
+      ],
+      week: { 1: ['arms'], 3: ['arms', 'pull'], 5: 'pull', 6: ['gone'] }
+    }
+    expect(plannedWeeklySets(S)).toEqual({ biceps: 9.2, forearm: 2.4, 'upper-back': 8 })
+    expect(plannedWeeklySets({})).toEqual({})
+    expect(plannedWeeklySets({ routines: null, week: { 1: ['arms'] } })).toEqual({})
   })
 })
 

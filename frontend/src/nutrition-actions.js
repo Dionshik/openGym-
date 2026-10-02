@@ -55,3 +55,7 @@ export const saveMeasurement = (d, values) => write((nut, s) => {
   if (Object.keys(row).filter(k => k !== 'd' && k !== 't').length === 0) s.measurements = list.filter(x => x !== row)
 })
 export const deleteMeasurement = d => write((nut, s) => { s.measurements = (s.measurements || []).filter(x => x.d !== d) })
+/** A goal for one measurement, in the stored unit; nothing (or zero) removes it. */
+export const setMeasureGoal = (key, v) => write((nut, s) => {
+  s.measureGoals = { ...(s.measureGoals || {}), [key]: { v: v > 0 ? Math.round(v * 10) / 10 : null, t: Date.now() } }
+})

@@ -9,10 +9,16 @@ const W = 340   // viewBox width; the svg stretches to its container, height com
 //        more of it). Used for effort on the weight curve, where the two belong on one line:
 //        the same weight with less left in the tank is not the same session.
 //   note extra text for that point's tooltip.
-// opts: { h, unit, color, axes, goal, invert }
+// opts: { h, unit, color, axes, goal, invert, forecast }
 //   invert flips the y axis, for a scale that counts down as it gets harder (RIR). Without it
 //   a curve of reps-in-reserve reads upside down, with the hardest sets at the floor.
-export default function LineChart({ points, h = 150, unit = '', color = 'var(--acc)', axes = true, goal = null, invert = false }) {
+//   forecast [{ t, y, lo, hi }] continues the curve past its last point: a dashed line through
+//        `y` inside a band from `lo` to `hi`. Both axes stretch to hold it. It is drawn, never
+//        hovered — the tooltip reports what was measured, not what is expected.
+//   second [{ t, y }] is another series on the same axes, drawn as a thin grey line behind the
+//        main one — the other arm beside this arm. Both axes stretch to hold it; the tooltip
+//        stays with the main series.
+export default function LineChart({ points, h = 150, unit = '', color = 'var(--acc)', axes = true, goal = null, invert = false, forecast = null, second = null }) {
   const svgRef = useRef(null)
   const wrapRef = useRef(null)
   const tipRef = useRef(null)
@@ -51,9 +57,15 @@ export default function LineChart({ points, h = 150, unit = '', color = 'var(--a
   const ys = pts.map(p => p.y)
   let ymin = Math.min(...ys), ymax = Math.max(...ys)
   if (goal != null && isFinite(goal)) { ymin = Math.min(ymin, goal); ymax = Math.max(ymax, goal) }
+  const fc = !single && Array.isArray(forecast) ? forecast.filter(p => p && isFinite(p.t) && isFinite(p.y) && isFinite(p.lo) && isFinite(p.hi) && p.t >= pts[pts.length - 1].t) : []
+  if (fc.length > 1) { ymin = Math.min(ymin, ...fc.map(p => p.lo)); ymax = Math.max(ymax, ...fc.map(p => p.hi)) }
+  const sec = !single && Array.isArray(second) ? second.filter(p => p && isFinite(p.t) && isFinite(p.y)) : []
+  const twin = sec.length > 1
+  if (twin) { ymin = Math.min(ymin, ...sec.map(p => p.y)); ymax = Math.max(ymax, ...sec.map(p => p.y)) }
   if (ymin === ymax) { ymin -= 1; ymax += 1 }
   const pad = (ymax - ymin) * 0.12; ymin -= pad; ymax += pad
-  const t0 = pts[0].t, t1 = pts[pts.length - 1].t || t0 + 1
+  const t0 = twin ? Math.min(pts[0].t, sec[0].t) : pts[0].t
+  const t1 = Math.max(fc.length > 1 ? fc[fc.length - 1].t : pts[pts.length - 1].t, twin ? sec[sec.length - 1].t : -Infinity) || t0 + 1
   const X = t => (t1 === t0 ? (P.l + W - P.r) / 2 : P.l + (t - t0) / (t1 - t0) * (W - P.l - P.r))
   const Y = y => {
     const f = (y - ymin) / (ymax - ymin)
@@ -129,7 +141,12 @@ export default function LineChart({ points, h = 150, unit = '', color = 'var(--a
           <line x1={P.l} y1={Y(goal)} x2={W - P.r} y2={Y(goal)} stroke="var(--yellow)" strokeWidth="1.6" strokeDasharray="7 4" />
           <text x={W - P.r - 2} y={Y(goal) - 5} textAnchor="end" fontSize="9.5" fontWeight="700" fill="var(--yellow)">{fmtNum(goal)}</text>
         </>}
-        <polygon points={`${P.l},${H - P.b} ${poly} ${X(last.t).toFixed(1)},${H - P.b}`} fill={`url(#${gid})`} />
+        <polygon points={`${twin ? X(pts[0].t).toFixed(1) : P.l},${H - P.b} ${poly} ${X(last.t).toFixed(1)},${H - P.b}`} fill={`url(#${gid})`} />
+        {twin && <polyline className="csec" points={sec.map(p => X(p.t).toFixed(1) + ',' + Y(p.y).toFixed(1)).join(' ')} fill="none" stroke="var(--label-3)" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />}
+        {fc.length > 1 && <g className="cfc">
+          <polygon points={[...fc.map(p => X(p.t).toFixed(1) + ',' + Y(p.hi).toFixed(1)), ...[...fc].reverse().map(p => X(p.t).toFixed(1) + ',' + Y(p.lo).toFixed(1))].join(' ')} fill={color} opacity=".14" />
+          <polyline points={fc.map(p => X(p.t).toFixed(1) + ',' + Y(p.y).toFixed(1)).join(' ')} fill="none" stroke={color} strokeWidth="2" strokeDasharray="5 5" strokeLinecap="round" />
+        </g>}
         <polyline points={poly} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
         {marked && pts.map((p, i) => (p.m == null ? null :
           <circle key={'m' + i} cx={X(p.t)} cy={Y(p.y)} r={2.4 + p.m * 3} fill={color} opacity={0.3 + p.m * 0.7} />))}

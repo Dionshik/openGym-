@@ -17,7 +17,10 @@
  *     forgotten, whichever way it runs); exNotes, barWeights: key union
  *   - nutrition (the food diary): rows and products by id, with tombstones and the fold line —
  *     see mergeNutrition in lib/nutrition.js; measurements: union by day like bodyweight;
- *     bodyProfile: whichever was edited later (`t`), whatever the copies' own `_ts` say
+ *     bodyProfile: whichever was edited later (`t`), whatever the copies' own `_ts` say;
+ *     measureGoals: per measurement, the goal set (or cleared) later;
+ *     reminders (the person's own, not `reminder`): by id, the row changed later — a deleted
+ *     one stays as a marker, so the other device does not bring it back
  *   - `_ts`: the later of the two; `_rev` dropped (the server sets it); `active` left to the caller
  *
  * Known limit: with no record of what each side deleted, an entry removed on one device inside
@@ -27,6 +30,8 @@
  */
 import { beatsWeight } from './exercises.js'
 import { mergeNutrition, nutritionExtras } from './nutrition.js'
+import { mergeGoals } from './body.js'
+import { mergeReminders } from './reminders.js'
 
 const clone = o => JSON.parse(JSON.stringify(o))
 const list = v => (Array.isArray(v) ? v : [])
@@ -105,6 +110,8 @@ export function mergeStates(a, b, { prefer } = {}) {
   // Height and birth year are facts about the person, not a setting of one device: the later
   // edit stands even when the other copy is the "newer" one overall.
   if (n.bodyProfile || o.bodyProfile) out.bodyProfile = clone((o.bodyProfile?.t || 0) > (n.bodyProfile?.t || 0) ? o.bodyProfile : (n.bodyProfile || o.bodyProfile))
+  if (n.measureGoals || o.measureGoals) out.measureGoals = clone(mergeGoals(n.measureGoals, o.measureGoals))
+  if (list(n.reminders).length || list(o.reminders).length) out.reminders = mergeReminders(n.reminders, o.reminders).map(clone)
   out._ts = Math.max(a._ts || 0, b._ts || 0)
   delete out._rev
   return out

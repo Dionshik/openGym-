@@ -44,6 +44,11 @@ const LABELS = {
   'auth.health.token': 'Created an Apple Health token',
   'auth.health.revoke': 'Revoked an Apple Health token',
   'auth.health.clear': 'Cleared delivered Health data',
+  // Stored photos (api/photos.js): the instance switch, and a member emptying their own store.
+  // The clear is filed under `auth` beside the Health one — both are a member taking personal
+  // data back, and neither says anything about what the data was.
+  'admin.photos.store': 'Switched photo storage',
+  'auth.photos.clear': 'Deleted all stored photos',
   'admin.invite.create': 'Created an invite code',
   'admin.invite.revoke': 'Revoked an invite code',
   'admin.audit.clear': 'Cleared the activity log',

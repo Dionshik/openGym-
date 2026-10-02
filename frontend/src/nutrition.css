@@ -76,6 +76,52 @@
 .bd-steps code,.bd-token{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;background:var(--surface-2);border-radius:6px;padding:1px 5px;color:var(--label);overflow-wrap:anywhere}
 .bd-token{display:block;padding:10px 12px;margin:8px 0;user-select:all;-webkit-user-select:all}
 
+/* a measurement field's caption with its help button, the links under a chart, the trend */
+.bd-fh{display:flex;align-items:center;gap:4px;margin:0 0 4px 2px}
+.bd-fh span{flex:1;min-width:0;font-size:12px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bd-fh .helpbtn{flex:none}
+.bd-acts{gap:6px 16px;flex-wrap:wrap;margin-top:8px}
+.bd-link{display:inline-flex;align-items:center;gap:5px;font-size:14px;color:var(--acc);padding:2px 0}
+.bd-link .icn{font-size:14px;flex:none}
+.bd-trend{margin-top:10px;line-height:1.4}
+.bd-ctx{display:flex;flex-wrap:wrap;gap:6px}
+.bd-ctx .tag{text-transform:none;white-space:normal}
+.bd-sides{display:flex;flex-direction:column;gap:8px;margin-top:6px;font-size:14px}
+.bd-side{line-height:1.4}
+.bd-lr{color:var(--label-2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.bd-lr b{color:var(--label);font-weight:600}
+.bodymap.bd-map{margin:0 auto 12px;max-width:260px}
+.bodymap.bd-map .bm-v{max-height:200px}
+
+/* ---- stored photos: a timeline of thumbnails, one picture, two side by side ---- */
+.ph{display:block;background:var(--surface-2);object-fit:cover}
+.ph-wait{animation:nt-pulse 1.4s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.ph-wait{animation:none}}
+.ph-strip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;overscroll-behavior-x:contain}
+.ph-strip::-webkit-scrollbar{display:none}
+.ph-cell{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--label-2)}
+.ph-thumb{width:84px;height:112px;border-radius:var(--r)}
+.ph-thumb.sq{height:84px}
+.ph-prev{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.ph-prev .ph-thumb{flex:none}
+.ph-full{width:100%;max-height:62vh;object-fit:contain;border-radius:var(--r);min-height:200px}
+.ph-cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ph-side{min-width:0}
+.ph-half{width:100%;aspect-ratio:3/4;border-radius:var(--r)}
+.ph-nav{margin-top:6px}
+.ph-nav .iconbtn{width:30px;height:30px;font-size:14px}
+/* the in-app viewfinder: live video, the last photo over it, the countdown over both */
+.gc-view{position:relative;margin:0 auto 12px;border-radius:var(--r-lg);overflow:hidden;background:#000}
+.gc-view video,.gc-view .gc-ghost,.gc-view .gc-shot{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.gc-view.mirror video,.gc-view.mirror .gc-ghost{transform:scaleX(-1)}
+.gc-ghost{pointer-events:none}
+.gc-count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:96px;font-weight:700;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.65);font-variant-numeric:tabular-nums}
+.gc-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;font-size:14px;color:var(--label-2)}
+.gc-row input[type=range]{flex:1;max-width:190px}
+.ph-meal{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 0 6px}
+.ph-meal::-webkit-scrollbar{display:none}
+.ph-meal .ph-thumb{width:64px;height:64px;flex:none}
+
 /* Two classes deep on purpose: index.css's `.input{width:100%}` may load after this file. */
 .lrow .input.bd-num{width:96px;flex:none;text-align:right;padding:9px 12px}
 .lrow .seg-inline{flex:none}

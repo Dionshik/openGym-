@@ -19,8 +19,13 @@ export const DEFAULTS = {
   food: { lookup: false, contact: '' },
   // Apple Health ingest (healthkit.js). `shortcutUrl` is the iCloud link to the owner's own copy
   // of the Shortcut, shown to members so they do not have to build it by hand.
-  health: { enabled: false, shortcutUrl: '' }
+  health: { enabled: false, shortcutUrl: '' },
+  // Stored photos (photos.js): members' pictures of their body and their meals, as files under
+  // ./data. `quotaMb` is the most one member may keep; `mealDays` deletes meal photos older than
+  // that many days (0 keeps them) — they are the bulk of the volume and the least worth keeping.
+  photos: { enabled: false, quotaMb: 500, mealDays: 0 }
 };
+const int = (v, lo, hi, fallback) => (Number.isInteger(v) && v >= lo && v <= hi ? v : fallback);
 
 export function createSettings({ dataDir, atomicWrite }) {
   const file = path.join(dataDir, 'settings.json');
@@ -28,7 +33,10 @@ export function createSettings({ dataDir, atomicWrite }) {
   try {
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (raw && typeof raw === 'object') {
-      state = { food: { ...DEFAULTS.food, ...(raw.food || {}) }, health: { ...DEFAULTS.health, ...(raw.health || {}) } };
+      state = {
+        food: { ...DEFAULTS.food, ...(raw.food || {}) }, health: { ...DEFAULTS.health, ...(raw.health || {}) },
+        photos: { ...DEFAULTS.photos, ...(raw.photos || {}) }
+      };
     }
   } catch { /* never saved: the defaults */ }
 
@@ -44,6 +52,11 @@ export function createSettings({ dataDir, atomicWrite }) {
       if (p.health && typeof p.health === 'object') {
         if ('enabled' in p.health) next.health.enabled = p.health.enabled === true;
         if ('shortcutUrl' in p.health) next.health.shortcutUrl = httpsUrl(p.health.shortcutUrl);
+      }
+      if (p.photos && typeof p.photos === 'object') {
+        if ('enabled' in p.photos) next.photos.enabled = p.photos.enabled === true;
+        if ('quotaMb' in p.photos) next.photos.quotaMb = int(p.photos.quotaMb, 10, 100000, next.photos.quotaMb);
+        if ('mealDays' in p.photos) next.photos.mealDays = int(p.photos.mealDays, 0, 3650, next.photos.mealDays);
       }
       state = next;
       atomicWrite(file, JSON.stringify(state), 0o600);

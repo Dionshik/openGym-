@@ -19,9 +19,11 @@ import { createPool } from './pool.js';
 import { createSettings } from './settings.js';
 import { createFood } from './food.js';
 import { createHealth } from './healthkit.js';
+import { createPhotos } from './photos.js';
 import { startCadence } from './coach/cadence.js';
 import { startWarmup } from './coach/warmup.js';
-import { dayReminderPush, restTimerPush, testPush } from './push-messages.js';
+import { dayReminderPush, restTimerPush, testPush, customReminderPush } from './push-messages.js';
+import { cleanReminders, dueReminders, loggedOn, createReminderLog, LINK_URL } from './reminders.js';
 import { verifyError } from './verify-error.js';
 
 const PORT = +(process.env.PORT || 3000);
@@ -108,6 +110,14 @@ const health = createHealth({ dataDir: DATA, atomicWrite, settings });
 // Like the pool's: present in the answer only when there is something, so a profile that never
 // connected Health gets byte-for-byte the answers it always did.
 const healthRev = uid => { const rev = health.enabled() ? health.rev(uid) : 0; return rev ? { health: rev } : {}; };
+// Stored photos (photos.js): files under photos/<uid>/, never profile data. The same kind of
+// revision as the two above, present only where a member actually keeps photos.
+const photos = createPhotos({ dataDir: DATA, atomicWrite, settings });
+const photosRev = uid => { const rev = photos.enabled() ? photos.rev(uid) : 0; return rev ? { photos: rev } : {}; };
+// The store was switched off again but this member's pictures are still on disk: say how many,
+// on the one answer the app reads at every start, so it can offer to delete them. Absent for
+// everyone else — which on an instance that never stored photos is everyone.
+const photosLeft = uid => { const n = photos.enabled() ? 0 : photos.count(uid); return n ? { photosKept: n } : {}; };
 const stateFile = uid => path.join(DATA, 'state-' + uid.replace(/[^a-zA-Z0-9_-]/g, '') + '.json');
 function readState(uid) {
   try { return JSON.parse(fs.readFileSync(stateFile(uid), 'utf8')); } catch { return null; }
@@ -352,9 +362,35 @@ function readStateCached(uid) {
   stateCache.set(uid, { mtimeMs: st.mtimeMs, size: st.size, S });
   return S;
 }
+// Reminders a member wrote themselves (reminders.js): any number a day, each on its own weekdays.
+// Same window as the day reminder, but its own marker — `user.lastReminder` is one date per
+// profile and belongs to the workout reminder below.
+const reminderLog = createReminderLog({ dataDir: DATA, atomicWrite });
+// Whether a progress photo was stored on a date — what "skip if already logged" asks of a
+// reminder about photos.
+const hasPhotoOn = (uid, d) => photos.enabled() && photos.hasOn(uid, d);
+function tickCustomReminders(user) {
+  const S = readStateCached(user.id);
+  const list = cleanReminders(S);
+  if (!list.length) return;
+  const now = userNow((S.reminder && typeof S.reminder.tz === 'string' && S.reminder.tz) || 'UTC');
+  if (!now) return;
+  for (const { r, key } of dueReminders(list, now, reminderLog.sent(user.id, now.date), REMINDER_WINDOW_MIN, Date.now())) {
+    // Already done today: stay quiet, and leave it unmarked — nothing was sent.
+    if (r.skipIfLogged && loggedOn(S, r.link, now.date, d => hasPhotoOn(user.id, d))) continue;
+    reminderLog.mark(user.id, now.date, key);
+    console.log('custom-reminder sent', user.id, r.id);
+    sendPush(user.id, customReminderPush(typeof S.lang === 'string' ? S.lang : 'en', r, LINK_URL[r.link]));
+  }
+}
 setInterval(() => {
   for (const user of db.users) {
     if (!db.subs.some(s => s.userId === user.id)) continue;
+    // Before the workout reminder and in a try of its own: that block leaves the loop body with
+    // `continue` on every path that sends nothing, and neither may cost the other its turn.
+    if (!user.disabled) {
+      try { tickCustomReminders(user); } catch (e) { console.error('custom reminders failed', user.id, e); }
+    }
     // One user's state file is one user's problem: a shape this tick cannot read is logged and
     // skipped, not allowed to take the process — and everyone else's reminders — down with it.
     // PUT /api/data refuses the obvious shapes, but a file already on disk answers to nobody.
@@ -563,6 +599,13 @@ function json(res, code, obj, extraHeaders) {
   res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...(extraHeaders || {}) });
   res.end(body);
 }
+// The one answer that is not JSON: the bytes of a stored photo (photos.js), with the type and
+// caching the caller decides. `nosniff` always — nginx adds it on the way out, but a paired app
+// or anything else talking to this port directly must not guess a type either.
+function send(res, code, buf, headers) {
+  res.writeHead(code, { ...(buf ? { 'Content-Length': buf.length } : {}), 'X-Content-Type-Options': 'nosniff', ...(headers || {}) });
+  res.end(buf || undefined);
+}
 // A request the caller got wrong. The catch-all at the bottom answers it with this status and
 // message and does not log it: three of the routes below are reachable without a session, and a
 // stack trace per malformed body would let anyone fill the container log with noise that looks
@@ -735,7 +778,8 @@ const routes = {
       invite_only: INVITE_ONLY, allow_guest: ALLOW_GUEST, pool: true, ...(coach ? { coach } : {}),
       // Absent unless the admin switched them on — see settings.js.
       ...(food.enabled() ? { food: food.publicConfig() } : {}),
-      ...(health.enabled() ? { health: true } : {})
+      ...(health.enabled() ? { health: true } : {}),
+      ...(photos.enabled() ? { photos: true } : {})
     });
   },
 
@@ -942,7 +986,7 @@ const routes = {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
     const state = readState(user.id);
-    json(res, 200, { state, rev: state?._rev || 0, ...poolRev(), ...healthRev(user.id) });
+    json(res, 200, { state, rev: state?._rev || 0, ...poolRev(), ...healthRev(user.id), ...photosRev(user.id), ...photosLeft(user.id) });
   },
   // Just the revision: the client asks this every half minute while it is open and on every
   // return to the foreground, and fetches the document only when the number moved — a signed-in
@@ -950,7 +994,7 @@ const routes = {
   'GET /api/data/rev': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    json(res, 200, { rev: readState(user.id)?._rev || 0, ...poolRev(), ...healthRev(user.id) });
+    json(res, 200, { rev: readState(user.id)?._rev || 0, ...poolRev(), ...healthRev(user.id), ...photosRev(user.id) });
   },
 
   'PUT /api/data': async (req, res) => {
@@ -1178,6 +1222,9 @@ const routes = {
     try { pool.dropUser(u.id); } catch (e) { console.error('pool: could not drop', u.id, e); }
     // What their Shortcut delivered from Apple Health, and the tokens it delivered it with.
     try { health.dropUser(u.id); } catch (e) { console.error('health: could not drop', u.id, e); }
+    try { reminderLog.dropUser(u.id); } catch (e) { console.error('reminders: could not drop', u.id, e); }
+    // Their photographs: the whole directory.
+    try { photos.dropUser(u.id); } catch (e) { console.error('photos: could not drop', u.id, e); }
     saveDb();
     // Logged with the name, because the id is about to mean nothing to anyone reading this back.
     audit(req, 'admin.user.delete', { user: admin, msg: name });
@@ -1276,28 +1323,35 @@ const routes = {
   ...food.routes({ json, readBody, readSession }),
   ...health.routes({ json, readBody, readSession, audit, userExists: uid => db.users.some(u => u.id === uid && !u.disabled) }),
 
-  // The two switches, for the dashboard. Both decide whether personal data crosses a boundary —
-  // out to a food database, in from a phone's Health app — so they are the admin's to flip,
-  // and each flip is logged.
+  /* ---------- stored photos: a member's own, and nobody else's ---------- */
+  ...photos.routes({ json, send, readBody, readSession, audit }),
+
+  // The switches, for the dashboard. Each decides whether personal data crosses a boundary —
+  // out to a food database, in from a phone's Health app, onto this server's disk as pictures —
+  // so they are the admin's to flip, and each flip is logged. What the dashboard gets back about
+  // photos is a count and a size: there is no route here that serves a member's picture.
   'GET /api/admin/extras': async (req, res) => {
     if (!requireAdmin(req, res)) return;
     const s = settings.get();
     json(res, 200, {
       food: { ...s.food, forcedOff: process.env.FOOD_LOOKUP_DISABLED === '1', cache: food.stats() },
-      health: { ...s.health, ...health.stats() }
+      health: { ...s.health, ...health.stats() },
+      photos: { ...s.photos, ...photos.stats() }
     });
   },
   'POST /api/admin/extras': async (req, res) => {
     const admin = requireAdmin(req, res); if (!admin) return;
     const body = await readBody(req);
     const before = settings.get();
-    const s = settings.patch({ food: body.food, health: body.health });
+    const s = settings.patch({ food: body.food, health: body.health, photos: body.photos });
     if (body.clearFoodCache === true) food.clearCache();
     if (s.food.lookup !== before.food.lookup) audit(req, 'admin.food.lookup', { user: admin, msg: s.food.lookup ? 'on' : 'off' });
     if (s.health.enabled !== before.health.enabled) audit(req, 'admin.health.ingest', { user: admin, msg: s.health.enabled ? 'on' : 'off' });
+    if (s.photos.enabled !== before.photos.enabled) audit(req, 'admin.photos.store', { user: admin, msg: s.photos.enabled ? 'on' : 'off' });
     json(res, 200, {
       food: { ...s.food, forcedOff: process.env.FOOD_LOOKUP_DISABLED === '1', cache: food.stats() },
-      health: { ...s.health, ...health.stats() }
+      health: { ...s.health, ...health.stats() },
+      photos: { ...s.photos, ...photos.stats() }
     });
   }
 };

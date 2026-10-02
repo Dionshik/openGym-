@@ -218,7 +218,9 @@ give up after sixty seconds. `POST /api/coach/food` answers `202` with a job id;
 **Nothing on disk.** The photo, the caption and the result live in the server's memory: the
 picture for the length of the call, the result for ten minutes or until collected. The job log
 gets the kind, the outcome and the duration, as for every other call. A restart forgets a job
-in flight and the app says so.
+in flight and the app says so. (Where the instance stores photos, a member may afterwards keep
+the picture with the diary entry — an explicit switch on the draft, off by default, and a
+separate upload to `api/photos.js`. This lane never sees that and still writes nothing.)
 
 They have their own cap, `caps.foodPerProfileDaily` (30; Advanced on the card), and a spent
 instance cap stops them too.
