@@ -1,0 +1,7 @@
+# The api image is built with ./api as its context and copies files in by name (see the `app`
+# stage of the Dockerfile). These are never among them — keeping them out only makes the
+# context smaller to send, which on a developer's machine is all of node_modules.
+node_modules
+test
+*.test.js
+*.log

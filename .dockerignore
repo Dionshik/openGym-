@@ -1,7 +1,28 @@
+# The web image is built from the repository root (web/Dockerfile) and needs three things from
+# it: frontend/, api/coach/core/ and web/nginx.conf.template. Everything else below only makes
+# the context bigger to send — or, for the first group, must never be sent at all.
+
+# Never part of a build
+.env
+data
+coach-auth
+media
+.git
+
+# Installed and built inside the image
 **/node_modules
 frontend/dist
-media
-data
-.env
-.git
+
+# Not read by `vite build`
+frontend/android
+frontend/ios
+frontend/resources
+api/test
+mcp
+website
+docs
+.github
+.gitea
+.claude
+.agents
 *.log

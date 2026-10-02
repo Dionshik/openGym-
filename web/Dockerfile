@@ -17,7 +17,14 @@ COPY frontend/package.json frontend/package-lock.json* ./
 # --ignore-scripts: the web image only needs `vite build`; the one heavy postinstall in this tree
 # (@capacitor/assets -> sharp, a libvips download from GitHub) is for drawing app icons and has
 # timed out on the shared runners — a lockfile-ignoring `npm install` fallback is no answer to that.
-RUN npm ci --ignore-scripts
+#
+# npm's download cache is a BuildKit cache mount: this layer is rebuilt whenever package.json
+# changes (every release bumps its version), and without the mount each of those rebuilds
+# downloads the whole tree again — Capacitor tooling, vitest and all, most of which `vite build`
+# never touches. With it they come from the cache, and the cache never lands in a layer.
+# Needs BuildKit: the default builder of Docker 23+ and of `docker compose` v2.
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts --no-audit --no-fund
 COPY api/coach/core/ /app/api/coach/core/
 COPY frontend/ ./
 RUN npm run build

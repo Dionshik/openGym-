@@ -27,8 +27,20 @@ function reachable(entry) {
   return [...seen].map(f => path.relative(API, f).split(path.sep).join('/'));
 }
 
+// The Dockerfile as stages: [{ name, body }] in file order.
+function stages() {
+  const text = fs.readFileSync(path.join(API, 'Dockerfile'), 'utf8').replace(/\r\n/g, '\n');
+  const out = [];
+  for (const block of text.split(/^(?=FROM\s)/m).filter(b => /^FROM\s/.test(b))) {
+    const m = block.match(/^FROM\s+\S+(?:\s+AS\s+(\S+))?/i);
+    out.push({ name: m[1] || '', body: block });
+  }
+  return out;
+}
+
 test('every module the server imports is copied into the image', () => {
-  const dockerfile = fs.readFileSync(path.join(API, 'Dockerfile'), 'utf8');
+  // The one list of application files: the `app` stage, which both targets copy from.
+  const dockerfile = stages().find(s => s.name === 'app').body;
   const files = new Set(), dirs = new Set();
   for (const m of dockerfile.matchAll(/^COPY\s+(.+)$/gm)) {
     const parts = m[1].trim().split(/\s+/);
@@ -46,4 +58,40 @@ test('every module the server imports is copied into the image', () => {
     return f.includes('/') ? !dirs.has(top) : !files.has(f);
   });
   assert.deepEqual(missing, [], 'imported by the server but not in a COPY line of api/Dockerfile');
+});
+
+/* The image is laid out so a rebuild downloads as little as possible, and that is a property a
+   later edit loses quietly — the build still works, it is just slow again. So: both targets take
+   the application from the `app` stage as their LAST instruction (nothing that fetches from a
+   network may come after the source, or every code change repeats it), the published default
+   stays the last stage, and no build argument is declared above a RUN in its own stage (a RUN
+   sees every ARG above it, so BUILD_DATE up there is a cache miss on every CI build). */
+test('both targets end with the application files, and nothing network-bound follows the source', () => {
+  const all = stages();
+  assert.equal(all.at(-1).name, 'default', 'a plain `docker build` must keep producing the runtime-free image');
+  for (const name of ['coach', 'default']) {
+    const stage = all.find(s => s.name === name);
+    assert.ok(stage, `no "${name}" stage`);
+    const lines = stage.body.split('\n').filter(l => /^[A-Z]+\s/.test(l));
+    assert.equal(lines.at(-1), 'COPY --from=app /app/ ./', `the ${name} target must end by copying the app stage`);
+    assert.equal(lines.filter(l => l.startsWith('COPY --from=app')).length, 1);
+  }
+});
+
+test('build arguments come after the last RUN of their stage', () => {
+  for (const stage of stages()) {
+    const lines = stage.body.split('\n');
+    const firstArg = lines.findIndex(l => /^ARG\s/.test(l));
+    if (firstArg < 0) continue;
+    const runAfter = lines.slice(firstArg).some(l => /^RUN\s/.test(l));
+    assert.equal(runAfter, false, `stage "${stage.name}" has a RUN below an ARG — every CI build would miss the cache there`);
+  }
+});
+
+test('every npm install in the image uses the cache mount', () => {
+  const text = stages().map(s => s.body).join('\n');
+  const runs = text.split(/^(?=RUN\s)/m).filter(b => /^RUN\s/.test(b)).map(b => b.split(/\n(?![ \t])/)[0]);
+  const npm = runs.filter(r => /\bnpm (ci|install)\b/.test(r));
+  assert.ok(npm.length >= 3);
+  for (const r of npm) assert.match(r, /--mount=type=cache,target=\/root\/\.npm/, r.split('\n')[0]);
 });

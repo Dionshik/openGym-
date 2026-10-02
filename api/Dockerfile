@@ -10,24 +10,24 @@
 #
 # The stage order matters: Docker builds the *last* stage when none is named, so `default` is
 # deliberately last and `coach` sits above it.
+#
+# Laid out so that a rebuild downloads as little as possible:
+#
+#   - Everything that fetches from a network sits ABOVE the application's own files. Editing
+#     server.js rebuilds one small COPY layer and nothing else — not the Agent SDK, not Codex.
+#     (They used to hang off a stage that already held the source, so every code change
+#     downloaded both again.)
+#   - npm's download cache is a BuildKit cache mount. When package.json does change — every
+#     release bumps its version — `npm ci` reinstalls from that cache instead of the registry,
+#     and the cache never ends up in an image layer.
+#   - The build arguments are declared after the last RUN of their stage. A RUN sees every ARG
+#     above it as an environment variable, so BUILD_DATE declared at the top made each CI build
+#     a cache miss from the first line down.
+#
+# The cache mounts need BuildKit, which is the default builder of Docker 23+ and of
+# `docker compose` v2. On something older: DOCKER_BUILDKIT=1 docker build …
 
-FROM node:22-alpine AS base
-
-# Declared on the base stage so both targets inherit the labels and the healthcheck.
-ARG VERSION=dev
-ARG VCS_REF=dev
-ARG BUILD_DATE=unknown
-
-LABEL maintainer="Duarte Santos https://gitlab.com/DuarteSantos8" \
-    org.opencontainers.image.title="opengym-api" \
-    org.opencontainers.image.description="Backend for Self-hosted gym & body-weight tracker — plan routines, log workouts (supersets & cardio too), track your weight and progress, passkey login. Your data, your server." \
-    org.opencontainers.image.source="https://gitlab.com/DuarteSantos8/opengym" \
-    org.opencontainers.image.url="https://gitlab.com/DuarteSantos8/opengym/container_registry" \
-    org.opencontainers.image.documentation="https://gitlab.com/DuarteSantos8/opengym#readme" \
-    org.opencontainers.image.licenses="AGPL-3.0-or-later" \
-    org.opencontainers.image.version=$VERSION \
-    org.opencontainers.image.revision=$VCS_REF \
-    org.opencontainers.image.created=$BUILD_DATE
+FROM node:22-alpine AS os
 
 WORKDIR /app
 
@@ -45,17 +45,6 @@ RUN apk upgrade --no-cache
 # an account is connected. It costs one line and no bytes worth measuring.
 RUN adduser -D -H -s /sbin/nologin coach
 
-COPY package.json package-lock.json* ./
-# `npm ci` rather than `npm install`: the lockfile is the point of committing one, and the SDK's
-# per-platform runtime is resolved from it (musl on this base) rather than from whatever the
-# build host happened to be.
-RUN npm ci --omit=dev --omit=optional && npm cache clean --force
-
-# Every module server.js (or anything under coach/) imports from this directory has to be named
-# here — a file that is not copied is a container that dies at boot with ERR_MODULE_NOT_FOUND,
-# and no unit test runs inside the image. test/dockerfile.test.js holds this line to the imports.
-COPY server.js push-messages.js verify-error.js pool.js settings.js food.js healthkit.js healthkit-parse.js ./
-COPY coach ./coach
 ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
@@ -66,19 +55,44 @@ HEALTHCHECK --interval=5m \
             --retries=3 \
             CMD wget --spider -q "http://127.0.0.1:${PORT}/api/health" || exit 1
 
+# Declared on this stage so both targets inherit the labels — and last in it, see the header.
+ARG VERSION=dev
+ARG VCS_REF=dev
+ARG BUILD_DATE=unknown
+
+LABEL maintainer="Duarte Santos https://gitlab.com/DuarteSantos8" \
+    org.opencontainers.image.title="opengym-api" \
+    org.opencontainers.image.description="Backend for Self-hosted gym & body-weight tracker — plan routines, log workouts (supersets & cardio too), track your weight and progress, passkey login. Your data, your server." \
+    org.opencontainers.image.source="https://gitlab.com/DuarteSantos8/opengym" \
+    org.opencontainers.image.url="https://gitlab.com/DuarteSantos8/opengym/container_registry" \
+    org.opencontainers.image.documentation="https://gitlab.com/DuarteSantos8/opengym#readme" \
+    org.opencontainers.image.licenses="AGPL-3.0-or-later" \
+    org.opencontainers.image.version=$VERSION \
+    org.opencontainers.image.revision=$VCS_REF \
+    org.opencontainers.image.created=$BUILD_DATE
+
 # ---------------------------------------------------------------------------------------------
-# The opt-in target. Dropping --omit=optional is the whole difference: it pulls in
-# @anthropic-ai/claude-agent-sdk together with the one platform runtime this base needs
-# (linux-*-musl), both pinned by the lockfile.
-FROM base AS coach
-RUN npm ci --omit=dev && npm cache clean --force
+# The application's own files, listed once and copied into both targets as their last layer.
+#
+# Every module server.js (or anything under coach/) imports from this directory has to be named
+# here — a file that is not copied is a container that dies at boot with ERR_MODULE_NOT_FOUND,
+# and no unit test runs inside the image. test/dockerfile.test.js holds this list to the imports.
+FROM scratch AS app
+COPY server.js push-messages.js verify-error.js pool.js settings.js food.js healthkit.js healthkit-parse.js /app/
+COPY coach /app/coach
+
+# ---------------------------------------------------------------------------------------------
+# The opt-in target: @anthropic-ai/claude-agent-sdk together with the one platform runtime this
+# base needs (linux-*-musl), both pinned by the lockfile, plus the Codex CLI.
+FROM os AS coach
 
 # Codex ships as a CLI rather than a library, so it is installed rather than resolved, and
 # bubblewrap is its sandbox — a Codex requirement, which is why neither appears in the default
-# target or anywhere in this tree until now.
-RUN apk add --no-cache bubblewrap \
- && npm install -g @openai/codex \
- && npm cache clean --force
+# target. Before package.json is copied: this layer depends on nothing of ours, so neither a
+# code change nor a version bump runs it again.
+RUN --mount=type=cache,target=/root/.npm \
+    apk add --no-cache bubblewrap \
+ && npm install -g @openai/codex --no-audit --no-fund
 
 # Where Codex keeps its refreshable login cache. Deliberately a sibling of /data rather than a
 # path inside it: docs/SELF_HOSTING tells owners to back up with `tar czf … data/`, and a live
@@ -87,11 +101,26 @@ RUN apk add --no-cache bubblewrap \
 RUN mkdir -p /coach-auth && chown coach:coach /coach-auth && chmod 700 /coach-auth
 VOLUME ["/coach-auth"]
 
+COPY package.json package-lock.json* ./
+# `npm ci` rather than `npm install`: the lockfile is the point of committing one, and the SDK's
+# per-platform runtime is resolved from it (musl on this base) rather than from whatever the
+# build host happened to be.
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev --no-audit --no-fund
+
+COPY --from=app /app/ ./
+
 # ---------------------------------------------------------------------------------------------
 # Last, so that a plain `docker build ./api` keeps producing the runtime-free image.
-FROM base AS default
+FROM os AS default
+
+COPY package.json package-lock.json* ./
 # npm itself is only a build-time tool here: the server is started with `node server.js` and
 # nothing in it spawns npm. Its bundled dependency tree (tar, brace-expansion, ...) is where
 # every vulnerability the image scan ever reported lived — none of them was in a package the
 # app uses. Gone from the published image; the coach target keeps npm for the Codex CLI.
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev --omit=optional --no-audit --no-fund \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
+COPY --from=app /app/ ./

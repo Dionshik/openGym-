@@ -21,7 +21,12 @@ docker compose up -d
   means and how to run without them (an empty `media/img/fedb/.complete` skips the download).
 - Open **http://localhost:8080** and create a profile with a passkey.
 - Rather build from source than pull prebuilt images? Skip `docker compose pull` and run
-  `docker compose up -d --build` instead — no Node needed locally either way.
+  `docker compose up -d --build` instead — no Node needed locally either way. The first build
+  downloads the npm packages; later ones reuse them from Docker's build cache, even when
+  `package.json` changed, and a code change rebuilds only the last small layer. That cache is
+  what `docker builder prune` and `docker system prune` delete — run either and the next build
+  downloads everything again. Building needs BuildKit, the default builder since Docker 23
+  (`docker version`); on something older, prefix the command with `DOCKER_BUILDKIT=1`.
 
 Check it's healthy:
 
