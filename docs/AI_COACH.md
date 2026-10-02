@@ -19,7 +19,7 @@ rest of this document applies to you.
 | **Anthropic API** | plain HTTPS to `api.anthropic.com` | an API key | default |
 | **OpenAI API** | plain HTTPS to `api.openai.com` | an API key | default |
 | **Google Gemini** | plain HTTPS to `generativelanguage.googleapis.com` | an API key | default |
-| **OpenAI-compatible endpoint** | plain HTTPS to a URL you give it — Ollama, LM Studio, vLLM, OpenRouter, a gateway of your own | an API key, optional | default |
+| **OpenAI-compatible endpoint** | plain HTTPS to a URL you give it — Ollama, LM Studio, LocalAI, vLLM, OpenRouter, a gateway of your own | an API key, or a username and password — both optional | default |
 | **Claude (Anthropic)** | the Claude Agent SDK, inside the container | a `claude setup-token` | `coach` |
 | **Codex (OpenAI)** | the Codex CLI, inside the container | Codex's own device sign-in | `coach` |
 
@@ -31,6 +31,38 @@ child process to drop privileges on, no runtime to carry in the image, and nothi
 A model on your own LAN is the compatible endpoint with no key: point it at
 `http://ollama.lan:11434` and pick a model from the list it serves. That is the whole
 configuration.
+
+### A model behind a login prompt
+
+A model reachable from the internet is usually put behind a reverse proxy that asks for a
+username and password — nginx `auth_basic` in front of LocalAI or Ollama, the address that opens
+with a browser login box. That is HTTP Basic, and the compatible endpoint can sign in to it:
+
+- **Endpoint** — the base address, without the path of any web interface behind it
+  (`https://localai.example.org`, not `https://localai.example.org/app`) and without the login
+  in it.
+- **Credential → Sign in with a username and password** — the same pair the browser prompt
+  takes. It is encrypted into `./data/coach.json` like a key; the card shows the username and
+  never the password.
+
+A login and an API key travel in the same `Authorization` header, so an endpoint has one or the
+other: saving a login replaces a saved key and the reverse. If your proxy asks for a login *and*
+the model behind it wants its own key, drop one of the two on the server side. Without a login
+the card says so in words — `401 the endpoint asks for a username and password` — instead of
+quoting the proxy's error page.
+
+Two things on the proxy that are not openGym's to set:
+
+- **The read timeout.** nginx gives the upstream 60 seconds by default (`proxy_read_timeout`),
+  and a local model writing a plan routinely needs longer; the job then fails with a `504`
+  after two retries. Raise it to match the job budget, e.g. `proxy_read_timeout 600s;`
+  (and `proxy_send_timeout` alongside).
+- **The body size.** A food photo is sent as base64 inside the request: about 200 KB as the
+  app shrinks it, 1.5 MB at most. nginx's default `client_max_body_size` is 1 MB — set it to
+  `4m` so a large one is not refused with a `413`.
+
+Use the `https://` address when the model is not on the same machine or private network: Basic
+sends the password with every request, and only the TLS connection keeps it unreadable.
 
 ## Turning it on
 
@@ -50,7 +82,8 @@ answers on instead, and a key only if it wants one.
   password in it, no query string. The host is written into the job log so you can see where
   jobs went.
 - **Use an API key** → paste it. It is encrypted into `./data/coach.json` and is never shown
-  again.
+  again. (A compatible endpoint behind a login prompt takes a username and password instead —
+  see above.)
 - **List models** asks the endpoint what it serves and turns the model field into a picker.
   Each provider has a starting default (it is in `api/coach/core/providers.js`, and it is a
   starting point, not a pin — names go stale, the list does not); the compatible endpoint has

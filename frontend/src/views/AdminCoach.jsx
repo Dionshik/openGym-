@@ -93,7 +93,10 @@ export default function AdminCoach() {
 
   const meta = d.providers.find(p => p.id === d.provider) || {}
   const authState = d.auth?.state
-  const authed = authState === 'connected' || authState === 'not-required' || authState === 'optional'
+  // An endpoint that answers with a login prompt is not "optional — none saved": the proxy in
+  // front of it wants a username and password, or did not take the one that is filed.
+  const needsLogin = !!d.runtime.needsLogin && !!meta.basic
+  const authed = !needsLogin && (authState === 'connected' || authState === 'not-required' || authState === 'optional')
   const needsEndpoint = !!meta.baseUrl
   const hasEndpoint = !needsEndpoint || !!d.baseUrl
   const live = d.enabled && d.runtime.ok && authed && hasEndpoint
@@ -101,6 +104,7 @@ export default function AdminCoach() {
   const status = !d.enabled ? 'Off — users see no Coach anywhere in the app.'
     : live ? <>On · {meta.label}{d.model ? ' · ' + d.model : ''}</>
       : !hasEndpoint ? 'On, but no endpoint yet — finish step 2.'
+        : needsLogin ? (authState === 'connected' ? 'On, but the endpoint did not accept the saved credential — see the Credential step.' : 'On, but the endpoint asks for a username and password — see the Credential step.')
         : !authed ? 'On, but no credential yet — finish the Credential step.'
           : !d.runtime.ok ? 'On, but the provider cannot be reached — see the Test step.'
             : 'On'
@@ -186,22 +190,27 @@ export default function AdminCoach() {
       </Step>}
 
       {/* ---------- credential ---------- */}
-      {hasCredentialStep && <Step n={num()} title="Credential" hint={credentialHint(d.auth, meta)} done={step3Done} {...stepAt()}>
+      {hasCredentialStep && <Step n={num()} title="Credential" hint={needsLogin ? (authState === 'connected' ? 'Saved credential not accepted' : 'Username and password needed') : credentialHint(d.auth, meta)} done={step3Done} {...stepAt()}>
         <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-          <CredentialPill auth={d.auth} />
+          {needsLogin ? <span className="adm-pill bad">{authState === 'connected' ? 'not accepted' : 'login needed'}</span> : <CredentialPill auth={d.auth} />}
         </div>
+        {needsLogin && <div className="adm-hint" style={{ color: 'var(--red)' }}>{authState === 'connected'
+          ? (d.auth.type === 'basic' ? 'The endpoint did not accept this username and password. Check them and save the login again.' : 'The endpoint answers with a login prompt, and an API key cannot answer it. Sign in with the username and password instead.')
+          : 'The endpoint answers with a login prompt — the kind a browser shows for a server behind nginx or another reverse proxy. Sign in with that username and password.'}</div>}
         {authState === 'connected' ? <>
-          <div className="adm-hint">Connected{d.auth.account ? ' as ' + d.auth.account : ''} via {credentialLabel(d.auth.type)}{d.auth.connectedAt ? ' · added ' + rel(d.auth.connectedAt) : ''}. The key is stored encrypted and is never shown again.</div>
+          <div className="adm-hint">{needsLogin ? 'Saved' : 'Connected'}{d.auth.account ? ' as ' + d.auth.account : ''} via {credentialLabel(d.auth.type)}{d.auth.connectedAt ? ' · added ' + rel(d.auth.connectedAt) : ''}. {d.auth.type === 'basic' ? 'The password' : 'The key'} is stored encrypted and is never shown again.</div>
           <div className="adm-actions">
             {meta.apiKey && <Button size="sm" variant="tinted" icon="lock" disabled={busy}
-              onClick={() => openSheet(close => <ApiKeySheet close={close} onDone={load} label={meta.label} placeholder={meta.keyPlaceholder} optional={meta.keyOptional} />)}>Replace key</Button>}
+              onClick={() => openSheet(close => <ApiKeySheet close={close} onDone={load} label={meta.label} placeholder={meta.keyPlaceholder} optional={meta.keyOptional} />)}>{d.auth.type === 'basic' ? 'Use an API key instead' : 'Replace key'}</Button>}
+            {meta.basic && <Button size="sm" variant="tinted" icon="key" disabled={busy}
+              onClick={() => openSheet(close => <LoginSheet close={close} onDone={load} label={meta.label} baseUrl={d.baseUrl} account={d.auth.type === 'basic' ? d.auth.account : ''} />)}>{d.auth.type === 'basic' ? 'Replace login' : 'Use a login instead'}</Button>}
             <Button size="sm" danger disabled={busy} onClick={disconnect}>Remove</Button>
           </div>
         </> : <>
           {authState === 'unreadable' && <div className="adm-hint" style={{ color: 'var(--red)' }}>
             The stored credential can't be decrypted. This usually means <code>./data</code> was restored without its <code>secret</code> file. Add the key again to fix it.
           </div>}
-          {authState === 'optional' && <div className="adm-hint">This endpoint works without a key. Add one only if your server asks for it (OpenRouter does; a model on your own network usually does not).</div>}
+          {authState === 'optional' && !needsLogin && <div className="adm-hint">This endpoint works without a key. Add one only if your server asks for it (OpenRouter does; a model on your own network usually does not).{meta.basic ? ' If the address opens with a browser login prompt — a model behind nginx or another reverse proxy — sign in with that username and password instead.' : ''}</div>}
           {authState === 'none' && <div className="adm-hint">{meta.setupToken
             ? 'Paste either a Claude Code setup token (your subscription) or an Anthropic API key (pay per use).'
             : 'Paste an API key from the provider\'s console. It is stored encrypted on this server and sent to the provider only while a job runs.'}</div>}
@@ -211,6 +220,8 @@ export default function AdminCoach() {
             {meta.apiKey && <Button size="sm" variant={meta.setupToken ? undefined : 'primary'} icon="lock" disabled={busy}
               onClick={() => openSheet(close => <ApiKeySheet close={close} onDone={load} label={meta.label} placeholder={meta.keyPlaceholder} optional={meta.keyOptional} />)}>
               {meta.keyOptional ? 'Add API key (optional)' : 'Add API key'}</Button>}
+            {meta.basic && <Button size="sm" variant={needsLogin ? 'primary' : undefined} icon="key" disabled={busy}
+              onClick={() => openSheet(close => <LoginSheet close={close} onDone={load} label={meta.label} baseUrl={d.baseUrl} />)}>Sign in with a username and password</Button>}
           </div>
         </>}
       </Step>}
@@ -313,7 +324,9 @@ export default function AdminCoach() {
           <div className="adm-group-t" style={{ marginTop: 14 }}>Whose account pays</div>
           <div className="adm-hint">{d.authMode === 'profile'
             ? 'Each profile signs in with their own account.'
-            : d.auth?.type === 'apikey' || meta.http
+            : d.auth?.type === 'basic'
+              ? 'One login for the whole instance: every profile may use the Coach through it, and the daily limits above are what bound the load on your model.'
+              : d.auth?.type === 'apikey' || meta.http
               ? 'One API key for the whole instance: every profile may use the Coach with it, and the daily limits above are what bound the spend.'
               : d.boundUid
                 ? 'One personal account, already in use by one profile. Every other profile is refused, so nobody spends somebody else\'s subscription.'
@@ -393,7 +406,8 @@ const credentialHint = (auth, meta) => {
 }
 
 const credentialLabel = type => ({
-  'cli-token': 'Claude Code setup token', 'chatgpt-cli': 'ChatGPT CLI login', oauth: 'legacy token', apikey: 'API key'
+  'cli-token': 'Claude Code setup token', 'chatgpt-cli': 'ChatGPT CLI login', oauth: 'legacy token', apikey: 'API key',
+  basic: 'username and password'
 }[type] || 'credential')
 
 // What each logged call was, for the recent-jobs list.
@@ -471,6 +485,44 @@ function ApiKeySheet({ close, onDone, label, placeholder, optional }) {
     <TextField value={key} autoFocus type="password" placeholder={placeholder || 'sk-…'} autoCapitalize="none" autoCorrect="off" onChange={e => setKey(e.target.value)} />
     <div style={{ height: 12 }} />
     <Button variant="primary" disabled={busy || !key.trim()} onClick={save}>Save key</Button>
+    <div style={{ height: 8 }} />
+  </>
+}
+
+/* A model behind a reverse proxy that asks for a login (nginx `auth_basic` in front of LocalAI or
+   Ollama): the same username and password the browser prompt takes. It is the endpoint's whole
+   credential — a key and a login both want the Authorization header, so saving one replaces the
+   other. The password is taken as typed, spaces included. */
+function LoginSheet({ close, onDone, label, baseUrl, account }) {
+  const toast = useUI(s => s.toast)
+  const [username, setUsername] = useState(account || '')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const save = async () => {
+    setBusy(true)
+    try {
+      await api('/api/admin/coach/connect', { method: 'POST', body: JSON.stringify({ type: 'basic', username: username.trim(), password }) })
+      setPassword('')
+      toast('Login saved')
+      close(); onDone()
+    } catch (e) { toast(e.message); setBusy(false) }
+  }
+  // Basic sends the password with every request, readable by anyone on the path unless the
+  // connection is encrypted. Fine inside one machine or one compose network; say so otherwise.
+  const plain = /^http:\/\//i.test(baseUrl || '')
+  return <>
+    <h3>Sign in to {label}</h3>
+    <div className="muted small" style={{ lineHeight: 1.5, marginBottom: 12 }}>
+      The username and password your endpoint's address asks for in a browser. Stored encrypted on this server and sent to the endpoint only while a request runs. The password is never shown again. This replaces an API key, if one is saved.
+    </div>
+    <TextField value={username} autoFocus placeholder="username" autoCapitalize="none" autoCorrect="off" autoComplete="off" onChange={e => setUsername(e.target.value)} />
+    <div style={{ height: 8 }} />
+    <TextField value={password} type="password" placeholder="password" autoCapitalize="none" autoCorrect="off" autoComplete="new-password" onChange={e => setPassword(e.target.value)} />
+    {plain && <div className="small" style={{ lineHeight: 1.5, marginTop: 10, color: 'var(--orange, var(--red))' }}>
+      The endpoint address starts with <code>http://</code>, so the password travels unencrypted. That is fine on the same machine or a private network — over the internet, use the <code>https://</code> address.
+    </div>}
+    <div style={{ height: 12 }} />
+    <Button variant="primary" disabled={busy || !username.trim() || !password} onClick={save}>Save login</Button>
     <div style={{ height: 8 }} />
   </>
 }

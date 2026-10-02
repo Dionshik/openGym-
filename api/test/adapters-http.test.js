@@ -293,3 +293,84 @@ test('models(): OpenAI’s list is cut to what Chat Completions can use; a compa
   const co = fakeFetch([ok({ data: [{ id: 'qwen2.5:3b' }, { id: 'llama3.2' }] })]);
   assert.deepEqual((await compatible.models({ providerOptions: { compatible: { baseUrl: 'http://ollama:11434' } } }, {}, { fetch: co })).models, ['llama3.2', 'qwen2.5:3b']);
 });
+
+/* ---------- a username and password instead of a key (HTTP Basic) ---------- */
+
+const decodeBasic = h => Buffer.from(String(h).replace(/^Basic /, ''), 'base64').toString('utf8');
+
+test('basicPair / basicHeader: one "user:password" token, UTF-8 before base64, and nothing that could split a header', async () => {
+  const { basicPair, basicHeader } = await import('../coach/core/providers.js');
+  assert.deepEqual(basicPair(' admin ', 'p:w '), { ok: true, value: 'admin:p:w ' }, 'the name is trimmed, the password is taken as typed');
+  assert.equal(basicPair('', 'x').ok, false);
+  assert.equal(basicPair('admin', '').ok, false);
+  assert.equal(basicPair('ad:min', 'x').ok, false, 'the first colon is where the server splits');
+  assert.equal(basicPair('admin', 'a\r\nx-evil: 1').ok, false);
+  assert.equal(basicPair('ad\tmin', 'x').ok, false);
+  assert.equal(basicPair('a'.repeat(201), 'x').ok, false);
+
+  assert.equal(basicHeader('Aladdin:open sesame'), 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==', 'the RFC 7617 example');
+  const cyr = 'дима:пароль№1';
+  assert.equal(decodeBasic(basicHeader(cyr)), cyr, 'a Cyrillic password survives — btoa alone would throw');
+});
+
+test('compatible: a login is sent as Authorization: Basic on the model list and on the job, and replaces the key', async () => {
+  const login = { OPENAI_COMPAT_BASIC: 'admin:s3cr:et' };
+  const f = fakeFetch([ok({ data: [{ id: 'qwen' }] })]);
+  const list = await compatible.models(cfgCompat, login, { fetch: f });
+  assert.deepEqual(list.models, ['qwen']);
+  assert.equal(f.calls[0].url, 'http://ollama.lan:11434/v1/models');
+  assert.equal(decodeBasic(f.calls[0].headers.authorization), 'admin:s3cr:et');
+  assert.match(f.calls[0].headers.authorization, /^Basic /);
+
+  const g = fakeFetch([ok({ choices: [{ message: { content: ANSWER }, finish_reason: 'stop' }] })]);
+  const r = await compatible.invoke({ cfg: cfgCompat, prompt: 'P', env: login, model: 'qwen', fetch: g });
+  assert.equal(r.code, 0);
+  assert.equal(decodeBasic(g.calls[0].headers.authorization), 'admin:s3cr:et');
+  assert.equal(g.calls[0].headers['content-type'], 'application/json');
+  assert.ok(!g.calls[0].url.includes('admin') && !JSON.stringify(g.calls[0].body).includes('s3cr'), 'the login is in the header and nowhere else');
+
+  // Both filed (which the server never does): one header, and the login is the one sent.
+  const h = fakeFetch([ok({ choices: [{ message: { content: ANSWER }, finish_reason: 'stop' }] })]);
+  await compatible.invoke({ cfg: cfgCompat, prompt: 'P', env: { ...login, OPENAI_COMPAT_API_KEY: 'compat-1' }, model: 'qwen', fetch: h });
+  assert.match(h.calls[0].headers.authorization, /^Basic /);
+});
+
+test('a login is only for a provider that declares one: OpenAI ignores the variable and still needs its key', async () => {
+  const f = fakeFetch([]);
+  const r = await openai.invoke({ cfg: {}, prompt: 'P', env: { OPENAI_COMPAT_BASIC: 'a:b' }, model: 'gpt-x', fetch: f });
+  assert.equal(r.spawnError, true);
+  assert.equal(f.calls.length, 0);
+});
+
+test('a proxy that asks for a login says so in words, and the failure is still "auth"', async () => {
+  // nginx's 401: an HTML page and the header that names what it wants.
+  const proxy = () => {
+    const calls = [];
+    const f = async (url, init) => {
+      calls.push(init.headers || {});
+      return {
+        ok: false, status: 401,
+        headers: { get: n => (n.toLowerCase() === 'www-authenticate' ? 'Basic realm="Restricted Access"' : null) },
+        text: async () => '<html><head><title>401 Authorization Required</title></head></html>'
+      };
+    };
+    f.calls = calls;
+    return f;
+  };
+  const none = await compatible.models(cfgCompat, {}, { fetch: proxy() });
+  assert.equal(none.ok, false);
+  assert.equal(none.error, '401 the endpoint asks for a username and password — add them in the Credential step');
+
+  const wrong = await compatible.invoke({ cfg: cfgCompat, prompt: 'P', env: { OPENAI_COMPAT_BASIC: 'admin:nope' }, model: 'qwen', fetch: proxy() });
+  assert.equal(wrong.code, 1);
+  assert.equal(wrong.stderr, '401 the endpoint did not accept this username and password');
+  assert.ok(!wrong.stderr.includes('nope'), 'the password is never echoed');
+
+  const cls = await attemptOnce({ adapter: compatible, cfg: { ...cfgCompat, models: {} }, kind: 'review', payload: { plan: { routines: [], week: {} } }, invokeOpts: { env: {}, fetch: proxy(), model: 'qwen' } }, null);
+  assert.equal(cls.errorClass, 'auth');
+
+  // A bearer-style 401 (no Basic challenge) keeps the provider's own message.
+  const bearer = fakeFetch([{ status: 401, body: { error: { message: 'invalid api key' } } }]);
+  const b = await compatible.invoke({ cfg: cfgCompat, prompt: 'P', env, model: 'qwen', fetch: bearer });
+  assert.equal(b.stderr, '401 invalid api key');
+});

@@ -34,9 +34,14 @@ export const HTTP_PROVIDERS = Object.freeze({
   // Ollama, LM Studio, vLLM, OpenRouter, a corporate gateway: anything that serves the
   // Chat Completions shape. The base URL is the whole configuration; a key is optional
   // because a model on your own LAN usually has none.
+  //
+  // `basicEnv` is the other way in: a model put behind a reverse proxy with a login prompt
+  // (nginx `auth_basic` in front of LocalAI or Ollama is the usual way to expose one). The
+  // proxy wants `Authorization: Basic …` where a key would be `Authorization: Bearer …` — one
+  // header, so an endpoint is signed in to with a key or with a login, never both.
   compatible: Object.freeze({
     label: 'OpenAI-compatible endpoint', runtime: 'HTTPS', http: true,
-    apiKeyEnv: 'OPENAI_COMPAT_API_KEY', oauthEnv: null,
+    apiKeyEnv: 'OPENAI_COMPAT_API_KEY', oauthEnv: null, basicEnv: 'OPENAI_COMPAT_BASIC',
     defaultBase: null, baseUrl: true, keyOptional: true,
     defaultModel: null,
     keyPlaceholder: '(optional)'
@@ -64,7 +69,37 @@ export function validateBaseUrl(raw) {
   let u;
   try { u = new URL(s); } catch { return { ok: false, error: 'not a valid URL' }; }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return { ok: false, error: 'only http:// and https:// endpoints are supported' };
-  if (u.username || u.password) return { ok: false, error: 'put the key in the credential field, not in the URL' };
+  if (u.username || u.password) return { ok: false, error: 'put the key or the login in the credential step, not in the URL' };
   if (u.search || u.hash) return { ok: false, error: 'a base URL has no query string' };
   return { ok: true, value: u.toString().replace(/\/+$/, '') };
+}
+
+/* ---------- username + password (HTTP Basic, RFC 7617) ---------- */
+
+const CONTROL = /[\u0000-\u001f\u007f]/;
+
+/**
+ * The pair as it is stored and carried: "user:password". The user name cannot hold a colon —
+ * the first one is where the server splits — and neither half may hold a control character,
+ * which is how a header gets a second line. The password is taken as typed: a leading or
+ * trailing space may be part of it.
+ */
+export function basicPair(username, password) {
+  const user = String(username == null ? '' : username).trim();
+  const pass = String(password == null ? '' : password);
+  if (!user) return { ok: false, error: 'no username supplied' };
+  if (!pass) return { ok: false, error: 'no password supplied' };
+  if (user.includes(':')) return { ok: false, error: 'a username cannot contain ":"' };
+  if (CONTROL.test(user) || CONTROL.test(pass)) return { ok: false, error: 'the username or password holds a control character' };
+  if (user.length > 200 || pass.length > 400) return { ok: false, error: 'the username or password is too long' };
+  return { ok: true, value: user + ':' + pass };
+}
+
+/** The Authorization value for a stored pair. UTF-8 first, so a Cyrillic password survives —
+ *  btoa alone throws on anything outside Latin-1. Runs the same in node and in a WebView. */
+export function basicHeader(pair) {
+  const bytes = new TextEncoder().encode(String(pair));
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return 'Basic ' + btoa(bin);
 }

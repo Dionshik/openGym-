@@ -11,7 +11,7 @@ import { computeCohort } from './cohort.js';
 import { adapterFor } from './adapters/index.js';
 import { canDropPrivileges } from './adapters/spawn.js';
 import { DATA_CATEGORIES, OPTIONAL_CATEGORIES } from './core/payload.js';
-import { validateBaseUrl, baseUrlFor } from './core/providers.js';
+import { validateBaseUrl, baseUrlFor, basicPair } from './core/providers.js';
 
 // Job failures the user sees, in the app's own voice. The raw provider detail never reaches
 // them — it goes to the admin card, which is where someone can act on it (FR-47).
@@ -214,6 +214,8 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
           id, label: p.label, runtime: p.runtime,
           setupToken: !!p.setupToken, deviceLogin: !!p.deviceLogin, apiKey: !!p.apiKeyEnv,
           http: !!p.http, baseUrl: !!p.baseUrl, keyOptional: !!p.keyOptional, keyPlaceholder: p.keyPlaceholder || null,
+          // Whether this provider can be signed in to with a username and password instead.
+          basic: !!p.basicEnv,
           defaultModel: p.defaultModel || null,
           // Which providers already hold a key — so switching chips is visibly not a reset.
           connected: !!(cfgStore.authFor(cfg, id) && cfgStore.authFor(cfg, id).data)
@@ -227,7 +229,9 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
         knownModels: check.models || null,
         caps: cfg.caps,
         community: !!cfg.community,
-        runtime: { ok: !!check.ok, version: check.version || null, error: check.error || null, needsKey: !!check.needsKey },
+        // needsLogin: the address answered with a login prompt (a reverse proxy's HTTP Basic),
+        // so what is missing or wrong is the credential, not the endpoint.
+        runtime: { ok: !!check.ok, version: check.version || null, error: check.error || null, needsKey: !!check.needsKey, needsLogin: !!check.needsLogin },
         authMode: cfg.authMode,
         boundUid: cfgStore.boundUidFor(cfg),
         /* Whether a credential is filed, and whose — never the credential. `unreadable` is its
@@ -341,9 +345,23 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       const meta = cfgStore.PROVIDERS[provider];
       const type = String(body.type || '');
       const envVar = (type === 'cli-token' || type === 'oauth') ? meta.oauthEnv
-        : type === 'apikey' ? meta.apiKeyEnv : null;
+        : type === 'apikey' ? meta.apiKeyEnv
+          : type === 'basic' ? meta.basicEnv : null;
       if (!envVar) {
         return json(res, 400, { error: `${provider} does not take a credential of type "${type}"` });
+      }
+      /* A username and password for the reverse proxy in front of the endpoint. Filed as one
+         "user:password" token so everything downstream — encryption, credentialFor, jobEnv —
+         handles it exactly like a key. It replaces a key rather than joining it: both would
+         want the Authorization header. The username doubles as the account label, which is
+         what the card shows; the password is never read back. */
+      if (type === 'basic') {
+        const pair = basicPair(body.username, body.password);
+        if (!pair.ok) return json(res, 400, { error: pair.error });
+        cfgStore.saveAuth(provider, {
+          type, account: String(body.username).trim().slice(0, 120), data: cfgStore.encrypt({ token: pair.value }), connectedAt: new Date().toISOString()
+        });
+        return json(res, 200, { ok: true });
       }
       const token = String(body.token || '').trim();
       if (!token) return json(res, 400, { error: 'no token supplied' });

@@ -338,8 +338,11 @@ export function jobEnv(jobDir, resolved) {
   const env = { PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', HOME: jobDir, TMPDIR: jobDir };
   const auth = resolved && resolved.auth;
   if (auth && auth.token) {
+    // 'basic' is a username and password for the proxy in front of the endpoint, filed as
+    // "user:password" and only by a provider that declares `basicEnv` (see core/providers.js).
     const name = (resolved.type === 'cli-token' || resolved.type === 'oauth') ? meta.oauthEnv
-      : resolved.type === 'apikey' ? meta.apiKeyEnv : null;
+      : resolved.type === 'apikey' ? meta.apiKeyEnv
+        : resolved.type === 'basic' ? meta.basicEnv : null;
     if (name) env[name] = auth.token;
   }
   // A provider whose runtime keeps its own credential cache needs a home that survives the job,

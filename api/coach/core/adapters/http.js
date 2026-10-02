@@ -17,9 +17,12 @@
  *   fetch threw / aborted    → code 1 with the host / timedOut
  *   no key and one required  → spawnError                             "missing", like an absent CLI
  *
+ * A provider that declares `basicEnv` can be signed in to with a username and password instead
+ * of a key (HTTP Basic — a model behind a reverse proxy with a login prompt).
+ *
  * A provider is described by a spec (see anthropic.js etc.); this file owns the transport.
  */
-import { HTTP_PROVIDERS, baseUrlFor } from '../providers.js';
+import { HTTP_PROVIDERS, baseUrlFor, basicHeader } from '../providers.js';
 
 export const MAX_OUTPUT_TOKENS = 16000;
 const DEFAULT_TIMEOUT_MS = 5 * 60000;
@@ -64,6 +67,27 @@ export function httpAdapter(spec) {
   if (!meta) throw new Error(`httpAdapter: unknown provider "${id}"`);
 
   const keyOf = env => (env && env[meta.apiKeyEnv]) || null;
+  // A login for the proxy in front of the endpoint ("user:password"), where the provider takes
+  // one. It and a key want the same header, so the login wins and the key is not sent.
+  const basicOf = env => (meta.basicEnv && env && env[meta.basicEnv]) || null;
+  const signedIn = env => !!(keyOf(env) || basicOf(env));
+  const authHeaders = env => {
+    const basic = basicOf(env);
+    return basic ? { authorization: basicHeader(basic) } : spec.headers(keyOf(env));
+  };
+  // A proxy's 401 is an HTML page, which says nothing useful in a card. What it asks for is in
+  // the header — and "this address wants a login" is the one thing the admin can act on.
+  const wantsLogin = res => {
+    let ask = '';
+    try { ask = String((res.headers && res.headers.get && res.headers.get('www-authenticate')) || ''); } catch { /* a fake fetch without headers */ }
+    return res.status === 401 && /^\s*basic\b/i.test(ask) && !!meta.basicEnv;
+  };
+  const refusal = (res, env, fallback) => {
+    if (!wantsLogin(res)) return fallback;
+    return basicOf(env)
+      ? 'the endpoint did not accept this username and password'
+      : 'the endpoint asks for a username and password — add them in the Credential step';
+  };
 
   const adapter = {
     id,
@@ -86,9 +110,9 @@ export function httpAdapter(spec) {
     async check(cfg, env, opts = {}) {
       const base = adapter.baseUrl(cfg);
       if (!base) return { ok: false, error: 'no endpoint configured' };
-      if (!keyOf(env) && !meta.keyOptional) return { ok: true, version: `HTTPS · ${hostOf(base)}`, needsKey: true };
+      if (!signedIn(env) && !meta.keyOptional) return { ok: true, version: `HTTPS · ${hostOf(base)}`, needsKey: true };
       const r = await adapter.models(cfg, env, opts);
-      if (!r.ok) return { ok: false, error: r.error };
+      if (!r.ok) return { ok: false, error: r.error, ...(r.needsLogin ? { needsLogin: true } : {}) };
       return { ok: true, version: `HTTPS · ${hostOf(base)} · ${r.models.length} models`, models: r.models };
     },
 
@@ -96,16 +120,21 @@ export function httpAdapter(spec) {
     async models(cfg, env, { fetch: fetchImpl = globalThis.fetch, timeoutMs = 20000, signal } = {}) {
       const base = adapter.baseUrl(cfg);
       if (!base) return { ok: false, error: 'no endpoint configured', models: [] };
-      const key = keyOf(env);
-      if (!key && !meta.keyOptional) return { ok: false, error: 'no API key configured', models: [] };
+      if (!signedIn(env) && !meta.keyOptional) return { ok: false, error: 'no API key configured', models: [] };
       let res;
       try {
-        res = await call(fetchImpl, base + spec.modelsPath, { method: 'GET', headers: spec.headers(key) }, timeoutMs, signal);
+        res = await call(fetchImpl, base + spec.modelsPath, { method: 'GET', headers: authHeaders(env) }, timeoutMs, signal);
       } catch (e) {
         return { ok: false, error: e.name === 'AbortError' ? 'timed out' : `could not reach ${hostOf(base)}: ${trim(e.message, 120)}`, models: [] };
       }
       const { data, text } = await readJson(res);
-      if (!res.ok) return { ok: false, error: `${res.status} ${trim(spec.errorMessage(data) || text, 200)}`, models: [] };
+      if (!res.ok) {
+        return {
+          ok: false, error: `${res.status} ${trim(refusal(res, env, spec.errorMessage(data) || text), 200)}`, models: [],
+          // So a card can send the admin to the credential rather than to "cannot be reached".
+          ...(wantsLogin(res) ? { needsLogin: true } : {})
+        };
+      }
       let models;
       try { models = spec.readModels(data); } catch { models = null; }
       if (!Array.isArray(models)) return { ok: false, error: 'unexpected model list shape', models: [] };
@@ -121,8 +150,7 @@ export function httpAdapter(spec) {
       const { cfg, prompt, system, schema, images, maxTokens, env, model, timeoutMs = DEFAULT_TIMEOUT_MS, fetch: fetchImpl = globalThis.fetch, signal } = opts;
       const base = adapter.baseUrl(cfg);
       if (!base) return { code: -1, text: '', stderr: `no endpoint configured for ${id}`, spawnError: true };
-      const key = keyOf(env);
-      if (!key && !meta.keyOptional) return { code: -1, text: '', stderr: `no API key configured for ${id}`, spawnError: true };
+      if (!signedIn(env) && !meta.keyOptional) return { code: -1, text: '', stderr: `no API key configured for ${id}`, spawnError: true };
       const chosen = model || meta.defaultModel;
       if (!chosen) return { code: 1, text: '', stderr: `no model chosen for ${id} — pick one from the list the endpoint serves` };
 
@@ -140,7 +168,7 @@ export function httpAdapter(spec) {
         try {
           res = await call(fetchImpl, base + spec.path(chosen), {
             method: 'POST',
-            headers: { 'content-type': 'application/json', ...spec.headers(key) },
+            headers: { 'content-type': 'application/json', ...authHeaders(env) },
             body: JSON.stringify(body)
           }, timeoutMs, signal);
         } catch (e) {
@@ -149,7 +177,7 @@ export function httpAdapter(spec) {
         }
         const { data, text } = await readJson(res);
         if (!res.ok) {
-          const msg = spec.errorMessage(data) || trim(text, 200);
+          const msg = refusal(res, env, spec.errorMessage(data) || trim(text, 200));
           if (RETRY_STATUSES.has(res.status) && transientRetries < RETRY_DELAYS_MS.length && !(signal && signal.aborted)) {
             await sleep(opts.retryDelayMs != null ? opts.retryDelayMs : RETRY_DELAYS_MS[transientRetries], signal);
             transientRetries++;
