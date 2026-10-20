@@ -190,6 +190,28 @@ test('a body that is not JSON on an error still yields a readable stderr', async
   assert.match(r.stderr, /^502 .*bad gateway/);
 });
 
+test('a web page where the API should be names the path to remove, instead of "unexpected shape"', async () => {
+  // LocalAI's web interface lives under /app and answers every path below it with its own page.
+  const page = '<!doctype html><html><head><title>LocalAI</title></head><body><div id="root"></div></body></html>';
+  const ui = { provider: 'compatible', providerOptions: { compatible: { baseUrl: 'https://localai.example.org/app' } } };
+  const list = await compatible.models(ui, {}, { fetch: fakeFetch([{ status: 200, body: page }]) });
+  assert.equal(list.ok, false);
+  assert.match(list.error, /web page, not the API — remove "\/app" from the Endpoint/);
+  const job = await compatible.invoke({ cfg: ui, prompt: 'P', env: {}, model: 'm', fetch: fakeFetch([{ status: 200, body: page }]) });
+  assert.equal(job.code, 1);
+  assert.match(job.stderr, /remove "\/app" from the Endpoint/);
+
+  // No path to blame: say what the address is, not what to delete.
+  const root = await compatible.models(cfgCompat, {}, { fetch: fakeFetch([{ status: 200, body: page }]) });
+  assert.match(root.error, /this address serves a web interface/);
+  // Not JSON and not a page either.
+  const odd = await compatible.models(cfgCompat, {}, { fetch: fakeFetch([{ status: 200, body: 'OK' }]) });
+  assert.equal(odd.error, 'the endpoint answered, but not with JSON');
+  // JSON of the wrong shape keeps its own message.
+  const shape = await compatible.models(cfgCompat, {}, { fetch: fakeFetch([ok({ data: { a: 1 } })]) });
+  assert.equal(shape.error, 'unexpected model list shape');
+});
+
 test('an answer cut off at the output limit fails as "provider", not as a half-parsed proposal', async () => {
   const cases = [
     [anthropic, ok({ content: [{ type: 'text', text: '{"coach_contract":1,"changes":[' }], stop_reason: 'max_tokens' })],

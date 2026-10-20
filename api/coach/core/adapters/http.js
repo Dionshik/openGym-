@@ -89,6 +89,18 @@ export function httpAdapter(spec) {
       : 'the endpoint asks for a username and password — add them in the Credential step';
   };
 
+  // A 2xx that is not JSON. Almost always the Endpoint points at a web interface rather than
+  // the API — LocalAI's lives under /app and answers any path below it with its own page — and
+  // "unexpected shape" gives the admin nothing to act on. Name the path that has to go.
+  const notJson = (text, base) => {
+    if (!/^\s*</.test(String(text || ''))) return 'the endpoint answered, but not with JSON';
+    let extra = '';
+    try { extra = new URL(base).pathname.replace(/\/+$/, ''); } catch { /* base was validated when it was saved */ }
+    return extra
+      ? `the endpoint answered with a web page, not the API — remove "${extra}" from the Endpoint and keep only the server's address`
+      : 'the endpoint answered with a web page, not the API — this address serves a web interface; the API may be on another address or port';
+  };
+
   const adapter = {
     id,
     runtime: meta.runtime,
@@ -135,6 +147,7 @@ export function httpAdapter(spec) {
           ...(wantsLogin(res) ? { needsLogin: true } : {})
         };
       }
+      if (data === null) return { ok: false, error: notJson(text, base), models: [] };
       let models;
       try { models = spec.readModels(data); } catch { models = null; }
       if (!Array.isArray(models)) return { ok: false, error: 'unexpected model list shape', models: [] };
@@ -191,6 +204,7 @@ export function httpAdapter(spec) {
           }
           return { code: 1, text: '', stderr: `${res.status} ${trim(msg, 280)}` };
         }
+        if (data === null) return { code: 1, text: '', stderr: notJson(text, base) };
         let out;
         try { out = spec.readText(data); } catch (e) { out = { error: `unexpected response shape: ${trim(e.message, 100)}` }; }
         if (out.error) return { code: 1, text: '', stderr: out.error };
