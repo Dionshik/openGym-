@@ -266,3 +266,35 @@ test('nothing typed reaches a disk: not the profile, not the job log', async () 
   const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
   for (const f of walk(DIR)) assert.ok(!fs.readFileSync(f, 'utf8').includes(marker), `${path.basename(f)} holds the text`);
 });
+
+test('"one of your own" is checked: an id stamped on several lines, or on a line it has no word in common with, is dropped', () => {
+  const customs = [{ id: 'c1', n: 'Pec Dock' }, { id: 'c2', n: 'Жим в хаммере' }];
+  // The whole workout stamped with the one custom exercise the model was shown.
+  const all = validateLog({ items: [
+    item({ said: 'присед без груза', names: ['bodyweight squat'], customId: 'c1' }),
+    item({ said: 'румынская тяга', names: ['barbell romanian deadlift'], customId: 'c1' }),
+    item({ said: 'бабочка', names: ['lever pec deck fly'], customId: 'c1' })
+  ] }, { customs, today: '2026-10-16' });
+  assert.deepEqual(all.result.items.map(i => i.customId), [undefined, undefined, undefined]);
+  // One line, but nothing in it is the exercise's name.
+  const stray = validateLog({ items: [item({ said: 'тяга верхнего блока', names: ['cable lat pulldown'], customId: 'c1' })] }, { customs });
+  assert.equal(stray.result.items[0].customId, undefined);
+  // One line, and the words agree — in the model's English or in the person's own.
+  const deck = validateLog({ items: [item({ said: 'бабочка', names: ['lever pec deck fly', 'pec deck'], customId: 'c1' })] }, { customs });
+  assert.equal(deck.result.items[0].customId, 'c1');
+  const hammer = validateLog({ items: [item({ said: 'жим в хаммере', names: ['lever chest press'], customId: 'c2' })] }, { customs });
+  assert.equal(hammer.result.items[0].customId, 'c2');
+  // After the check, the lines resolve by name again.
+  const r = resolveLog(all.result, { customEx: customs });
+  assert.notEqual(r.items[1].matches[0]?.id, 'c1');
+});
+
+test('through the lane: a model that stamps one custom exercise on every line does not decide the draft', async () => {
+  lookupOnly('log10', { customEx: [{ id: 'c1', n: 'Pec Dock', bp: 'chest' }] });
+  process.env.FIXTURE_MODE = 'logtext-same-custom';
+  try {
+    const s = await settle('log10', logJobs.start('log10', { text: 'barbell bench press 3x8 80, barbell full squat 5x5 100' }).id);
+    assert.equal(s.state, 'done', JSON.stringify(s));
+    assert.deepEqual(s.result.items.map(i => i.matches[0]?.id), ['0025', '0043']);
+  } finally { delete process.env.FIXTURE_MODE; }
+});

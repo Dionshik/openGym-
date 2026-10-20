@@ -16,7 +16,7 @@
  * in from the caller, and the phone that brought its own key runs this very module.
  */
 import { CONTRACT } from './payload.js';
-import { readMatchItem, resolveMatch } from './match.js';
+import { readMatchItem, resolveMatch, tokens } from './match.js';
 
 export const MAX_LOG_TEXT = 1500;   // a whole session, typed out
 // Stated again in LOGTEXT_SCHEMA (schemas.js) as maxItems; the validator is what holds them.
@@ -131,10 +131,10 @@ export function readWhen(when, today) {
  * @returns {{ ok:true, result:{ items:object[], date:string|null, start:string|null, minutes:number|null, unit:'kg'|'lb'|null } }
  *         | { ok:false, errors:string[] }}
  */
-export function validateLog(data, { customIds = [], today = null } = {}) {
+export function validateLog(data, { customIds = [], customs = null, today = null } = {}) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { ok: false, errors: ['the answer must be one JSON object'] };
   if (!Array.isArray(data.items)) return { ok: false, errors: ['`items` must be an array (empty when the text names no exercise)'] };
-  const own = new Set(customIds);
+  const own = new Set([...customIds, ...(customs || []).map(c => c && c.id).filter(Boolean)]);
   const errors = [];
   const items = [];
   data.items.slice(0, MAX_LOG_ITEMS).forEach((it, i) => {
@@ -145,11 +145,39 @@ export function validateLog(data, { customIds = [], today = null } = {}) {
     items.push({ ...r.item, sets });
   });
   if (errors.length) return { ok: false, errors };
+  dropDoubtfulCustomIds(items, customs);
   const unit = data.unit === 'kg' || data.unit === 'lb' ? data.unit : null;
   const minutes = inRange(num(data.minutes), 1, 600);
   const start = typeof data.start === 'string' && /^([01]?\d|2[0-3]):[0-5]\d$/.test(data.start.trim())
     ? data.start.trim().padStart(5, '0') : null;
   return { ok: true, result: { items, date: readWhen(data.when, today), start, minutes: minutes == null ? null : Math.round(minutes), unit } };
+}
+
+/**
+ * "This is one of your own exercises" is the one claim in an answer that the ranking takes on
+ * trust (rankLibrary puts that exercise first, at full score), so it is checked here. A small
+ * model shown a list with one custom exercise in it will happily stamp that id on every line
+ * of a workout — so an id claimed by more than one line is dropped from all of them, and an id
+ * whose name shares not a single word with what the person typed, or with the model's own
+ * English names for the line, is dropped too. Dropping it costs nothing: the line is still
+ * resolved by name, and the person's own exercises are still searched by their words.
+ * Mutates `items`.
+ */
+export function dropDoubtfulCustomIds(items, customs) {
+  const claims = new Map();
+  for (const it of items) if (it.customId) claims.set(it.customId, (claims.get(it.customId) || 0) + 1);
+  const nameOf = new Map((customs || []).filter(c => c && c.id).map(c => [c.id, c.n]));
+  for (const it of items) {
+    if (!it.customId) continue;
+    let keep = claims.get(it.customId) === 1;
+    if (keep && nameOf.has(it.customId)) {
+      const mine = tokens(nameOf.get(it.customId));
+      const said = new Set([...tokens(it.said), ...it.names.flatMap(n => [...tokens(n)])]);
+      keep = [...mine].some(w => said.has(w));
+    }
+    if (!keep) delete it.customId;
+  }
+  return items;
 }
 
 /** Validated answer → what the client renders: each exercise resolved against the catalogue and

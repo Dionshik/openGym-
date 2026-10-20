@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
-  usageOf, logCandidates, initialChoice, convertWeight, setsLine, logMode, entryFromLog, entriesFromDraft,
+  usageOf, logCandidates, initialChoice, initialChoices, convertWeight, setsLine, logMode, entryFromLog, entriesFromDraft,
   unresolved, plainLog, MAX_LOG_TEXT
 } from './workout-text.js'
 import { CATALOGUE, registerCustom } from './exercises.js'
@@ -45,6 +45,18 @@ describe('which exercise a line is', () => {
     const st = S({ workouts: logged([INCLINE]) })
     expect(initialChoice({ matches: [{ id: INCLINE, score: 0.85 }], exact: false }, st)).toEqual({ status: 'sure', id: INCLINE })
     expect(initialChoice({ matches: [{ id: INCLINE, score: 0.6 }], exact: false }, st)).toEqual({ status: 'ask', id: null })
+  })
+})
+
+describe('across the lines', () => {
+  it('asks on every line that would be sure of the same exercise — six ticked guesses of one row is a broken answer', () => {
+    registerCustom([{ id: 'c1', n: 'Pec Dock', bp: 'chest', custom: true }])
+    const stamped = { matches: [{ id: 'c1', score: 1, custom: true }], exact: true }
+    const bench = { matches: [{ id: BENCH, score: 1 }], exact: true }
+    expect(initialChoices([stamped, stamped, bench], S())).toEqual([
+      { status: 'ask', id: null }, { status: 'ask', id: null }, { status: 'sure', id: BENCH }
+    ])
+    expect(initialChoices([stamped, bench], S())).toEqual([{ status: 'sure', id: 'c1' }, { status: 'sure', id: BENCH }])
   })
 })
 

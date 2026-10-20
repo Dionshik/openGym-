@@ -9,7 +9,7 @@ import { disclosure } from '../lib/coach-api.js'
 import { emptyCoach } from '../lib/coach.js'
 import { draftFor, hasLookupConsent, LOOKUP_CONSENT_VERSION } from '../lib/exercise-match.js'
 import { readWorkoutText, workoutTextError } from '../lib/workout-text-api.js'
-import { usageOf, logCandidates, initialChoice, setsLine, entriesFromDraft, unresolved, MAX_LOG_TEXT } from '../lib/workout-text.js'
+import { usageOf, logCandidates, initialChoices, setsLine, entriesFromDraft, unresolved, MAX_LOG_TEXT } from '../lib/workout-text.js'
 import { MUSCLE_NAME } from '../lib/muscles.js'
 import { useSheetKeyboard, tappable } from '../lib/use-sheet-keyboard.js'
 import { Thumb } from './Media.jsx'
@@ -83,7 +83,7 @@ export default function WorkoutFromText({ onOpen, onCreate, onSearch, close }) {
       const items = Array.isArray(r?.items) ? r.items : []
       const st = useStore.getState().S
       setDraft({ ...r, items })
-      setChoices(items.map(it => initialChoice(it, st, usageOf(st))))
+      setChoices(initialChoices(items, st))
       const y = new Date(); y.setDate(y.getDate() - 1)
       setDate(r?.date && r.date <= today ? r.date : isoOf(y))
       setTime(r?.start || '18:00')

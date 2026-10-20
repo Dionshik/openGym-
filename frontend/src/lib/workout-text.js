@@ -51,6 +51,20 @@ export function initialChoice(item, S, usage = usageOf(S)) {
   return { status: 'ask', id: null }
 }
 
+/**
+ * The draft's first answer for every line. On top of initialChoice, one rule across lines: an
+ * exercise the app would be "sure" of on two lines or more is asked about on all of them. Two
+ * lines of one session rarely are the same exercise, and when every line lands on one row (a
+ * model that stamped one custom exercise on the whole workout) the person must not be shown
+ * six ticked guesses.
+ */
+export function initialChoices(items, S, usage = usageOf(S)) {
+  const out = (items || []).map(it => initialChoice(it, S, usage))
+  const count = {}
+  for (const c of out) if (c.status === 'sure') count[c.id] = (count[c.id] || 0) + 1
+  return out.map(c => (c.status === 'sure' && count[c.id] > 1 ? { status: 'ask', id: null } : c))
+}
+
 /** A weight read in one unit, in the other — to the quarter, the smallest plate either side. */
 export function convertWeight(w, from, to) {
   if (!(w > 0) || !from || !to || from === to) return w || 0

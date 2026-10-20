@@ -107,7 +107,8 @@ if (kind === 'logtext') {
         said,
         names: [said.toLowerCase()],
         bp: 'chest',
-        ...(mine ? { customId: mine.id } : {}),
+        // A small model shown one custom exercise stamps it on every line (seen in the field).
+        ...(MODE === 'logtext-same-custom' && own[0] ? { customId: own[0].id } : mine ? { customId: mine.id } : {}),
         create: { name: said, desc: 'Fixture description.', primary: ['chest'], secondary: [] },
         sets
       };
