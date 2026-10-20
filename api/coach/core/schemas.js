@@ -198,7 +198,48 @@ export const SUGGEST_SCHEMA = {
   required: ['coach_contract', 'ideas']
 };
 
+// "Describe the workout you did" (logtext.js): the lookup's item, plus the rows of sets. `when`
+// stays three loose fields rather than a oneOf — the grammar converters handle a flat object
+// best, and the validator decides which of them counts.
+export const LOGTEXT_SCHEMA = {
+  type: 'object',
+  properties: {
+    coach_contract: { type: 'integer' },
+    when: { type: 'object', properties: { daysAgo: { type: 'integer' }, weekday: STR, date: STR } },
+    unit: STR,
+    minutes: NUM,
+    start: STR,
+    items: {
+      type: 'array',
+      maxItems: 15,
+      items: {
+        type: 'object',
+        properties: {
+          said: STR,
+          names: { type: 'array', maxItems: 4, items: STR },
+          bp: STR, eq: STR, customId: STR,
+          create: {
+            type: 'object',
+            properties: { name: STR, desc: STR, primary: STRINGS, secondary: STRINGS },
+            required: ['name']
+          },
+          sets: {
+            type: 'array',
+            maxItems: 30,
+            items: {
+              type: 'object',
+              properties: { reps: NUM, weight: NUM, sec: NUM, min: NUM, km: NUM, speed: NUM, warmup: { type: 'boolean' } }
+            }
+          }
+        },
+        required: ['names', 'create', 'sets']
+      }
+    }
+  },
+  required: ['coach_contract', 'items']
+};
+
 export const SCHEMAS = {
   review: REVIEW_SCHEMA, create: CREATE_SCHEMA, refine: CREATE_SCHEMA, debrief: DEBRIEF_SCHEMA, match: MATCH_SCHEMA,
-  meal: MEAL_SCHEMA, label: LABEL_SCHEMA, suggest: SUGGEST_SCHEMA
+  meal: MEAL_SCHEMA, label: LABEL_SCHEMA, suggest: SUGGEST_SCHEMA, logtext: LOGTEXT_SCHEMA
 };

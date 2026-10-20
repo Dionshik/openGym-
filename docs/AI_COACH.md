@@ -218,6 +218,41 @@ routine built this way does not spend the Coach's own daily runs; a spent instan
 stops them all the same. They appear in the admin card's recent jobs as **Exercise lookup**,
 counts and outcomes only.
 
+### Logging a past workout in your own words
+
+**History → Describe in words** (also **Describe it in words instead** at the bottom of *Log a
+past workout*), on any instance where the Coach is available. Type the session the way you would
+tell someone about it, in any language — *"вчера: жим лёжа 3×8 по 80, присед 5×5 100,
+подтягивания 3×10, планка 3 по 60 с"* — and the app comes back with a draft to check:
+
+- **the day** — "yesterday", "on Friday", "12.10" — with the start time and the duration if you
+  said them; all three can be changed on the draft;
+- **every exercise you named**, with the sets copied out of the text. A line the app is sure of
+  is shown as chosen and can still be changed. A line it is not sure of asks **Which one did you
+  mean?**, with the library rows it most likely is (an exercise you have logged before comes
+  first and says so), a **Create "…"** row that opens the custom-exercise form already filled
+  in, **Find it in the library**, and **Leave this line out**.
+
+**Open the workout** only works once every line has an answer. It opens the ordinary *log a past
+workout* screen for that day, with the sets filled in and ticked — and an exercise named without
+numbers given last time's rows, unticked — where anything can be edited before **Finish** saves
+it. Like any workout logged after the fact, it does not move your working weights.
+
+It is the exercise lookup asked about a whole session, and it is built the same way: the model
+**only reads**. It names each exercise in plain English and copies the numbers out;
+`api/coach/core/logtext.js` resolves the names against the catalogue, your own exercises and the
+shared pool with the lookup's own code, drops any number that cannot be a set (9,000 reps, a
+weight with nothing done under it), and works out the date itself — the model says "friday" or
+"1 day ago", never a computed date. What it sends is what a lookup sends — the text, the names
+of your own exercises, your language — plus your weight unit and today's date. The go-ahead is
+the lookup's (`coach.lookupConsent`), and it counts against the lookups' **30 a day**.
+
+Unlike a lookup it is a **job with a poll**, not an awaited request: fifteen exercises with their
+sets can take a local model longer than the sixty seconds a proxy in front of the api waits. The
+answer waits in memory for ten minutes to be collected, nothing typed is written to disk, and the
+admin card's recent jobs show it as **Workout from text**, counts and outcomes only. It uses the
+Coach's text model, not the vision one.
+
 ### The food diary: a photo, a label, a description, a suggestion
 
 Four entry points in the nutrition section use the same provider (see

@@ -16,6 +16,7 @@ import { SCHEMAS } from './schemas.js';
 import { extractJSON, contractOK } from './parse.js';
 import { validatePlan, validateReview, validateDebrief } from './validate.js';
 import { validateMatch } from './match.js';
+import { validateLog } from './logtext.js';
 import { FOOD_KINDS, validateFood } from './food.js';
 
 /**
@@ -74,6 +75,14 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
     const m = validateMatch(parsed.value, { customIds: (payload.custom || []).map(c => c.id) });
     if (!m.ok) return { ok: false, repairable: !repair, errors: m.errors, raw: r.text, errorClass: 'unusable' };
     return { ok: true, result: { items: m.items } };
+  }
+
+  // A workout read from text: the lookup's interpretation per exercise, plus the sets and the
+  // day (logtext.js) — resolved against the catalogue by the caller, like a lookup.
+  if (kind === 'logtext') {
+    const l = validateLog(parsed.value, { customIds: (payload.custom || []).map(c => c.id), today: payload.meta?.today || null });
+    if (!l.ok) return { ok: false, repairable: !repair, errors: l.errors, raw: r.text, errorClass: 'unusable' };
+    return { ok: true, result: l.result };
   }
 
   // The food diary's three questions, each with its own shape and its own validator (food.js).

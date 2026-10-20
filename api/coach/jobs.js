@@ -147,7 +147,9 @@ export function capState(uid) {
 /* Exercise lookups (match) keep a count of their own. One is a sentence in and a few lines out
    — a fraction of a plan or a review — and somebody building a routine asks several in a row;
    charged against the Coach's own daily cap they would spend it before a single review ran. */
-function bumpMatchDaily(uid) {
+// A workout read from text (logtext-jobs.js) counts here too: it is the same kind of call — the
+// person's own words in, an interpretation out — just a longer sentence.
+export function bumpMatchDaily(uid) {
   const rec = readUser(uid);
   const d = todayISO();
   patchUser(uid, { matchDaily: rec.matchDaily?.date === d ? { date: d, count: rec.matchDaily.count + 1 } : { date: d, count: 1 } });

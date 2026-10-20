@@ -87,30 +87,42 @@ export function validateMatch(data, { customIds = [] } = {}) {
   const errors = [];
   const items = [];
   data.items.slice(0, MAX_ITEMS).forEach((it, i) => {
-    if (!it || typeof it !== 'object') { errors.push(`items[${i}] must be an object`); return; }
-    const names = [...new Set((Array.isArray(it.names) ? it.names : []).filter(isStr).map(n => clamp(n, 80).toLowerCase()))].slice(0, MAX_NAMES);
-    if (!names.length) { errors.push(`items[${i}].names must list at least one English name for the exercise`); return; }
-    const c = it.create && typeof it.create === 'object' ? it.create : {};
-    const primary = muscles(c.primary);
-    const item = {
-      said: clamp(it.said, 120),
-      names,
-      bp: BODY_PARTS.includes(it.bp) ? it.bp : null,
-      eq: EQUIPMENT.includes(it.eq) ? it.eq : null,
-      create: {
-        // A model that left the name out still described an exercise; its own first English
-        // name is a truer label for it than refusing the whole answer.
-        name: clamp(c.name, 60) || names[0],
-        desc: clamp(c.desc, 600),
-        primary,
-        secondary: muscles(c.secondary).filter(m => !primary.includes(m))
-      }
-    };
-    if (isStr(it.customId) && own.has(it.customId)) item.customId = it.customId;
-    items.push(item);
+    const r = readMatchItem(it, `items[${i}]`, own);
+    if (r.error) errors.push(r.error); else items.push(r.item);
   });
   if (errors.length) return { ok: false, errors };
   return { ok: true, items };
+}
+
+/**
+ * One interpreted exercise, checked — shared with the workout read from text (logtext.js),
+ * which says the same thing about each exercise and more about the sets.
+ *
+ * @param {Set<string>} own  this person's custom exercise ids
+ * @returns {{ item:object } | { error:string }}
+ */
+export function readMatchItem(it, where, own = new Set()) {
+  if (!it || typeof it !== 'object') return { error: `${where} must be an object` };
+  const names = [...new Set((Array.isArray(it.names) ? it.names : []).filter(isStr).map(n => clamp(n, 80).toLowerCase()))].slice(0, MAX_NAMES);
+  if (!names.length) return { error: `${where}.names must list at least one English name for the exercise` };
+  const c = it.create && typeof it.create === 'object' ? it.create : {};
+  const primary = muscles(c.primary);
+  const item = {
+    said: clamp(it.said, 120),
+    names,
+    bp: BODY_PARTS.includes(it.bp) ? it.bp : null,
+    eq: EQUIPMENT.includes(it.eq) ? it.eq : null,
+    create: {
+      // A model that left the name out still described an exercise; its own first English
+      // name is a truer label for it than refusing the whole answer.
+      name: clamp(c.name, 60) || names[0],
+      desc: clamp(c.desc, 600),
+      primary,
+      secondary: muscles(c.secondary).filter(m => !primary.includes(m))
+    }
+  };
+  if (isStr(it.customId) && own.has(it.customId)) item.customId = it.customId;
+  return { item };
 }
 
 /* ---------- from an English name to catalogue rows ---------- */

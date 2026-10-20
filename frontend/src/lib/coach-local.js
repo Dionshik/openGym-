@@ -18,6 +18,7 @@
 import * as payloadLib from '../../../api/coach/core/payload.js'
 import { runPipeline } from '../../../api/coach/core/pipeline.js'
 import { buildMatchPayload, cleanText, resolveMatch } from '../../../api/coach/core/match.js'
+import { buildLogPayload, cleanLogText, resolveLog } from '../../../api/coach/core/logtext.js'
 import { FOOD_KINDS, buildFoodPayload, checkImage, cleanCaption } from '../../../api/coach/core/food.js'
 import { hasFoodConsent } from './food-ai.js'
 import { withPoolRows } from '../../../api/coach/core/pool-view.js'
@@ -291,4 +292,36 @@ export async function localFood(S, req = {}) {
     }
     return attempt.result
   } finally { fooding = false }
+}
+
+/* "Describe the workout you did", on a phone with its own key: the same core as the server's
+   lane (api/coach/core/logtext.js), counted against the lookups — it is the same kind of call. */
+let readingLog = false
+export async function localLogText(S, text, today) {
+  const fail = (code, detail) => Object.assign(new Error(code), { code, detail: detail || null })
+  const asked = cleanLogText(text)
+  if (!asked) throw fail('empty')
+  if (readingLog) throw fail('busy')
+  if (!hasLookupConsent(S)) throw fail('consent')
+  const d = await loadCoachDevice()
+  const adapter = ADAPTERS[d.provider]
+  if (d.mode !== 'byok' || !adapter) throw fail('off')
+  const cap = await matchCapState()
+  if (cap.used >= cap.limit) throw fail('cap')
+
+  readingLog = true
+  try {
+    await saveCoachDevice({ matchDaily: { d: todayISO(), n: cap.used + 1 } })
+    const key = await getApiKey()
+    const attempt = await runPipeline({
+      adapter, cfg: cfgOf(d), kind: 'logtext', payload: buildLogPayload(S, asked, { today }),
+      model: d.model || HTTP_PROVIDERS[d.provider].defaultModel, timeoutMs: timeoutFor(d.provider), maxTokens: 6000,
+      invokeOpts: { env: envOf(d, key), fetch: nativeFetch }
+    })
+    if (!attempt.ok) {
+      const detail = attempt.detail || (Array.isArray(attempt.errors) ? attempt.errors.slice(0, 3).map(String).join(' · ').slice(0, 300) : null)
+      throw fail(attempt.errorClass || 'provider', detail)
+    }
+    return resolveLog(attempt.result, withPoolRows(S, poolRows(), { all: true }))
+  } finally { readingLog = false }
 }

@@ -5,7 +5,7 @@ import { PROMPTS } from './prompts.js';
 
 // Tasks whose prompt stands alone: they are not coaching, read no plan and no training, and the
 // coaching rules in common.md would be forty lines about a payload they never get.
-const STANDALONE = ['match', 'meal', 'label', 'suggest'];
+const STANDALONE = ['match', 'meal', 'label', 'suggest', 'logtext'];
 
 export const taskOf = (kind, payload) =>
   kind === 'review' ? 'review' : kind === 'debrief' ? 'debrief' : STANDALONE.includes(kind) ? kind

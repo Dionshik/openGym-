@@ -20,6 +20,7 @@ import { glyphOf, GLYPH_GROUPS, DEFAULT_GLYPH } from './lib/glyphs.js'
 import BodyMap from './components/BodyMap.jsx'
 import MuscleExplorer from './components/MuscleExplorer.jsx'
 import DescribeExercise from './components/DescribeExercise.jsx'
+import WorkoutFromText from './components/WorkoutFromText.jsx'
 import { coachAvailable } from './lib/coach.js'
 import { poolAvailable, suggestBlocker, suggestionOf, suggestExercise, withdrawSuggestion, poolErrorText, POOL_ERRORS } from './lib/pool.js'
 import { DEMO } from './lib/demo.js'
@@ -1946,6 +1947,12 @@ export function beginWorkout(routineIds, bw) {
 // the finish path to file the workout where its date belongs instead of at the end.
 function LogPastWorkout({ close }) {
   const st = useStore(s => s.S)
+  // "Describe it in words" asks the Coach's provider, so it is offered exactly where the Coach
+  // is — the same predicate as the picker's "describe it in your own words".
+  const config = useStore(s => s.config)
+  const user = useStore(s => s.user)
+  const coachMode = useStore(s => s.coachLocal?.mode)
+  const canDescribe = coachAvailable(config, user, { demo: DEMO, mobile: MOBILE, coachMode })
   const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
   const [date, setDate] = useState(isoOf(yesterday))
   const [time, setTime] = useState('18:00')
@@ -1978,6 +1985,10 @@ function LogPastWorkout({ close }) {
     <SelectRow icon="dumbbell" title={t('Routine')} value={routineId} options={options} onChange={setRoutineId} />
     <div style={{ height: 18 }} />
     <Button variant="primary" onClick={submit}>{t('Continue')}</Button>
+    {canDescribe && <>
+      <div style={{ height: 8 }} />
+      <Button icon="sparkles" onClick={() => { close(); workoutFromTextSheet() }}>{t('Describe it in words instead')}</Button>
+    </>}
   </>
 }
 // Three ways out when the day already has a workout. Replacing with several on that day means
@@ -1998,11 +2009,31 @@ export function logPastWorkoutSheet() {
   if (S().active) { toast(t('Finish the current workout first.')); return }
   ui().openSheet(close => <LogPastWorkout close={close} />)
 }
+// The same past workout, typed out in words and read by the AI (components/WorkoutFromText.jsx).
+// It ends where the form above does: the usual screen pointed at that day — here with the
+// exercises and the sets already on it.
+export function workoutFromTextSheet() {
+  if (S().active) { toast(t('Finish the current workout first.')); return }
+  ui().openSheet(close => <WorkoutFromText close={close}
+    onCreate={(draft, done) => customExSheet(null, done, draft)}
+    onSearch={done => { const p = exercisePicker(ex => { p.close(); done(ex) }) }}
+    onOpen={({ date, time, durationMin, entries }) => {
+      const go = replaceId => { close(); beginBackfill({ iso: date, time, durationMin, routineId: null, replaceId, entries }) }
+      const existing = workoutsOn(S(), date)
+      if (!existing.length) { go(null); return }
+      ui().openSheet(c => <SameDayChoice iso={date} existing={existing} close={c}
+        onReplace={id => { c(); go(id) }} onAdd={() => { c(); go(null) }} />, { kind: 'center' })
+    }} />)
+}
 // Backfill stays single-routine (the LogPastWorkout UI is one picker), but it emits the new
 // shape: a one-element (or empty) routine list, per-entry rid, no top-level routineId.
-function beginBackfill({ iso, time, durationMin, routineId, replaceId }) {
+// `entries`, when given, are the session's exercises already built (a workout read from text);
+// otherwise they come from the routine, as for a live start.
+function beginBackfill({ iso, time, durationMin, routineId, replaceId, entries: given = null }) {
   const st = S()
-  const { entries, routineIds: rids, routines } = buildCombinedEntries(st, routineId ? [routineId] : [])
+  const built = buildCombinedEntries(st, routineId ? [routineId] : [])
+  const { routineIds: rids, routines } = built
+  const entries = given || built.entries
   update(s => {
     s.active = {
       id: uid(), d: iso, start: backfillStart(iso, time),

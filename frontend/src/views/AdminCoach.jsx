@@ -413,7 +413,7 @@ const credentialLabel = type => ({
 // What each logged call was, for the recent-jobs list.
 const KIND_LABEL = {
   create: 'Plan', review: 'Review', debrief: 'Workout debrief', match: 'Exercise lookup',
-  meal: 'Meal read', label: 'Label read', suggest: 'Meal suggestion'
+  meal: 'Meal read', label: 'Label read', suggest: 'Meal suggestion', logtext: 'Workout from text'
 }
 
 // The failure classes jobs.js emits, in words an operator can act on.

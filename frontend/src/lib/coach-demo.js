@@ -183,6 +183,13 @@ export const demoMatch = async text => {
   await new Promise(r => setTimeout(r, 900))
   return plainMatch(text)
 }
+// "Describe the workout you did" in the demo: the app's own search on each line, its numbers
+// read by a pattern (lib/workout-text.js plainLog). Nothing is interpreted and no day is read.
+export const demoLogText = async text => {
+  const { plainLog } = await import('./workout-text.js')
+  await new Promise(r => setTimeout(r, 900))
+  return plainLog(text)
+}
 export const demoDisclosure = () => ({
   provider: 'demo', providerLabel: t('the configured AI provider'),
   categories: ['plan', 'training', 'bodyweight', 'profile', 'prefs'], optional: ['bodyProfile', 'nutrition'], version: 1

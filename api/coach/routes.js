@@ -7,6 +7,7 @@
 import * as cfgStore from './config.js';
 import * as jobs from './jobs.js';
 import * as foodJobs from './food-jobs.js';
+import * as logtextJobs from './logtext-jobs.js';
 import { computeCohort } from './cohort.js';
 import { adapterFor } from './adapters/index.js';
 import { canDropPrivileges } from './adapters/spawn.js';
@@ -49,6 +50,13 @@ const FOOD_ERROR = {
   cap: 'that is enough for today — try again tomorrow'
 };
 const FOOD_HTTP = { kind: 400, empty: 400, noimage: 400, badimage: 400, toolarge: 413, novision: 409 };
+// A workout read from text: refused before anything is spent; a job that ran and failed says so
+// on the poll.
+const LOGTEXT_ERROR = {
+  empty: 'describe the workout first',
+  busy: 'the last one is still being read',
+  cap: 'that is enough lookups for today — try again tomorrow'
+};
 
 export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
   /** Every user route starts the same way: signed in, feature on, feature reachable. */
@@ -173,6 +181,31 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       if (!user) return json(res, 401, { error: 'not signed in' });
       const body = await readBody(req);
       json(res, 200, foodJobs.cancel(user.id, body.id));
+    },
+
+    /* "Describe the workout you did": the text goes to the provider, which copies the exercises,
+       sets and day out of it; each exercise comes back resolved against the catalogue, like a
+       lookup. A job and a poll rather than an awaited request — a whole session can take a
+       local model longer than a proxy waits. Nothing is logged: the person checks the draft. */
+    'POST /api/coach/logtext': async (req, res) => {
+      const user = guard(req, res); if (!user) return;
+      const body = await readBody(req);
+      try {
+        json(res, 202, { job: logtextJobs.start(user.id, { text: body.text, today: body.today }), cap: jobs.matchCapState(user.id) });
+      } catch (e) {
+        if (!(e instanceof jobs.CoachError)) throw e;
+        json(res, (e.code === 'empty' ? 400 : HTTP_FOR[e.code]) || 400, { error: LOGTEXT_ERROR[e.code] || USER_ERROR[e.code] || 'the request could not be started', code: e.code });
+      }
+    },
+    'GET /api/coach/logtext/job': async (req, res) => {
+      const user = guard(req, res); if (!user) return;
+      json(res, 200, logtextJobs.get(user.id, new URL(req.url, 'http://x').searchParams.get('id')));
+    },
+    'POST /api/coach/logtext/cancel': async (req, res) => {
+      const user = readSession(req);
+      if (!user) return json(res, 401, { error: 'not signed in' });
+      const body = await readBody(req);
+      json(res, 200, logtextJobs.cancel(user.id, body.id));
     },
 
     'POST /api/coach/pending/resolve': async (req, res) => {

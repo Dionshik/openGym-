@@ -85,6 +85,36 @@ if (kind === 'match') {
   });
 }
 
+// A workout read from text: each comma-separated piece is an exercise, its words the English
+// name, and "3x8 80" in it the rows. Shaped to exercise the validator too: a weekday it does
+// not compute, a row with nothing in it, and 9000 reps nobody did.
+if (kind === 'logtext') {
+  if (MODE === 'logtext-broken') out({ coach_contract: 1, items: [{ said: 'x', sets: [] }] });
+  const text = String(P.text || '');
+  const parts = text.split(/[,;]+/).map(s => s.trim()).filter(Boolean).slice(0, 15);
+  const own = (P.custom || []);
+  out({
+    coach_contract: 1,
+    ...(/yesterday|вчера/i.test(text) ? { when: { daysAgo: 1 } } : /friday|пятниц/i.test(text) ? { when: { weekday: 'friday' } } : {}),
+    unit: /\blb\b/i.test(text) ? 'lb' : undefined,
+    items: parts.map(part => {
+      const said = part.replace(/(?:yesterday|вчера|on friday|в пятницу)/ig, '').replace(/[\d.,]+\s*(?:[xх×*]\s*[\d.,]+)*(?:\s*(?:kg|кг|lb))?/gi, '').trim() || part;
+      const mine = own.find(c => c.n.toLowerCase() === said.toLowerCase());
+      const m = part.match(/(\d+)\s*[xх×*]\s*(\d+)(?:\s+(\d+(?:\.\d+)?))?/i);
+      const sets = m ? Array.from({ length: +m[1] }, () => ({ reps: +m[2], ...(m[3] ? { weight: +m[3] } : {}) })) : [];
+      if (MODE === 'logtext-junk') sets.push({}, { reps: 9000 });
+      return {
+        said,
+        names: [said.toLowerCase()],
+        bp: 'chest',
+        ...(mine ? { customId: mine.id } : {}),
+        create: { name: said, desc: 'Fixture description.', primary: ['chest'], secondary: [] },
+        sets
+      };
+    })
+  });
+}
+
 // The food diary's three questions. Canned, and shaped to exercise the validators: one item
 // with energy that contradicts its macros, one weight a model would give as text.
 if (kind === 'meal') {
