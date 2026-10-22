@@ -282,7 +282,9 @@ export function accountFor(uid) {
     mode: cfg.authMode,
     provider: cfg.provider,
     providerLabel: providerMeta(cfg).label,
-    account: c.ok ? (c.account || null) : null,
+    // A login for the proxy in front of the model is half of a secret, not an account name: its
+    // username stays on the admin card and never reaches a member.
+    account: c.ok && c.type !== 'basic' ? (c.account || null) : null,
     connected: !!c.ok,
     reason: c.ok ? null : c.reason,
     message: c.ok ? null : (c.message || null)

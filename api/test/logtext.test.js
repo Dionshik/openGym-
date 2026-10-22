@@ -48,7 +48,7 @@ test('the payload is the words, the language, the unit, today and the names of t
   assert.deepEqual(p, {
     coach_contract: 1, task: 'logtext',
     meta: { lang: 'ru', unit: 'lb', today: '2026-10-16', weekday: 'friday' },
-    text: 'вчера, жим 3x8 80, присед 5x5 100',
+    text: 'вчера\nжим 3x8 80\nприсед 5x5 100',
     custom: [{ id: 'c1', n: 'Мой тренажёр' }]
   });
   const leaked = JSON.stringify(p);
@@ -137,7 +137,8 @@ test('validateLog: a broken shape goes back for repair; past the caps the rest i
   assert.equal(validateLog([]).ok, false);
   assert.equal(validateLog({ items: 'bench' }).ok, false);
   assert.match(validateLog({ items: [{ said: 'x', sets: [] }] }).errors[0], /names/);
-  assert.match(validateLog({ items: [item({ sets: '3x8' })] }).errors[0], /sets must be an array/);
+  // Not a broken shape any more: the shorthand as a string is read like a line of text.
+  assert.equal(validateLog({ items: [item({ sets: '3x8 80' })] }).result.items[0].sets.length, 3);
   const many = validateLog({ items: Array.from({ length: 20 }, () => item({ sets: Array.from({ length: 40 }, () => ({ reps: 5 })) })) });
   assert.equal(many.result.items.length, MAX_LOG_ITEMS);
   assert.equal(many.result.items[0].sets.length, MAX_LOG_SETS);
@@ -297,4 +298,95 @@ test('through the lane: a model that stamps one custom exercise on every line do
     assert.equal(s.state, 'done', JSON.stringify(s));
     assert.deepEqual(s.result.items.map(i => i.matches[0]?.id), ['0025', '0043']);
   } finally { delete process.env.FIXTURE_MODE; }
+});
+
+/* ------------------------------ read from the text itself ------------------------------ */
+
+test('the sets on a line are read by pattern, in the ways people write them', async () => {
+  const { setsFromText } = await import('../coach/core/logtext-parse.js');
+  const rows = (n, r) => Array(n).fill(r);
+  const cases = [
+    ['3х8 по 80', rows(3, { reps: 8, weight: 80 })],
+    ['3x8 80', rows(3, { reps: 8, weight: 80 })],
+    ['3 подхода по 8 повторений 80 кг', rows(3, { reps: 8, weight: 80 })],
+    ['3 sets of 8 at 80', rows(3, { reps: 8, weight: 80 })],
+    ['80×8, 85×6, 90×4', [{ reps: 8, weight: 80 }, { reps: 6, weight: 85 }, { reps: 4, weight: 90 }]],
+    ['80x8x3', rows(3, { reps: 8, weight: 80 })],
+    ['3x8x80', rows(3, { reps: 8, weight: 80 })],
+    ['3 по 10', rows(3, { reps: 10 })],
+    ['4 по 12 по 22,5 кг', rows(4, { reps: 12, weight: 22.5 })],
+    ['+10 кг 3х8', rows(3, { reps: 8, weight: 10 })],
+    ['7.5x10', [{ reps: 10, weight: 7.5 }]],
+    ['3 по 10 с 40', rows(3, { reps: 10, weight: 40 })],
+    ['3 по 60 с', rows(3, { sec: 60 })],
+    ['3x60 сек', rows(3, { sec: 60 })],
+    ['60 секунд', [{ sec: 60 }]],
+    ['30 мин', [{ min: 30 }]],
+    ['20 минут 3 км', [{ min: 20, km: 3 }]],
+    ['разминка 2х10 по 40', rows(2, { reps: 10, weight: 40, warmup: true })],
+    ['12 повторений с 40', [{ reps: 12, weight: 40 }]],
+    ['без цифр', []]
+  ];
+  for (const [line, want] of cases) assert.deepEqual(setsFromText(line), want, line);
+});
+
+test('the day is read from the start of the first line or a line of its own — never from a weight or a distance', async () => {
+  const { dateFromText } = await import('../coach/core/logtext-parse.js');
+  const T = '2026-10-22';     // a Thursday
+  const day = t => dateFromText(t, T)?.iso || null;
+  assert.equal(day('вчера\nжим 3х8'), '2026-10-21');
+  assert.equal(day('позавчера: жим'), '2026-10-20');
+  assert.equal(day('13.10\nжим'), '2026-10-13');
+  assert.equal(day('13.10.2026'), '2026-10-13');
+  assert.equal(day('Тренировка 13.10: жим 3х8 80'), '2026-10-13');
+  assert.equal(day('13 октября\nжим'), '2026-10-13');
+  assert.equal(day('Oct 13, bench 3x8'), '2026-10-13');
+  assert.equal(day('в пятницу жим 3х8'), '2026-10-16');
+  assert.equal(day('5 дней назад'), '2026-10-17');
+  assert.equal(day('жим 3х8\n13.10'), '2026-10-13', 'a line that is only a date, anywhere');
+  assert.equal(day('01.12'), '2025-12-01', 'a day still to come this year is last year’s');
+  assert.equal(day('бег 3.5 км'), null);
+  assert.equal(day('жим 3x8 по 22.5'), null);
+  assert.equal(day('жим 3х8\nприсед 12.5 кг'), null);
+  assert.equal(day('31.02'), null);
+});
+
+test('a model that copied no numbers and no day: both are read from the text, line by line', () => {
+  const text = cleanLogText('вчера\nжим лёжа 3х8 по 80\nжим гантелей 80×10, 85×8, 90×6\nподтягивания, 3 подхода по 10\nпланка 3 по 60 с\nскручивания');
+  const v = validateLog({
+    items: [
+      item({ said: 'жим лёжа', names: ['barbell bench press'] }),
+      item({ said: 'жим гантелей', names: ['dumbbell bench press'] }),
+      item({ said: 'подтягивания', names: ['pull-up'] }),
+      item({ said: 'планка', names: ['front plank'] }),
+      item({ said: 'скручивания', names: ['crunch'] })
+    ]
+  }, { today: '2026-10-22', text });
+  assert.equal(v.ok, true, JSON.stringify(v.errors));
+  assert.equal(v.result.date, '2026-10-21');
+  assert.deepEqual(v.result.items.map(i => i.sets.length), [3, 3, 3, 3, 0]);
+  assert.deepEqual(v.result.items[0].sets[0], { reps: 8, weight: 80 });
+  assert.deepEqual(v.result.items[1].sets.map(s => s.weight), [80, 85, 90]);
+  assert.deepEqual(v.result.items[3].sets[0], { sec: 60 });
+});
+
+test('what the model did copy is kept; the text only fills gaps — except the day, which the text decides', () => {
+  const text = '13.10\nжим лёжа 3х8 по 80';
+  const v = validateLog({ when: { daysAgo: 1 }, items: [item({ said: 'жим лёжа', sets: [{ reps: 5, weight: 100 }] })] }, { today: '2026-10-22', text });
+  assert.deepEqual(v.result.items[0].sets, [{ reps: 5, weight: 100 }]);
+  assert.equal(v.result.date, '2026-10-13');
+  // No day in the text: the model's reading stands.
+  const m = validateLog({ when: { daysAgo: 1 }, items: [] }, { today: '2026-10-22', text: 'жим 3х8' });
+  assert.equal(m.result.date, '2026-10-21');
+});
+
+test('sets in the shapes a model writes instead of rows are unfolded', async () => {
+  const { modelRows } = await import('../coach/core/logtext.js');
+  assert.deepEqual(modelRows({ sets: 3, reps: 8, weight: 80 }), Array(3).fill({ reps: 8, weight: 80, sec: undefined, min: undefined, km: undefined }));
+  assert.deepEqual(modelRows({ sets: [{ sets: 3, reps: 8, weight: 80 }] }).length, 3);
+  assert.deepEqual(modelRows({ sets: { reps: 10 } }), [{ reps: 10 }]);
+  assert.deepEqual(modelRows({ reps: 12 }).map(readSet), [{ reps: 12 }]);
+  assert.deepEqual(modelRows({ sets: ['80x8', '85x6'] }), [{ reps: 8, weight: 80 }, { reps: 6, weight: 85 }]);
+  assert.deepEqual(readSet({ repetitions: 8, kg: 80 }), { reps: 8, weight: 80 });
+  assert.deepEqual(readSet({ seconds: 45 }), { sec: 45 });
 });

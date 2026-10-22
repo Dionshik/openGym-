@@ -16,7 +16,8 @@
  * in from the caller, and the phone that brought its own key runs this very module.
  */
 import { CONTRACT } from './payload.js';
-import { readMatchItem, resolveMatch, tokens } from './match.js';
+import { readMatchItem, resolveMatch, tokens, sameWord } from './match.js';
+import { dateFromText, piecesForItems, setsFromText, unitFromText, readSet, num } from './logtext-parse.js';
 
 export const MAX_LOG_TEXT = 1500;   // a whole session, typed out
 // Stated again in LOGTEXT_SCHEMA (schemas.js) as maxItems; the validator is what holds them.
@@ -36,11 +37,13 @@ export const isISODate = s => { const d = toDate(s); return !!d && fromDate(d) =
 
 /* ---------- what leaves ---------- */
 
-/** Like cleanText in match.js, with room for a whole session — and line breaks kept as ", ",
- *  because one exercise per line is how most people type a workout. */
+/** Like cleanText in match.js, with room for a whole session — and with its line breaks kept:
+ *  one exercise per line is how most people type a workout, and the lines are what
+ *  logtext-parse.js reads the day and the sets from. */
 export const cleanLogText = text => String(text == null ? '' : text)
-  .replace(/\s*[\r\n]+\s*/g, ', ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ')
-  .replace(/^[,\s]+|[,\s]+$/g, '').slice(0, MAX_LOG_TEXT);
+  .replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]+/g, ' ')
+  .split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n')
+  .slice(0, MAX_LOG_TEXT);
 
 /**
  * The payload: the words, the language and weight unit the person uses, today's date (so the
@@ -68,39 +71,10 @@ export function buildLogPayload(S, text, { today } = {}) {
 
 /* ---------- the validator ---------- */
 
-// A model writes "80", "80 kg", "8-10", 8.0 — take the first number in it, or nothing.
-const num = v => {
-  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-  if (typeof v !== 'string') return null;
-  const m = v.replace(',', '.').match(/-?\d+(?:\.\d+)?/);
-  return m ? Number(m[0]) : null;
-};
+// readSet — the check every row passes — lives in logtext-parse.js, so the demo can use it
+// without loading the catalogue this module pulls in; it is re-exported from here.
+export { readSet };
 const inRange = (v, lo, hi) => (v != null && v >= lo && v <= hi ? v : null);
-const round = (v, step) => Math.round(v / step) * step;
-
-/**
- * One row of a logged exercise, or null when there is nothing in it to log. Out-of-range
- * numbers are dropped rather than clamped: 8000 reps is a misread, and the nearest legal value
- * would be a confident wrong one.
- */
-export function readSet(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  const reps = inRange(num(raw.reps), 1, 500);
-  const weight = inRange(num(raw.weight), 0, 1000);
-  const sec = inRange(num(raw.sec), 1, 7200);
-  const min = inRange(num(raw.min), 0.5, 600);
-  const km = inRange(num(raw.km), 0.01, 300);
-  let speed = inRange(num(raw.speed), 0.1, 60);
-  if (speed == null && km != null && min != null) speed = inRange(+(km / (min / 60)).toFixed(1), 0.1, 60);
-  const out = {};
-  if (reps != null) out.reps = Math.round(reps);
-  if (weight != null && weight > 0) out.weight = round(weight, 0.25);
-  if (sec != null) out.sec = Math.round(sec);
-  if (min != null) out.min = round(min, 0.5);
-  if (speed != null) out.speed = round(speed, 0.1);
-  if (raw.warmup === true) out.warmup = true;
-  return out.reps || out.sec || out.min ? out : null;
-}
 
 /**
  * The day the text names, as a date no later than `today` and not much more than a year back —
@@ -131,7 +105,30 @@ export function readWhen(when, today) {
  * @returns {{ ok:true, result:{ items:object[], date:string|null, start:string|null, minutes:number|null, unit:'kg'|'lb'|null } }
  *         | { ok:false, errors:string[] }}
  */
-export function validateLog(data, { customIds = [], customs = null, today = null } = {}) {
+/**
+ * The rows a model wrote for one exercise, in whatever shape it chose: the asked-for array of
+ * rows, one row object, a row that says how many times it was done (`{ sets: 3, reps: 8 }`),
+ * a count with the numbers on the exercise itself, or the shorthand as a string ("3x8 80").
+ * Each row is then checked by readSet; this only unfolds them.
+ */
+export function modelRows(it) {
+  const own = { reps: it.reps, weight: it.weight, sec: it.sec, min: it.min, km: it.km };
+  let raw = it.sets;
+  if (typeof raw === 'string' && !/^\s*\d+\s*$/.test(raw)) return setsFromText(raw);
+  if (raw != null && num(raw) != null && (typeof raw === 'number' || typeof raw === 'string')) {
+    const n = Math.round(num(raw));
+    return n >= 1 && n <= MAX_LOG_SETS ? Array.from({ length: n }, () => ({ ...own })) : [];
+  }
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) raw = [raw];
+  if (!Array.isArray(raw)) return (own.reps != null || own.sec != null || own.min != null) ? [own] : [];
+  return raw.flatMap(r => {
+    if (typeof r === 'string') return setsFromText(r);
+    const n = r && typeof r === 'object' ? num(r.count ?? r.times ?? r.sets) : null;
+    return n != null && n > 1 && n <= MAX_LOG_SETS ? Array.from({ length: Math.round(n) }, () => ({ ...r })) : [r];
+  });
+}
+
+export function validateLog(data, { customIds = [], customs = null, today = null, text = null } = {}) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { ok: false, errors: ['the answer must be one JSON object'] };
   if (!Array.isArray(data.items)) return { ok: false, errors: ['`items` must be an array (empty when the text names no exercise)'] };
   const own = new Set([...customIds, ...(customs || []).map(c => c && c.id).filter(Boolean)]);
@@ -140,17 +137,30 @@ export function validateLog(data, { customIds = [], customs = null, today = null
   data.items.slice(0, MAX_LOG_ITEMS).forEach((it, i) => {
     const r = readMatchItem(it, `items[${i}]`, own);
     if (r.error) { errors.push(r.error); return; }
-    if (it.sets != null && !Array.isArray(it.sets)) { errors.push(`items[${i}].sets must be an array of set objects`); return; }
-    const sets = (it.sets || []).slice(0, MAX_LOG_SETS).map(readSet).filter(Boolean);
+    const sets = modelRows(it).slice(0, MAX_LOG_SETS).map(readSet).filter(Boolean);
     items.push({ ...r.item, sets });
   });
   if (errors.length) return { ok: false, errors };
   dropDoubtfulCustomIds(items, customs);
-  const unit = data.unit === 'kg' || data.unit === 'lb' ? data.unit : null;
+  // What the model left out, read from the text itself: the sets of an exercise it returned
+  // without any, from the line that exercise is on (logtext-parse.js).
+  if (text) {
+    const lines = piecesForItems(text, items, isISODate(today) ? today : null);
+    items.forEach((it, k) => {
+      if (!it.sets.length && lines[k]) it.sets = setsFromText(lines[k]).slice(0, MAX_LOG_SETS).map(readSet).filter(Boolean);
+    });
+  }
+  // The unit is what the text says, not what the model assumed: a model copying an example with
+  // "kg" in it would otherwise turn a pound profile's 185 into 408. No unit in the text means
+  // the person's own (null). Without the text (tests, older callers) the model's word stands.
+  const unit = text ? unitFromText(text) : (data.unit === 'kg' || data.unit === 'lb' ? data.unit : null);
   const minutes = inRange(num(data.minutes), 1, 600);
   const start = typeof data.start === 'string' && /^([01]?\d|2[0-3]):[0-5]\d$/.test(data.start.trim())
     ? data.start.trim().padStart(5, '0') : null;
-  return { ok: true, result: { items, date: readWhen(data.when, today), start, minutes: minutes == null ? null : Math.round(minutes), unit } };
+  // The day: from the text when it says one (no interpretation needed), else the model's reading.
+  const said = text && isISODate(today) ? dateFromText(text, today) : null;
+  const date = said ? said.iso : readWhen(data.when, today);
+  return { ok: true, result: { items, date, start, minutes: minutes == null ? null : Math.round(minutes), unit } };
 }
 
 /**
@@ -171,9 +181,10 @@ export function dropDoubtfulCustomIds(items, customs) {
     if (!it.customId) continue;
     let keep = claims.get(it.customId) === 1;
     if (keep && nameOf.has(it.customId)) {
-      const mine = tokens(nameOf.get(it.customId));
-      const said = new Set([...tokens(it.said), ...it.names.flatMap(n => [...tokens(n)])]);
-      keep = [...mine].some(w => said.has(w));
+      // Word by word, allowing for an ending: "в хаммере" names "Хаммер", "бабочку" "Бабочка".
+      const mine = [...tokens(nameOf.get(it.customId))];
+      const said = [...tokens(it.said), ...it.names.flatMap(n => [...tokens(n)])];
+      keep = mine.some(w => said.some(s => sameWord(w, s)));
     }
     if (!keep) delete it.customId;
   }

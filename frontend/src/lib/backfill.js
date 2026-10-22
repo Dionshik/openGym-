@@ -37,3 +37,25 @@ export function completeBackfill(workouts, active, w) {
   const kept = replaceId ? workouts.filter(x => x.id !== replaceId) : workouts
   return insertChronological(kept, w)
 }
+
+// Moving a logged workout to another day: "I logged Tuesday's session on Wednesday". The same
+// workout — its id, sets, records and note — on the new date, at the same time of day and for
+// the same duration, filed where that date puts it in the history. Returns a new array; an
+// unknown id or a date that is not a real calendar day leaves the history as it was.
+export function moveWorkout(workouts, id, iso) {
+  const w = (workouts || []).find(x => x.id === id)
+  if (!w || !/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return workouts
+  const target = new Date(iso + 'T12:00:00')
+  const real = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+  if (Number.isNaN(target.getTime()) || real(target) !== iso) return workouts
+  if (w.d === iso) return workouts
+  // Day by day in the local calendar rather than a multiple of 24 h, so a move across a
+  // daylight-saving change keeps 18:00 at 18:00.
+  const from = new Date(w.d + 'T12:00:00')
+  const days = Math.round((target - from) / 86400000)
+  const start = new Date(w.start || backfillStart(w.d))
+  start.setDate(start.getDate() + days)
+  const length = Math.max(0, (w.end || w.start || 0) - (w.start || 0))
+  const moved = { ...w, d: iso, start: start.getTime(), end: start.getTime() + length }
+  return insertChronological(workouts.filter(x => x.id !== id), moved)
+}

@@ -111,7 +111,7 @@ export default function AdminCoach() {
 
   // Chips, grouped.
   const groups = [
-    { title: 'Paste an API key', hint: 'Plain HTTPS to the provider. Works on the default api image — nothing extra to install.', items: d.providers.filter(p => p.http) },
+    { title: 'Paste an API key', hint: 'Plain HTTPS to the provider. Works on the default api image — nothing extra to install. Google Gemini: a key from aistudio.google.com (AIza…); it reads photos too.', items: d.providers.filter(p => p.http) },
     { title: 'Runs a local AI runtime', hint: 'Needs the bigger api image built with --target coach.', items: d.providers.filter(p => RUNTIME_IDS.includes(p.id)) },
     { title: 'Testing', hint: 'A built-in fake that answers instantly, so the whole loop can be tried without an account.', items: d.providers.filter(p => TESTING_IDS.includes(p.id)) }
   ]
@@ -164,7 +164,9 @@ export default function AdminCoach() {
 
     {d.enabled && <>
       {/* ---------- provider ---------- */}
-      <Step n={num()} title="Provider" hint={meta.label || 'Which AI answers the Coach'} done={step1Done} {...stepAt()}>
+      {/* Once chosen, this step folds to one line — which hid that there was a list at all.
+          The line says what it holds: tap to switch, and which providers are in it. */}
+      <Step n={num()} title="Provider" hint={meta.label ? `${meta.label} · tap to switch (Google Gemini, Anthropic, OpenAI, your own endpoint…)` : 'Which AI answers the Coach'} done={step1Done} {...stepAt()}>
         <div className="adm-hint">Pick who answers. A key or token you save stays with its provider, so you can switch back and forth without pasting it again.</div>
         {groups.map(g => !!g.items.length && <div key={g.title} className="adm-group">
           <div className="adm-group-t">{g.title}</div>

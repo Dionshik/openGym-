@@ -222,8 +222,20 @@ counts and outcomes only.
 
 **History → Describe in words** (also **Describe it in words instead** at the bottom of *Log a
 past workout*), on any instance where the Coach is available. Type the session the way you would
-tell someone about it, in any language — *"вчера: жим лёжа 3×8 по 80, присед 5×5 100,
-подтягивания 3×10, планка 3 по 60 с"* — and the app comes back with a draft to check:
+tell someone about it, in any language — the day on the first line, then one exercise per line:
+
+```
+13.10
+жим лёжа 3х8 по 80
+жим гантелей на наклонной 30х10, 32,5х8
+подтягивания 3 по 10
+планка 3 по 60 с
+```
+
+The day can be "вчера", "в пятницу", "13.10", "13 октября"; sets as "3х8 80" (three sets of
+eight at 80), "80х8, 85х6" (two different sets), "3 подхода по 8 повторений 80 кг", "+10 кг" for
+added load, "3 по 60 с" for a hold, "30 минут 5 км" for cardio. The app comes back with a draft to
+check:
 
 - **the day** — "yesterday", "on Friday", "12.10" — with the start time and the duration if you
   said them; all three can be changed on the draft;
@@ -243,13 +255,34 @@ It is the exercise lookup asked about a whole session, and it is built the same 
 `api/coach/core/logtext.js` resolves the names against the catalogue, your own exercises and the
 shared pool with the lookup's own code, drops any number that cannot be a set (9,000 reps, a
 weight with nothing done under it), and works out the date itself — the model says "friday" or
-"1 day ago", never a computed date. What it sends is what a lookup sends — the text, the names
+"1 day ago", never a computed date.
+
+The numbers do not depend on the model at all when it drops them. A small local model under a
+grammar will happily answer every line with an empty `sets` array and no day, so
+`api/coach/core/logtext-parse.js` reads both straight from the text: the day from the start of
+the first line or a line that is only a date (never from "бег 3.5 км"), and the sets of any
+exercise the model returned without them from the line that exercise is on. What the model did
+copy is kept; a day written in the text wins over the model's reading of it. The weight unit is
+taken from the text too ("кг", "lb"), never from the model — no unit written means the profile's
+own. The demo build reads text with the same module.
+
+What the draft calls "sure" is deliberately narrow: one of the model's English names *is* the
+row's name and no other row scores the same, or it is one of your own exercises named outright
+(in any grammatical case — "в хаммере" finds "Хаммер"), or it is an exercise you already log
+that scored close to the best. Everything else is asked. The workout it opens keeps the session's
+*target* — the routine's prescription, or last time's — rather than what you typed, so a session
+that fell short is read as one by the progression engine.
+
+What it sends is what a lookup sends — the text, the names
 of your own exercises, your language — plus your weight unit and today's date. The go-ahead is
 the lookup's (`coach.lookupConsent`), and it counts against the lookups' **30 a day**.
 
 Unlike a lookup it is a **job with a poll**, not an awaited request: fifteen exercises with their
 sets can take a local model longer than the sixty seconds a proxy in front of the api waits. The
-answer waits in memory for ten minutes to be collected, nothing typed is written to disk, and the
+answer waits in memory for an hour to be collected (a phone that locked mid-read stops polling;
+after that the app says the answer expired rather than that the server restarted), it shares
+the instance's two provider slots with the Coach and the food diary, nothing typed is written to
+disk, and the
 admin card's recent jobs show it as **Workout from text**, counts and outcomes only. It uses the
 Coach's text model, not the vision one.
 

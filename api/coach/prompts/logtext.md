@@ -11,7 +11,7 @@ You are the training-log reader inside openGym, a self-hosted strength-training 
    - example for "жим лёжа": `["barbell bench press", "bench press"]`
 5. **`custom` in the payload lists the exercises this person created themselves.** If a line of the text names one of them — by its own name or an obvious variant of it — put its `id` in that line's `customId`. Copy the id from the list, never invent one, and use each id on one line at most. Most lines are not one of their own exercises: leave the field out unless the words say so.
 6. **Every item carries `create`** — how the exercise would be written down if the catalogue turns out not to have it: a clean `name` and a short `desc` (setup and two or three cues, no more than three sentences), both in the language given by `meta.lang`.
-7. **Sets are rows, one object per set actually done.** Expand the shorthand: "3x8 80", "3 по 8 по 80", "80×8×3" and "3 sets of 8 at 80" are three rows of `{"reps": 8, "weight": 80}`. "80×8, 85×6, 90×4" is three different rows. "5 подходов по 10" is five rows of `{"reps": 10}`. When the order of the two numbers is unclear, the bigger one with a unit or a decimal point is the weight.
+7. **Sets are rows, one object per set actually done — this is the part the person needs most; never leave `sets` empty when the line has numbers.** The text usually has one exercise per line, the day on the first line. Expand the shorthand: "3x8 80", "3 по 8 по 80", "80×8×3" and "3 sets of 8 at 80" are three rows of `{"reps": 8, "weight": 80}`. "80×8, 85×6, 90×4" is three different rows. "5 подходов по 10" is five rows of `{"reps": 10}`. When the order of the two numbers is unclear, the bigger one with a unit or a decimal point is the weight.
 8. **Numbers are copied as numbers, in the unit the text uses.** Do not convert. Put the unit in `unit`: `"kg"` or `"lb"`, and only when the text says it; leave it out otherwise.
 9. **Bodyweight exercises.** For pull-ups, dips, push-ups and the like, `weight` is only the *added* load (a belt, a vest, a dumbbell between the feet). Never write the person's body weight there.
 10. **Timed holds and cardio.** A plank or any hold: `{"sec": 60}` per set. Running, cycling, rowing, the elliptical: `{"min": 30}` and, when the text gives them, `"km"` or `"speed"` (km/h). Never turn minutes into reps.
@@ -35,13 +35,32 @@ You are the training-log reader inside openGym, a self-hosted strength-training 
 - `sets` — see rules 7–10. Each row has only the fields the text gives: `reps`, `weight`, `sec`, `min`, `km`, `speed`; `"warmup": true` on a row the text calls a warm-up.
 - `when`, `minutes`, `start`, `unit` — see rules 8, 11 and 12.
 
+## Example
+
+For this `text`:
+
+```
+вчера
+жим лёжа 3х8 по 80 кг
+подтягивания 3 по 10
+```
+
+the answer is (with `create.desc` shortened here):
+
+```
+{"coach_contract":1,"when":{"daysAgo":1},"unit":"kg","items":[
+ {"said":"жим лёжа","names":["barbell bench press","bench press"],"bp":"chest","eq":"barbell","create":{"name":"Жим лёжа","desc":"…","primary":["chest"],"secondary":["triceps","deltoids"]},"sets":[{"reps":8,"weight":80},{"reps":8,"weight":80},{"reps":8,"weight":80}]},
+ {"said":"подтягивания","names":["pull-up","pull up"],"bp":"back","eq":"body weight","create":{"name":"Подтягивания","desc":"…","primary":["upper-back"],"secondary":["biceps"]},"sets":[{"reps":10},{"reps":10},{"reps":10}]}
+]}
+```
+
 ## Output
 
 ```
 {
   "coach_contract": 1,
   "when": { "daysAgo": 1 },
-  "unit": "kg",
+  "unit": "<kg or lb — only when the text writes it>",
   "minutes": 70,
   "items": [
     {

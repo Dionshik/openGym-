@@ -57,6 +57,14 @@ export default function WorkoutFromText({ onOpen, onCreate, onSearch, close }) {
   useEffect(() => { let on = true; disclosure().then(d => { if (on) setInfo(d) }).catch(() => {}); return () => { on = false } }, [])
   // The sheet closed while the AI was still reading: stop it, rather than spend the call.
   useEffect(() => () => ctl.current?.abort(), [])
+  // The draft starts at its top, with the page itself unscrolled (see read()).
+  const topRef = useRef(null)
+  useEffect(() => {
+    if (phase !== 'review') return
+    try { window.scrollTo(0, 0) } catch { /* not in every test environment */ }
+    const sheet = topRef.current?.closest?.('.sheet')
+    if (sheet) sheet.scrollTop = 0
+  }, [phase])
 
   const provider = info?.host || info?.providerLabel || config?.coach?.providerLabel || t('the configured AI provider')
   const fine = DEMO
@@ -68,6 +76,10 @@ export default function WorkoutFromText({ onOpen, onCreate, onSearch, close }) {
   const read = async () => {
     const asked = text.trim()
     if (!asked || phase === 'reading') return
+    // Put the keyboard away before the wait, not when the text box disappears under it: iOS
+    // closing the keyboard over a box that is gone leaves the page scrolled under the sheet,
+    // and taps then land beside what is drawn — the draft's buttons looked dead.
+    inputRef.current?.blur()
     setError('')
     setPhase('reading')
     setWaited(0)
@@ -80,6 +92,8 @@ export default function WorkoutFromText({ onOpen, onCreate, onSearch, close }) {
         await useStore.getState().pushState()
       }
       const r = await readWorkoutText(asked, { signal: c.signal, onWait: ms => setWaited(Math.round(ms / 1000)) })
+      // Cancelled while the answer was on its way: the person asked not to see it.
+      if (c.signal.aborted) { setPhase('write'); return }
       const items = Array.isArray(r?.items) ? r.items : []
       const st = useStore.getState().S
       setDraft({ ...r, items })
@@ -111,11 +125,11 @@ export default function WorkoutFromText({ onOpen, onCreate, onSearch, close }) {
 
   if (phase !== 'review') return <>
     <h3>{t('Describe the workout')}</h3>
-    <div className="muted small" style={{ marginBottom: 10 }}>{t('In your own words, in any language: the exercises, sets, reps, weight — and the day. The AI finds the exercises in the library and asks when it is not sure.')}</div>
+    <div className="muted small" style={{ marginBottom: 10, lineHeight: 1.5 }}>{t('The day on the first line — “yesterday”, “on Friday” or a date like 13.10. Then one exercise per line with its sets: 3x8 80 is three sets of eight at 80, 80x8, 85x6 are two different sets. The AI finds the exercises in the library and asks when it is not sure.')}</div>
     <div className="picker-search">
-      <textarea ref={inputRef} className="input" rows={6} maxLength={MAX_LOG_TEXT} value={text} onFocus={onFocus}
+      <textarea ref={inputRef} className="input" rows={7} maxLength={MAX_LOG_TEXT} value={text} onFocus={onFocus}
         disabled={phase === 'reading'}
-        placeholder={t('e.g. yesterday: bench press 3x8 80 kg, squat 5x5 100, pull-ups 3x10, plank 3 × 60 s')}
+        placeholder={['13.10', t('bench press 3x8 80'), t('incline dumbbell press 30x10, 32.5x8'), t('pull-ups 3x10'), t('plank 3 × 60 s')].join('\n')}
         onChange={e => setText(e.target.value)} />
     </div>
     {phase === 'reading'
@@ -136,11 +150,12 @@ export default function WorkoutFromText({ onOpen, onCreate, onSearch, close }) {
   const unit = draft.unit || (S.unit === 'lb' ? 'lb' : 'kg')
 
   return <>
-    <div className="row between" style={{ marginBottom: 10 }}><h3>{t('Check the workout')}</h3>
+    <div ref={topRef} className="row between" style={{ marginBottom: 10 }}><h3>{t('Check the workout')}</h3>
       <Button size="sm" variant="ghost" onClick={() => setPhase('write')}>{t('Edit the text')}</Button>
     </div>
     <Row icon="calendar" title={t('Date')}>
       <input type="date" className="timef" value={date} max={today} onChange={e => setDate(e.target.value)} /></Row>
+    {!draft.date && <div className="small" style={{ margin: '-4px 2px 8px', color: 'var(--orange)' }}>{t('No day in the text — yesterday is set; check it.')}</div>}
     <Row icon="clock" title={t('Start time')}>
       <input type="time" className="timef" value={time} onChange={e => setTime(e.target.value)} /></Row>
     <Stepper label={t('Duration')} unit="min" value={dur} step={5} decimal={false} onChange={v => setDur(Math.max(1, Math.round(v)))} />
@@ -154,18 +169,20 @@ export default function WorkoutFromText({ onOpen, onCreate, onSearch, close }) {
       const d = draftFor(item)
       const unfolded = c.status === 'ask' || open === i
       return <div key={i}>
-        <h4 className="sec">{item.said ? `“${item.said}”` : d.n}{line ? <span className="dim"> · {line}</span> : null}</h4>
+        <h4 className="sec">{item.said ? `“${item.said}”` : d.n}{line ? <span className="dim"> · {line}</span> : <span className="dim"> · {t('no sets in the text — fill them in on the next screen')}</span>}</h4>
         {c.status === 'skip'
           ? <div className="list"><div className="item dim" {...tappable(() => unskip(i))}>
             <div className="grow"><div className="tt">{t('Left out')}</div><div className="ss">{t('Tap to choose an exercise for this line after all')}</div></div>
             <Icon name="reset" className="chev" />
           </div></div>
           : <>
-            {ex && c.status !== 'ask' && <div className="list"><div className="item" {...tappable(() => setOpen(open === i ? -1 : i))}>
+            {ex && c.status !== 'ask' && <div className="list"><div className="item">
               <Thumb ex={ex} /><div className="grow"><div className="tt capitalize">{exerciseNameFor(ex)}</div>
                 <div className={'ss' + (usage[ex.id] ? '' : ' capitalize')}>{usage[ex.id] ? t('you have logged this before') : t(MUSCLE_NAME[ex.tg] || ex.tg || ex.bp)}</div></div>
-              <span className="tag acc"><Icon name="check" /></span>
-              <span className="small acc" style={{ marginLeft: 6 }}>{open === i ? t('Close') : t('Change')}</span>
+              {/* A real button, not a row that happens to be tappable: it is the one control on
+                  the line, and it must be unmistakable which part of the row it is. */}
+              <Button size="sm" variant={open === i ? 'plain' : 'tinted'} aria-expanded={open === i}
+                onClick={() => setOpen(open === i ? -1 : i)}>{open === i ? t('Close') : t('Change')}</Button>
             </div></div>}
             {unfolded && <>
               {c.status === 'ask' && <div className="small acc" style={{ margin: '0 2px 6px' }}>{rows.length ? t('Which one did you mean?') : t('Not in the library — create it, or find it yourself.')}</div>}

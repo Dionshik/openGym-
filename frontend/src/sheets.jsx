@@ -41,7 +41,7 @@ import { useSheetKeyboard, useRevealActiveChip, tappable } from './lib/use-sheet
 import { isFav, toggleFav, sortFavouritesFirst } from './lib/favourites.js'
 import { buildSessionEntries } from './lib/session-start.js'
 import { buildCombinedEntries, deriveSessionName } from './lib/session-merge.js'
-import { workoutsOn, backfillStart, backfillEnd, completeBackfill } from './lib/backfill.js'
+import { workoutsOn, backfillStart, backfillEnd, completeBackfill, moveWorkout } from './lib/backfill.js'
 import { editSessionFor, isEditSession, editedEnd, editedPrs, editHasWork } from './lib/workout-edit.js'
 
 const S = () => useStore.getState().S
@@ -1850,10 +1850,54 @@ function WorkoutDetail({ w, close }) {
       nav('/workout')
     }}>{t('Edit workout')}</Button>
     <div style={{ height: 8 }} />
+    <Button icon="calendar" onClick={() => {
+      if (heldBySession(w.id)) { toast(t('Finish the current workout first.')); return }
+      saveNote()
+      ui().openSheet(c => <MoveWorkout w={w} close={c} onMoved={close} />, { kind: 'center' })
+    }}>{t('Move to another day')}</Button>
+    <div style={{ height: 8 }} />
     <Button variant="danger" onClick={() => confirmSheet({ title: t('Delete workout?'), message: t('This removes it from your history for good.'), confirmText: t('Delete'), danger: true, onConfirm: () => { update(s => { s.workouts = s.workouts.filter(x => x.id !== w.id) }); close(); toast(t('Workout deleted')) } })}>{t('Delete workout')}</Button>
   </>
 }
 export const workoutDetailSheet = w => ui().openSheet(close => <WorkoutDetail w={w} close={close} />)
+
+// A workout an open session will write over when it is finished: the one being edited (same id),
+// or the one a "Replace" past workout is replacing. Moving it now would have Finish delete it.
+const heldBySession = id => { const A = S().active; return !!A && (A.id === id || A.backfill?.replaceId === id) }
+
+// "I logged Tuesday's session on Wednesday": the same workout, another day (lib/backfill.js
+// moveWorkout keeps its sets, records, note, time of day and length). Up to today; a day that
+// already has a workout keeps both.
+function MoveWorkout({ w, close, onMoved }) {
+  const st = useStore(s => s.S)
+  const today = todayISO()
+  const [date, setDate] = useState(w.d)
+  const shift = n => { const d = new Date(date + 'T12:00:00'); d.setDate(d.getDate() + n); const next = isoOf(d); if (next <= today) setDate(next) }
+  const others = date && date !== w.d ? workoutsOn(st, date).filter(x => x.id !== w.id) : []
+  const move = () => {
+    if (!date || date > today) { toast(t('Pick a day up to today')); return }
+    if (date === w.d) { close(); return }
+    if (heldBySession(w.id)) { toast(t('Finish the current workout first.')); return }
+    update(s => { s.workouts = moveWorkout(s.workouts, w.id, date) })
+    close()
+    onMoved && onMoved()
+    toast(t('Moved to {0}', fmtDate(date, true)))
+  }
+  return <div style={{ textAlign: 'center', padding: '4px 0' }}>
+    <h3 style={{ marginBottom: 6 }}>{t('Move to another day')}</h3>
+    <div className="muted small" style={{ marginBottom: 14, lineHeight: 1.5 }}>{t('The workout keeps its sets, records and note — only the day changes.')}</div>
+    <div className="row" style={{ gap: 6, justifyContent: 'center', marginBottom: 10 }}>
+      <button className="iconbtn" aria-label={t('A day earlier')} onClick={() => shift(-1)}><Icon name="chevronLeft" /></button>
+      <input type="date" className="timef" value={date} max={today} onChange={e => setDate(e.target.value)} />
+      <button className="iconbtn" aria-label={t('A day later')} disabled={date >= today} onClick={() => shift(1)}><Icon name="chevronRight" /></button>
+    </div>
+    <div className="small dim" style={{ marginBottom: 14 }}>{date ? fmtDate(date, true) : ''}</div>
+    {others.length > 0 && <div className="small" style={{ marginBottom: 14, color: 'var(--orange)' }}>{t('That day already has “{0}” — both will be kept.', others.map(x => x.name).join(', '))}</div>}
+    <button className="btn primary" disabled={!date || date === w.d} onClick={move}>{t('Move')}</button>
+    <div style={{ height: 8 }} />
+    <Button variant="ghost" className="dim" onClick={close}>{t('Cancel')}</Button>
+  </div>
+}
 
 /* ============================ calendar ============================ */
 function Calendar({ start, close }) {

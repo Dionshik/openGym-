@@ -296,12 +296,16 @@ export async function localFood(S, req = {}) {
 
 /* "Describe the workout you did", on a phone with its own key: the same core as the server's
    lane (api/coach/core/logtext.js), counted against the lookups — it is the same kind of call. */
-let readingLog = false
-export async function localLogText(S, text, today) {
+// The read in flight, by number: a cancelled one stops holding the lane at once, and its late
+// finish cannot clear the flag of a read started after it.
+let readingLog = 0
+let readSeq = 0
+export async function localLogText(S, text, today, { signal } = {}) {
   const fail = (code, detail) => Object.assign(new Error(code), { code, detail: detail || null })
   const asked = cleanLogText(text)
   if (!asked) throw fail('empty')
   if (readingLog) throw fail('busy')
+  if (signal?.aborted) throw fail('cancelled')
   if (!hasLookupConsent(S)) throw fail('consent')
   const d = await loadCoachDevice()
   const adapter = ADAPTERS[d.provider]
@@ -309,19 +313,24 @@ export async function localLogText(S, text, today) {
   const cap = await matchCapState()
   if (cap.used >= cap.limit) throw fail('cap')
 
-  readingLog = true
+  const mine = ++readSeq
+  readingLog = mine
+  const release = () => { if (readingLog === mine) readingLog = 0 }
+  signal?.addEventListener('abort', release, { once: true })
   try {
     await saveCoachDevice({ matchDaily: { d: todayISO(), n: cap.used + 1 } })
     const key = await getApiKey()
     const attempt = await runPipeline({
       adapter, cfg: cfgOf(d), kind: 'logtext', payload: buildLogPayload(S, asked, { today }),
       model: d.model || HTTP_PROVIDERS[d.provider].defaultModel, timeoutMs: timeoutFor(d.provider), maxTokens: 6000,
-      invokeOpts: { env: envOf(d, key), fetch: nativeFetch }
+      // The native fetch races the signal, so Cancel ends the provider call rather than waiting it out.
+      invokeOpts: { env: envOf(d, key), fetch: nativeFetch, ...(signal ? { signal } : {}) }
     })
+    if (signal?.aborted) throw fail('cancelled')
     if (!attempt.ok) {
       const detail = attempt.detail || (Array.isArray(attempt.errors) ? attempt.errors.slice(0, 3).map(String).join(' · ').slice(0, 300) : null)
       throw fail(attempt.errorClass || 'provider', detail)
     }
     return resolveLog(attempt.result, withPoolRows(S, poolRows(), { all: true }))
-  } finally { readingLog = false }
+  } finally { release() }
 }

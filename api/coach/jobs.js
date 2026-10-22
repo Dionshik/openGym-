@@ -335,7 +335,10 @@ export function acquireSlot() {
   running++;
   return true;
 }
-export function releaseSlot() { running = Math.max(0, running - 1); pump(); }
+// A slot handed back by any lane can be the one another lane is waiting for: the Coach's queue
+// first, then every lane that asked to be told (food-jobs.js, logtext-jobs.js) — each of them
+// only ever pumped itself, so two photos being read could leave a workout read queued forever.
+export function releaseSlot() { running = Math.max(0, running - 1); pump(); slotFreed(); }
 const slotHooks = [];
 export function onSlotFree(fn) { slotHooks.push(fn); }
 function slotFreed() { for (const fn of slotHooks) { try { fn(); } catch (e) { console.error('coach slot hook failed', e); } } }

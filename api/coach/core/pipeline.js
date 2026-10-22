@@ -80,7 +80,7 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
   // A workout read from text: the lookup's interpretation per exercise, plus the sets and the
   // day (logtext.js) — resolved against the catalogue by the caller, like a lookup.
   if (kind === 'logtext') {
-    const l = validateLog(parsed.value, { customs: payload.custom || [], today: payload.meta?.today || null });
+    const l = validateLog(parsed.value, { customs: payload.custom || [], today: payload.meta?.today || null, text: payload.text || null });
     if (!l.ok) return { ok: false, repairable: !repair, errors: l.errors, raw: r.text, errorClass: 'unusable' };
     return { ok: true, result: l.result };
   }

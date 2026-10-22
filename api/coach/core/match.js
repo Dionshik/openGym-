@@ -170,6 +170,31 @@ export function tokens(name) {
   return out;
 }
 
+/**
+ * Two words that are the same word up to its ending. Russian names a thing in six cases —
+ * "Хаммер", "в хаммере", "на хаммер" — and the user's own exercise names are as likely to be
+ * Russian as English, so an exact token match misses most of them. Same word: equal, or both at
+ * least four letters and sharing all but the last two letters of the shorter one (and at least
+ * four).
+ */
+export function sameWord(a, b) {
+  if (a === b) return true;
+  const n = Math.min(a.length, b.length);
+  if (n < 4) return false;
+  let i = 0;
+  while (i < n && a[i] === b[i]) i++;
+  return i >= Math.max(4, n - 2);
+}
+/** similarity() with sameWord in place of equality — for the user's own names only. */
+function looseSimilarity(q, e) {
+  if (!q.size || !e.size) return 0;
+  const es = [...e];
+  let hit = 0;
+  for (const w of q) if (es.some(x => sameWord(w, x))) hit++;
+  if (!hit) return 0;
+  return 0.7 * (hit / q.size) + 0.3 * Math.min(1, hit / e.size);
+}
+
 const libTokens = new Map();
 const tokensOfEntry = e => {
   let t = libTokens.get(e.id);
@@ -223,7 +248,7 @@ export function rankLibrary(item, { customs = [], max = MAX_MATCHES } = {}) {
     const before = scored.length;
     consider({ id: c.id, eq: c.eq, bp: c.bp }, t, true);
     if (scored.length === before) {
-      const s = similarity(saidTokens, t);
+      const s = looseSimilarity(saidTokens, t);
       if (s >= MIN_SCORE) scored.push({ id: c.id, score: +s.toFixed(3), len: t.size, custom: true });
     }
   }

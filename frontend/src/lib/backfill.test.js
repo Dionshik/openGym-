@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { workoutsOn, backfillStart, backfillEnd, insertChronological, completeBackfill } from './backfill.js'
+import { workoutsOn, backfillStart, backfillEnd, insertChronological, completeBackfill, moveWorkout } from './backfill.js'
 
 const w = (id, d, start = 0) => ({ id, d, start })
 
@@ -55,5 +55,45 @@ describe('completeBackfill', () => {
     const out = completeBackfill(list, { backfill: { durationMin: 60, replaceId: 'b' } }, w('x', '2026-01-05', 30))
     expect(out.map(x => x.id)).toEqual(['a', 'x', 'd'])
     expect(list).toHaveLength(3)
+  })
+})
+
+describe('moveWorkout', () => {
+  const at = (iso, hh, mm = 0) => { const d = new Date(iso + 'T12:00:00'); d.setHours(hh, mm, 0, 0); return d.getTime() }
+  const w = (id, d, hh, minutes = 60, extra = {}) => ({ id, d, start: at(d, hh), end: at(d, hh) + minutes * 60000, entries: [], ...extra })
+  const hist = () => [w('a', '2026-10-12', 18), w('b', '2026-10-13', 7, 45, { prs: ['0025'], note: 'heavy' }), w('c', '2026-10-15', 19)]
+
+  it('keeps the workout — id, records, note — and its time of day and length, on the new date', () => {
+    const out = moveWorkout(hist(), 'b', '2026-10-14')
+    const m = out.find(x => x.id === 'b')
+    expect(m.d).toBe('2026-10-14')
+    expect(new Date(m.start).getHours()).toBe(7)
+    expect(m.end - m.start).toBe(45 * 60000)
+    expect(m.prs).toEqual(['0025'])
+    expect(m.note).toBe('heavy')
+    expect(out.map(x => x.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('files it where its new date puts it, in either direction', () => {
+    expect(moveWorkout(hist(), 'b', '2026-10-11').map(x => x.id)).toEqual(['b', 'a', 'c'])
+    expect(moveWorkout(hist(), 'a', '2026-10-16').map(x => x.id)).toEqual(['b', 'c', 'a'])
+    // onto a day that already has one: both stay, ordered by the time of day
+    const same = moveWorkout(hist(), 'b', '2026-10-12')
+    expect(same.map(x => x.id)).toEqual(['b', 'a', 'c'])
+  })
+
+  it('leaves the history alone for an unknown id, the same day, or a date that is not one', () => {
+    const h = hist()
+    expect(moveWorkout(h, 'zz', '2026-10-14')).toBe(h)
+    expect(moveWorkout(h, 'b', '2026-10-13')).toBe(h)
+    expect(moveWorkout(h, 'b', '2026-02-30')).toBe(h)
+    expect(moveWorkout(h, 'b', 'tomorrow')).toBe(h)
+  })
+
+  it('does not change the other workouts or the array it was given', () => {
+    const h = hist()
+    const before = JSON.stringify(h)
+    moveWorkout(h, 'b', '2026-10-10')
+    expect(JSON.stringify(h)).toBe(before)
   })
 })

@@ -91,7 +91,7 @@ if (kind === 'match') {
 if (kind === 'logtext') {
   if (MODE === 'logtext-broken') out({ coach_contract: 1, items: [{ said: 'x', sets: [] }] });
   const text = String(P.text || '');
-  const parts = text.split(/[,;]+/).map(s => s.trim()).filter(Boolean).slice(0, 15);
+  const parts = text.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean).slice(0, 15);
   const own = (P.custom || []);
   out({
     coach_contract: 1,
