@@ -12,15 +12,18 @@
 // The screens that call it arrive in PR 4. Nothing in this file needs one to be tested, which
 // is the point of it being separate from them.
 
-import { EXIDX } from './exercises.js'
+import { EXIDX, canonicalExId } from './exercises.js'
 import { modeOf, isBw, isPerSide, cleanupSg } from './history.js'
 import { uid, todayISO, DAYN } from './format.js'
 import { mergePlan } from './plan-share.js'
+import { deleteRoutine } from './routines.js'
 import { POLICIES } from './progression.js'
-import { t } from './i18n.js'
+import { t, tn } from './i18n.js'
 
 // Bumping this re-prompts everyone: it means what we share, or who we share it with, changed.
-export const CONSENT_VERSION = 1
+// 2: the training line names the session notes, which the payload carries and version 1 never
+// mentioned.
+export const CONSENT_VERSION = 2
 
 // Bounds. The whole state has to stay inside the server's 5 MB body limit, and a Coach log
 // that grows forever is exactly the kind of thing that eats it invisibly. Worst case here is
@@ -61,12 +64,15 @@ export const coachAvailable = (config, user, { demo, mobile, coachMode } = {}) =
 
 // What each data category means, in the user's words. Rendered from the same list the payload
 // builder uses (api/coach/core/categories.js), so the screen cannot promise less than leaves.
+// Each entry returns [title, detail] in the current language, through literal t() calls so
+// check-source-strings sees every key. When the screens passed these to t() as variables the
+// checker could not see them, and eight of the ten had no translation in any pack.
 export const CATEGORY_TEXT = {
-  plan: ['Your plan', 'Routines, exercises, sets and reps, your weekly schedule and progression settings.'],
-  training: ['Your logged training', 'Sets you logged in the review window — weights, reps, times, effort ratings and how long sessions took.'],
-  bodyweight: ['Body weight', 'Weigh-ins from the same window, and your goal weight if you set one.'],
-  profile: ['What you tell the Coach', 'Your intake answers, including any limitations or injuries you describe.'],
-  prefs: ['A few preferences', 'Your unit, your language and which effort scale you log.']
+  plan: () => [t('Your plan'), t('Routines, exercises, sets and reps, your weekly schedule and progression settings.')],
+  training: () => [t('Your logged training'), t('Sets you logged in the review window: weights, reps, times, effort ratings, how long sessions took, and your session notes.')],
+  bodyweight: () => [t('Body weight'), t('Weigh-ins from the same window, and your goal weight if you set one.')],
+  profile: () => [t('What you tell the Coach'), t('Your intake answers, including any limitations or injuries you describe.')],
+  prefs: () => [t('A few preferences'), t('Your unit, your language and which effort scale you log.')]
 }
 // The optional ones (api/coach/core/categories.js OPTIONAL_CATEGORIES): each has a switch of
 // its own on the Body screen and is off until turned on.
@@ -141,6 +147,13 @@ export const planHash = S => hashPlan(canonicalPlan(S))
 const findRoutine = (S, id) => (S.routines || []).find(r => r.id === id) || null
 const findEx = (routine, id) => (routine?.ex || []).find(e => e.id === id) || null
 
+// The Coach reads a routine's name cut at 80 characters (NAME_MAX in api/coach/core/payload.js),
+// and the server copies that cut name into a rename's `before`. Compared whole, a longer name
+// never matched, and every rename of it was shown as already overtaken by an edit. Not imported
+// from payload.js, which would pull the exercise catalogue into the main bundle; coach.test.js
+// pins the two together.
+export const ROUTINE_NAME_SEEN = 80
+
 /** The plan's current value for whatever a change is about — what `before` is checked against. */
 export function currentValue(S, change) {
   const r = findRoutine(S, change.target?.routineId)
@@ -154,7 +167,7 @@ export function currentValue(S, change) {
     case 'inc': return e?.inc ?? null
     case 'exercise-prog': return e?.prog ?? null
     case 'routine-prog': return r?.prog ?? null
-    case 'rename-routine': return r?.name ?? null
+    case 'rename-routine': return r?.name == null ? null : String(r.name).slice(0, ROUTINE_NAME_SEEN)
     case 'week': return [].concat(S.week?.[change.target?.weekday] ?? [])   // routine-id list; [] = rest
     default: return undefined            // structural changes have no single scalar to compare
   }
@@ -370,7 +383,7 @@ export function profileLines(p) {
   const lines = []
   if (goal) lines.push(t(goal))
   if (exp) lines.push(t(exp))
-  if (p.daysPerWeek) lines.push(p.daysPerWeek === 1 ? t('1 day a week') : t('{0} days a week', p.daysPerWeek))
+  if (p.daysPerWeek) lines.push(tn('1 day a week', '{0} days a week', p.daysPerWeek))
   if (p.sessionMin) lines.push(t('{0} min per session', p.sessionMin))
   if (p.equipment?.length) lines.push(p.equipment.join(', '))
   if (p.limitations) lines.push(t('Limits: {0}', p.limitations))
@@ -392,9 +405,13 @@ export function applyCreatedPlan(s, proposal, { schedule } = {}) {
   pushSnapshot(s, proposal.id, t('Before the Coach’s plan'))
   const bundle = proposal.bundle
   // The Coach's `why` texts are for the review screen; they have no place in the routine data.
+  // A link is never the Coach's to write: validatePlan already drops one from the model's plan,
+  // and this drops it again on the way into mergePlan, which would otherwise carry a `url` on a
+  // plan's own exercises through to the profile (cleanCustom keeps links for shared plans).
   const stripped = {
     ...bundle,
-    routines: bundle.routines.map(r => ({ ...r, why: undefined, ex: r.ex.map(e => ({ ...e, why: undefined, name: undefined })) }))
+    routines: bundle.routines.map(r => ({ ...r, why: undefined, ex: r.ex.map(e => ({ ...e, why: undefined, name: undefined })) })),
+    customEx: (bundle.customEx || []).map(c => { const { url, media, ...rest } = c || {}; return rest })
   }
   const res = mergePlan(s, stripped, { schedule })
   // Only when the week actually moved — with the switch off the old schedule still stands, and
@@ -416,7 +433,8 @@ const CHANGE_APPLY = {
   'add-exercise': (s, c) => {
     const r = need(findRoutine(s, c.target.routineId))
     const a = c.after || {}
-    const e = { id: a.id, sets: a.sets || 3, mode: a.mode || 'reps' }
+    // A drawing's id the Coach may have picked up names the exercise it draws.
+    const e = { id: canonicalExId(a.id), sets: a.sets || 3, mode: a.mode || 'reps' }
     if (e.mode === 'cardio') { e.min = a.min || 20; e.speed = a.speed || 8 }
     else if (e.mode === 'time') e.sec = a.sec || 45
     else e.reps = a.reps || 10
@@ -424,6 +442,7 @@ const CHANGE_APPLY = {
     if (POLICIES.includes(a.prog)) e.prog = a.prog
     if (Number.isInteger(a.repsMin)) e.repsMin = a.repsMin
     if (Number.isInteger(a.repsMax)) e.repsMax = a.repsMax
+    if (Number.isInteger(a.setsMax)) e.setsMax = a.setsMax   // triple progression's set ceiling
     // Only when the Coach disagreed with the catalogue: an absent flag has always meant
     // "whatever the exercise says", and writing one out would freeze today's dataset into
     // the plan.
@@ -451,7 +470,7 @@ const CHANGE_APPLY = {
     // app halve a rep count that was never per-side, so an explicit flag is dropped and the new
     // exercise goes back to whatever the catalogue says about it.
     const { bodyweight, side, ...keep } = old
-    r.ex[i] = { ...keep, id: a.id, ...(a.sets ? { sets: a.sets } : {}), ...(a.reps ? { reps: a.reps } : {}), ...(a.weight > 0 ? { weight: a.weight } : {}) }
+    r.ex[i] = { ...keep, id: canonicalExId(a.id), ...(a.sets ? { sets: a.sets } : {}), ...(a.reps ? { reps: a.reps } : {}), ...(a.weight > 0 ? { weight: a.weight } : {}) }
   },
   sets: (s, c) => { need(findExIn(s, c)).sets = c.after },
   reps: (s, c) => { need(findExIn(s, c)).reps = c.after },
@@ -501,33 +520,26 @@ const CHANGE_APPLY = {
       id: uid(), name: a.name, emoji: a.emoji || '🏋️',
       ...(POLICIES.includes(a.prog) ? { prog: a.prog } : {}),
       ex: a.ex.map(e => ({
-        id: e.id, sets: e.sets || 3, mode: e.mode || 'reps',
+        id: canonicalExId(e.id), sets: e.sets || 3, mode: e.mode || 'reps',
         ...(e.mode === 'time' ? { sec: e.sec || 45 } : { reps: e.reps || 10 }),
         ...(Number.isInteger(e.repsMax) ? { repsMax: e.repsMax } : {}),
+        ...(Number.isInteger(e.setsMax) ? { setsMax: e.setsMax } : {}),
         ...(e.bodyweight != null ? { bodyweight: !!e.bodyweight } : {}),
         ...(e.side ? { side: true } : {})
       }))
     })
   },
   'remove-routine': (s, c) => {
-    const id = c.target.routineId
-    s.routines = s.routines.filter(r => r.id !== id)
-    // A week pointing at a routine that no longer exists reads as a rest day anyway; clearing
-    // it keeps the plan honest rather than merely harmless.
-    Object.keys(s.week || {}).forEach(d => { if (s.week[d] === id) delete s.week[d] })
-    // RoutineEdit does the same on a hand-deleted routine. A pointer left behind here is not
-    // merely inert: the day still counts as overridden, so it wears a "rescheduled" badge for good.
-    const dropped = {}
-    Object.keys(s.dayPlan || {}).forEach(iso => {
-      if (s.dayPlan[iso] === id) { dropped[iso] = id; delete s.dayPlan[iso] }
-    })
-    recordDayPlanDrops(s, dropped)
+    // The same delete as Plan and RoutineEdit. It used to compare each weekday with ===, which
+    // missed a combined day (a list) and left the deleted id on it. The week comes back from the
+    // snapshot on a revert; the dropped reschedules are not in the snapshot, so they are recorded.
+    recordDayPlanDrops(s, deleteRoutine(s, c.target.routineId))
   },
   'rename-routine': (s, c) => { need(findRoutine(s, c.target.routineId)).name = c.after },
   week: (s, c) => {
     // A single-routine op: the slot is a list, but the Coach only ever names one routine (or
     // rest), and it replaces the day. This collapses a combined day to one routine — the same
-    // stated limitation as a DayOverride (see docs/COMBINE_ROUTINES.md §8).
+    // stated limitation as a DayOverride (see docs/dev/COMBINE_ROUTINES.md §8).
     const d = c.target.weekday
     if (c.after == null || c.after === 'rest') delete s.week[d]
     else s.week[d] = [c.after]
@@ -609,7 +621,7 @@ export function changeTitle(c, S) {
   const ex = c.target?.exId ? exTitle(c.target.exId) : null
   switch (c.type) {
     case 'add-exercise': return t('Add {0}', exTitle(c.after?.id))
-    case 'remove-exercise': return t('Drop {0}', ex)
+    case 'remove-exercise': return t('Remove {0}', ex)
     case 'swap-exercise': return t('Swap {0} for {1}', ex, exTitle(c.after?.id))
     case 'sets': return t('{0}: sets', ex)
     case 'reps': return t('{0}: reps', ex)
@@ -641,7 +653,7 @@ export function changeValues(c, S) {
       const ids = [].concat(v ?? []).filter(x => x && x !== 'rest')
       return ids.length ? ids.map(routineName).join(' + ') : t('Rest')
     }
-    if (v == null) return '—'
+    if (v == null) return '–'
     if (typeof v === 'object') return v.id ? exTitle(v.id) : v.name || JSON.stringify(v)
     if (Array.isArray(v)) return v.length + ''
     return String(v)

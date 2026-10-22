@@ -71,7 +71,7 @@ async function startServer(t) {
 
 test('absent until an admin turns it on, and the data answers are what they always were', async t => {
   const h = await startServer(t);
-  assert.equal('photos' in (await h.req('GET', '/api/config')).body, false);
+  assert.equal('photos' in (await h.req('GET', '/api/config', { uid: ANN })).body, false);
   assert.deepEqual(await h.req('GET', '/api/photos', { uid: ANN }), { status: 403, body: { error: 'disabled' } });
   assert.deepEqual(await h.upload(ANN), { status: 403, body: { error: 'disabled' } });
   assert.equal((await h.raw('/api/photo?id=' + 'a'.repeat(24), { uid: ANN })).status, 403);
@@ -84,7 +84,7 @@ test('absent until an admin turns it on, and the data answers are what they alwa
   assert.deepEqual(before, { enabled: false, quotaMb: 500, mealDays: 0, users: 0, files: 0, bytes: 0 });
   const after = await h.req('POST', '/api/admin/extras', { uid: ADMIN, body: { photos: { enabled: true, quotaMb: 200, mealDays: 90, junk: 1 } } });
   assert.deepEqual(after.body.photos, { enabled: true, quotaMb: 200, mealDays: 90, users: 0, files: 0, bytes: 0 });
-  assert.equal((await h.req('GET', '/api/config')).body.photos, true);
+  assert.equal((await h.req('GET', '/api/config', { uid: ANN })).body.photos, true);
   assert.match(fs.readFileSync(path.join(h.dataDir, 'audit.log'), 'utf8'), /"ev":"admin\.photos\.store".*"msg":"on"/);
   // numbers out of range are not taken
   const odd = await h.req('POST', '/api/admin/extras', { uid: ADMIN, body: { photos: { quotaMb: 1, mealDays: -5 } } });

@@ -4,13 +4,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import net from 'node:net';
 import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { boundPort } from './helpers.mjs';
 
 const API = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SECRET = crypto.randomBytes(32).toString('hex');
@@ -24,31 +24,24 @@ const UID = 'u_bad_1';
 const authed = { Cookie: `gymsid=${mintSession(UID)}`, 'Content-Type': 'application/json' };
 const anon = { 'Content-Type': 'application/json' };
 
-const freePort = () => new Promise(r => {
-  const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); });
-});
-
 async function startServer(t) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gym-bad-'));
   fs.writeFileSync(path.join(dataDir, 'secret'), SECRET, { mode: 0o600 });
   fs.writeFileSync(path.join(dataDir, 'db.json'), JSON.stringify({
     users: [{ id: UID, name: 'One', created: new Date().toISOString() }], creds: [], subs: [], invites: []
   }));
-  const port = await freePort();
   const child = spawn(process.execPath, ['server.js'], {
     cwd: API, stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, ORIGIN: 'http://localhost:8080', RP_ID: 'localhost' }
+    env: { ...process.env, PORT: '0', DATA_DIR: dataDir, ORIGIN: 'http://localhost:8080', RP_ID: 'localhost' }
   });
-  const h = { api: `http://127.0.0.1:${port}`, log: '', dataDir };
+  const h = { api: '', log: '', dataDir };
   child.stdout.on('data', d => h.log += d);
   child.stderr.on('data', d => h.log += d);
   t.after(() => { child.kill('SIGKILL'); fs.rmSync(dataDir, { recursive: true, force: true }); });
-  let up = false;
-  for (let i = 0; i < 100 && !up; i++) {
-    try { up = (await fetch(`${h.api}/api/health`)).ok; } catch { /* not up yet */ }
-    if (!up) await new Promise(r => setTimeout(r, 100));
-  }
-  assert.ok(up, `server never came up:\n${h.log}`);
+  // The boot line carries the port the listener bound, so it is both the address and the
+  // readiness signal — see boundPort in helpers.mjs for why the test does not pick one.
+  h.port = await boundPort(child, () => h.log);
+  h.api = `http://127.0.0.1:${h.port}`;
   // The boot line is fine; anything that looks like a stack frame after this is a defect.
   h.stackFrames = () => h.log.split('\n').filter(l => /^\s+at /.test(l)).length;
   return h;
@@ -151,20 +144,47 @@ test('PUT /api/data: an array is not a document, and null entries never reach th
   assert.equal(onDisk()._rev, 1);
   assert.deepEqual(onDisk().workouts.map(w => w.id), ['w1']);
   r = await status(h, 'GET', '/api/data/rev', authed);
-  assert.deepEqual(r.body, { rev: 1 });
+  assert.deepEqual(r.body, { rev: 1, wid: onDisk()._wid });
 
   // Null and other non-object entries are dropped: every server-side reader of the document
   // (reminder tick, admin drill-down) dereferences the entries, and a 400 would strand a client
   // whose own copy is already malformed.
-  r = await put({ state: { workouts: [null, { id: 'w2', d: '2026-09-02' }, 7, 'x', [], { id: 'w3', d: '2026-09-03' }], routines: [null, { id: 'r1', name: 'A', ex: [] }] }, baseRev: 1 });
+  r = await put({ state: { workouts: [null, { id: 'w2', d: '2026-09-02' }, 7, 'x', [], { id: 'w3', d: '2026-09-03' }], routines: [null, { id: 'r1', name: 'A', ex: [] }], unit: 'kg' }, baseRev: 1 });
   assert.equal(r.status, 200);
   assert.equal(r.body.rev, 2);
   assert.deepEqual(onDisk().workouts.map(w => w.id), ['w2', 'w3']);
   assert.deepEqual(onDisk().routines.map(x => x.id), ['r1']);
-  // Absent lists stay absent — every client fills its own defaults.
+  // Absent lists stay absent from a client that stamps its own changes: every client fills its
+  // own defaults. From one that does not, a list it left out is one it never knew, and the stored
+  // one stays (sync-stamps.js keepUnknown).
   r = await put({ state: { unit: 'kg' }, baseRev: 2 });
   assert.equal(r.status, 200);
+  assert.deepEqual(onDisk().workouts.map(w => w.id), ['w2', 'w3']);
+  // What it was told is not what is stored, so the revision moves on past the one it was told.
+  assert.equal(r.body.rev, 3);
+  assert.equal(onDisk()._rev, 4);
+  r = await put({ state: { unit: 'kg' }, baseRev: 3, stamped: true });
+  assert.equal(r.status, 409);
+  r = await put({ state: { unit: 'kg' }, baseRev: 4, stamped: true });
+  assert.equal(r.status, 200);
   assert.equal('workouts' in onDisk(), false);
+  assert.equal(h.stackFrames(), 0, `stack traces in the log:\n${h.log}`);
+});
+
+test('PUT /api/data: a document nested too deep to store is a 400, not a 500, and nothing is written', async t => {
+  const h = await startServer(t);
+  const onDisk = () => JSON.parse(fs.readFileSync(path.join(h.dataDir, `state-${UID}.json`), 'utf8'));
+  let r = await status(h, 'PUT', '/api/data', authed, JSON.stringify({ state: { workouts: [], routines: [], unit: 'kg' }, baseRev: 0 }));
+  assert.equal(r.status, 200);
+  // JSON.parse takes this (it is not recursive in V8); JSON.stringify on the way to the disk is.
+  const depth = 200000;
+  const deep = '{"state":{"workouts":[],"routines":[],"x":' + '['.repeat(depth) + ']'.repeat(depth) + '},"baseRev":1}';
+  r = await status(h, 'PUT', '/api/data', authed, deep);
+  assert.equal(r.status, 400);
+  assert.equal(r.body.error, 'invalid state');
+  assert.equal(onDisk()._rev, 1);
+  r = await status(h, 'GET', '/api/data/rev', authed);
+  assert.deepEqual(r.body, { rev: 1, wid: onDisk()._wid });
   assert.equal(h.stackFrames(), 0, `stack traces in the log:\n${h.log}`);
 });
 

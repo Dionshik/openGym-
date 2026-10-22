@@ -8,7 +8,7 @@ import { DEF, useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { LANGS, DERIVED_LOCALES } from '../lib/i18n-core.js'
 
-vi.mock('../lib/sound.js', () => ({ beep: vi.fn(), vibrate: vi.fn(), unlock: vi.fn() }))
+vi.mock('../lib/sound.js', () => ({ beep: vi.fn(), vibrate: vi.fn(), alertBuzz: vi.fn(), unlock: vi.fn() }))
 vi.mock('../lib/api.js', () => ({ api: vi.fn(() => Promise.resolve({})) }))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -214,6 +214,7 @@ describe('remove-exercise locale coverage', () => {
 
   it('defines every new prompt in every non-English locale pack', () => {
     expect(Object.keys(packs)).toHaveLength(nonEnglishLangCount)
+    expect(Object.keys(packs).some(p => p.endsWith('/ar.js'))).toBe(true)
     Object.entries(packs).forEach(([path, pack]) => {
       required.forEach(key => expect(pack, `${path} is missing ${key}`).toHaveProperty(key))
     })

@@ -123,6 +123,14 @@ test('the compatible endpoint: base URL is validated, a keyless endpoint counts 
     const { call } = harness();
     let r = await call('POST /api/admin/coach/config', { provider: 'compatible', baseUrl: 'http://user:pw@x' });
     assert.equal(r.status, 400);
+    // Empty passes validateBaseUrl on purpose (it means "the default" for anthropic/openai/gemini),
+    // but compatible has no default, so empty is nowhere to call. This used to save baseUrl: null
+    // and baseUrlFor() then handed the adapter ''. The phone refuses it too.
+    r = await call('POST /api/admin/coach/config', { provider: 'compatible', baseUrl: '' });
+    assert.equal(r.status, 400, 'an empty endpoint for a provider with no default');
+    assert.match(r.body.error, /no default endpoint/);
+    r = await call('POST /api/admin/coach/config', { provider: 'compatible', baseUrl: '   ' });
+    assert.equal(r.status, 400, 'whitespace is empty');
     r = await call('POST /api/admin/coach/config', { provider: 'compatible', baseUrl: base + '/' });
     assert.equal(r.status, 200);
 
@@ -290,4 +298,95 @@ test('a debrief is enqueued as its own kind, and the cohort routes gate on the a
   await call('POST /api/coach/debrief', {});
   while (jobs.status('admin-1').job && Date.now() < until) await new Promise(res => setTimeout(res, 25));
   assert.equal(jobs.status('admin-1').last.errorClass, 'noworkout');
+});
+
+/* ---------- configurable max message length (issue #267) ---------- */
+test('an admin can raise the Coach message length past the old 1000-char default, clamped to a sane range', async () => {
+  fresh();
+  const { call } = harness();
+
+  // A safe default for an instance that has never touched the setting.
+  assert.equal((await call('GET /api/admin/coach')).body.maxMessageLen, 1000);
+
+  const set = await call('POST /api/admin/coach/config', { maxMessageLen: 2500 });
+  assert.equal(set.status, 200);
+  assert.equal((await call('GET /api/admin/coach')).body.maxMessageLen, 2500);
+  assert.equal(cfg.load().maxMessageLen, 2500, 'persists with the rest of the Coach config');
+
+  // Clamped, not trusted outright — the admin route validates the same way `caps` does above.
+  await call('POST /api/admin/coach/config', { maxMessageLen: 999999 });
+  assert.equal((await call('GET /api/admin/coach')).body.maxMessageLen, 4000, 'ceiling');
+  await call('POST /api/admin/coach/config', { maxMessageLen: 1 });
+  assert.equal((await call('GET /api/admin/coach')).body.maxMessageLen, 200, 'floor');
+
+  // The chat UI reads the limit off the status poll, not the admin card it cannot reach.
+  await call('POST /api/admin/coach/config', { maxMessageLen: 1800 });
+  const status = await call('GET /api/coach/status');
+  assert.equal(status.body.maxMessageLen, 1800);
+});
+
+// The guard in front of every user route answers 503 while the Coach is switched off or has no
+// provider connected. It sent the words with no class, so the app could not pick its own,
+// translated line for it and a German lifter read "the Coach is not set up on this instance". It
+// names the class now: 'off', the class enqueue's own refusal carries for the same state.
+test('the Coach-off guard names its class beside the words, on every guarded user route', async () => {
+  const guarded = ['GET /api/coach/status', 'POST /api/coach/plan', 'POST /api/coach/review', 'POST /api/coach/debrief',
+    'GET /api/coach/cohort', 'POST /api/coach/cohort/share', 'POST /api/coach/pending/resolve'];
+  const refusal = { error: 'the Coach is not set up on this instance', code: 'off' };
+  const { call } = harness();
+  for (const [state, patch] of [['switched off', { enabled: false }], ['no provider connected', { provider: 'anthropic' }]]) {
+    fresh(patch);
+    assert.equal(cfg.isConnected(), false, state);
+    for (const key of guarded) {
+      const r = await call(key, {});
+      assert.equal(r.status, 503, `${state}: ${key}`);
+      assert.deepEqual(r.body, refusal, `${state}: ${key}`);
+    }
+  }
+});
+
+/* ---------- configurable max output tokens (reasoning models) ---------- */
+test('an admin can raise the Coach output cap for a reasoning model, clamped to a sane range', async () => {
+  fresh();
+  const { call } = harness();
+
+  // The old hard-coded constant, for an instance that has never touched the setting.
+  assert.equal((await call('GET /api/admin/coach')).body.maxOutputTokens, 16000);
+
+  const set = await call('POST /api/admin/coach/config', { maxOutputTokens: 48000 });
+  assert.equal(set.status, 200);
+  assert.equal((await call('GET /api/admin/coach')).body.maxOutputTokens, 48000);
+  assert.equal(cfg.load().maxOutputTokens, 48000, 'persists with the rest of the Coach config');
+
+  // Clamped, not trusted outright — a reasoning model needs more than 16000, but not a million.
+  await call('POST /api/admin/coach/config', { maxOutputTokens: 999999 });
+  assert.equal((await call('GET /api/admin/coach')).body.maxOutputTokens, 65536, 'ceiling');
+  await call('POST /api/admin/coach/config', { maxOutputTokens: 1 });
+  assert.equal((await call('GET /api/admin/coach')).body.maxOutputTokens, 1024, 'floor');
+});
+
+/* ---------- compatible extra headers (issue #385) ---------- */
+test('an admin can store extra headers for the compatible endpoint; framing names are refused', async () => {
+  fresh();
+  const { call } = harness();
+
+  // Empty by default.
+  assert.equal((await call('GET /api/admin/coach')).body.headers, null);
+
+  let r = await call('POST /api/admin/coach/config', { provider: 'compatible', baseUrl: 'http://127.0.0.1:9', headers: { 'x-opencode-session': 'sess-1' } });
+  assert.equal(r.status, 200);
+  assert.deepEqual((await call('GET /api/admin/coach')).body.headers, { 'x-opencode-session': 'sess-1' });
+  assert.deepEqual(cfg.load().providerOptions.compatible.headers, { 'x-opencode-session': 'sess-1' }, 'persists with the rest of the Coach config');
+
+  // Reserved framing names are refused, and a fixed-endpoint provider takes none.
+  r = await call('POST /api/admin/coach/config', { headers: { authorization: 'Bearer x' } });
+  assert.equal(r.status, 400);
+  r = await call('POST /api/admin/coach/config', { provider: 'openai', headers: { 'x-a': 'b' } });
+  assert.equal(r.status, 400);
+
+  // Clearing with null drops the key rather than storing an empty map.
+  r = await call('POST /api/admin/coach/config', { provider: 'compatible', headers: null });
+  assert.equal(r.status, 200);
+  assert.equal((await call('GET /api/admin/coach')).body.headers, null);
+  assert.equal('headers' in cfg.load().providerOptions.compatible, false);
 });

@@ -76,9 +76,10 @@ LABEL maintainer="Duarte Santos https://gitlab.com/DuarteSantos8" \
 #
 # Every module server.js (or anything under coach/) imports from this directory has to be named
 # here — a file that is not copied is a container that dies at boot with ERR_MODULE_NOT_FOUND,
-# and no unit test runs inside the image. test/dockerfile.test.js holds this list to the imports.
+# and no unit test runs inside the image. test/dockerfile.test.js and test/dockerfile-copy.test.js
+# hold this list to the imports.
 FROM scratch AS app
-COPY server.js push-messages.js verify-error.js pool.js settings.js food.js healthkit.js healthkit-parse.js reminders.js photos.js /app/
+COPY server.js push-messages.js nudge.js nudge-copy.js verify-error.js password.js rate-limit.js passkeys-store.js device-link.js media.js queue.js sync-stamps.js durable.js pool.js settings.js food.js healthkit.js healthkit-parse.js reminders.js photos.js /app/
 COPY coach /app/coach
 
 # ---------------------------------------------------------------------------------------------
@@ -89,10 +90,11 @@ FROM os AS coach
 # Codex ships as a CLI rather than a library, so it is installed rather than resolved, and
 # bubblewrap is its sandbox — a Codex requirement, which is why neither appears in the default
 # target. Before package.json is copied: this layer depends on nothing of ours, so neither a
-# code change nor a version bump runs it again.
+# code change nor a version bump runs it again. The version is pinned (upstream 1.4.1), so a
+# rebuild installs the CLI the Coach was tested against rather than whatever is newest.
 RUN --mount=type=cache,target=/root/.npm \
     apk add --no-cache bubblewrap \
- && npm install -g @openai/codex --no-audit --no-fund
+ && npm install -g @openai/codex@0.160.0 --no-audit --no-fund
 
 # Where Codex keeps its refreshable login cache. Deliberately a sibling of /data rather than a
 # path inside it: docs/SELF_HOSTING tells owners to back up with `tar czf … data/`, and a live

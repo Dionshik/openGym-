@@ -27,8 +27,9 @@ export const mealName = m => MEAL_NAME[MEALS[m] || 'snack']()
 export const mealNow = (h = new Date().getHours()) => (h < 11 ? 0 : h < 16 ? 1 : h < 22 ? 2 : 3)
 const mealOptions = () => MEALS.map((k, i) => ({ value: i, label: MEAL_NAME[k]() }))
 
-/** "165 kcal · P 31 · F 3.6 · C 0" — one line under a food's name. */
-export const macroLine = v => `${Math.round(v.k)} ${t('kcal')} · ${t('P')} ${fmt1(v.p)} · ${t('F')} ${fmt1(v.f)} · ${t('C')} ${fmt1(v.c)}`
+/** "165 kcal · P 31 · F 3.6 · C 0" — one line under a food's name. The fat letter is the first
+ *  letter of the translated "Fat" (Ж in Russian), not t('F'): upstream's 'F' is the failure mark. */
+export const macroLine = v => `${Math.round(v.k)} ${t('kcal')} · ${t('P')} ${fmt1(v.p)} · ${t('Fat').charAt(0)} ${fmt1(v.f)} · ${t('C')} ${fmt1(v.c)}`
 export const fmt1 = n => (Math.round((n || 0) * 10) / 10).toLocaleString(getLang(), { maximumFractionDigits: 1 })
 
 /* ============================ how much ============================ */

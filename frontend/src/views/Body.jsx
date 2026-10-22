@@ -121,7 +121,7 @@ export default function Body() {
       <div className="row between">
         <div>
           <div className="lbl2">{t('Body weight')}</div>
-          <div className="big" style={{ fontSize: 24 }}>{bw ? <>{fmtNum(bw.w)} <span className="muted" style={{ fontSize: '1rem' }}>{S.unit}</span></> : '—'}</div>
+          <div className="big" style={{ fontSize: 24 }}>{bw ? <>{fmtNum(bw.w)} <span className="muted" style={{ fontSize: '1rem' }}>{S.unit}</span></> : '–'}</div>
           {bw && <div className="dim small">{fmtDate(bw.d, true)}</div>}
         </div>
         <Button size="sm" icon="plus" onClick={() => bwSheet()}>{t('Log')}</Button>

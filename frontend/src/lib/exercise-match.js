@@ -8,6 +8,7 @@
 import { EXIDX, BODYPARTS, allExercises, searchExercises } from './exercises.js'
 import { ALL_EQUIPMENT } from './equipment.js'
 import { MUSCLES, inMuscleOrder } from './muscles.js'
+import { exerciseNameFor } from './i18n-core.js'
 
 export const MAX_TEXT = 600          // api/coach/core/match.js MAX_TEXT — the server cuts there too
 export const MAX_CANDIDATES = 6
@@ -15,6 +16,12 @@ export const MAX_CANDIDATES = 6
 export const LOOKUP_CONSENT_VERSION = 1
 // How many rows the app's own search may add under the ones the Coach resolved.
 const OWN_SEARCH_ROWS = 3
+// A phrase the search answers with more rows than this is too vague to add neighbours from.
+// About one row in fifty of the catalogue (~6,100 since v1.4.0): "barbell bench press" finds
+// 43 and "leg press" 66, while "press" finds over 500 and "deadlift" 146.
+const VAGUE_ROWS = 120
+// A name as words: case, "ё" and punctuation aside ("Pull-up" is "pull up").
+const plain = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
 
 /**
  * The exercises one interpreted item could be, best first.
@@ -33,8 +40,11 @@ export function candidatesFor(item, S) {
   const said = String((item && item.said) || '').trim()
   if (said && out.length < MAX_CANDIDATES) {
     const own = searchExercises(allExercises(S), said)
-    // A phrase that matches half the catalogue ("press") is not evidence of anything.
-    if (own.length <= 40) own.slice(0, OWN_SEARCH_ROWS).forEach(add)
+    // A phrase that matches half the catalogue ("press") is not evidence of anything, except for
+    // a row whose whole name it is: "plank" finds 122 rows, and one of them is the plank.
+    const whole = plain(said)
+    const rows = own.length <= VAGUE_ROWS ? own : own.filter(e => plain(e.n) === whole || plain(exerciseNameFor(e)) === whole)
+    rows.slice(0, OWN_SEARCH_ROWS).forEach(add)
   }
   return out.slice(0, MAX_CANDIDATES)
 }

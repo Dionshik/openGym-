@@ -8,14 +8,14 @@ import { readFileSync } from 'node:fs'
 import { EXDB } from './exercises-data.js'
 import { EXTRA } from './exercises-extra.js'
 import { EXTRA_WGER } from './exercises-extra-wger.js'
-import { CATALOGUE, EXIDX, BODYPARTS, searchExercises, isCardio } from './exercises.js'
+import { CATALOGUE, EXIDX, BODYPARTS, EXTRA_SHADOWED, allExercises, sameNameKey, searchExercises, isCardio } from './exercises.js'
 import { ALL_EQUIPMENT } from './equipment.js'
 import { musclesOf } from './muscles.js'
 import { matchExercise } from './import-csv.js'
-import { _setLangState, exerciseNameFor, exerciseNameSearchText, instrFor } from './i18n-core.js'
+import { _setLangState, exerciseNameFor, exerciseNameSearchText, instrFor, instrTranslated } from './i18n-core.js'
 import { tokens } from '../../../api/coach/core/match.js'
 import { LIBRARY } from '../../../api/coach/core/library.js'
-import ruNames, { ALIASES } from '../exercise-names/ru.js'
+import ruNames, { ALIASES } from '../exercise-names-extra/ru.js'
 import ruSteps from '../instr-extra/ru.js'
 
 const ALL = [...EXTRA, ...EXTRA_WGER]
@@ -25,9 +25,10 @@ const attribution = JSON.parse(readFileSync(new URL('../../../licenses/wger-attr
 
 describe('extra catalogue rows', () => {
   it('are appended to the upstream dataset, which itself is untouched', () => {
-    expect(EXDB).toHaveLength(1324)
-    expect(CATALOGUE).toHaveLength(EXDB.length + ALL.length)
-    expect(CATALOGUE[EXDB.length].id).toBe(ALL[0].id)
+    expect(CATALOGUE.slice(0, EXDB.length).map(e => e.id)).toEqual(EXDB.map(e => e.id))
+    const listed = ALL.filter(e => !EXTRA_SHADOWED.has(e.id))
+    expect(CATALOGUE).toHaveLength(EXDB.length + listed.length)
+    expect(CATALOGUE[EXDB.length].id).toBe(listed[0].id)
     expect(ALL.length).toBeGreaterThan(300)
   })
 
@@ -97,14 +98,31 @@ describe('extra catalogue rows', () => {
     expect(EXIDX[withPhotos[0].id].img2).toBe(withPhotos[0].img2)
   })
 
-  it('never repeat a name — an upstream one or each other’s', () => {
+  it('never repeat each other’s name', () => {
     const key = n => [...tokens(n)].sort().join(' ')
-    const seen = new Map(EXDB.map(e => [key(e.n), e.n]))
+    const seen = new Map()
     for (const e of ALL) {
       const k = key(e.n)
       expect(seen.get(k), `"${e.n}" repeats "${seen.get(k)}"`).toBeUndefined()
       seen.set(k, e.n)
     }
+  })
+
+  // v1.4.0's catalogue (5,632 exercises) has some of them under the very same name. Shipped ids
+  // never go away: those resolve as before, and only drop out of what can be browsed and picked.
+  it('one that repeats an upstream name resolves by id but is not listed', () => {
+    const upstream = new Set(EXDB.map(e => sameNameKey(e.n)))
+    const repeats = ALL.filter(e => upstream.has(sameNameKey(e.n)))
+    expect([...EXTRA_SHADOWED].sort()).toEqual(repeats.map(e => e.id).sort())
+    expect(repeats.length).toBeGreaterThan(0)
+    const listed = new Set(allExercises({}).map(e => e.id))
+    for (const e of repeats) {
+      expect(EXIDX[e.id]).toMatchObject({ id: e.id, n: e.n })
+      expect(listed.has(e.id), e.id).toBe(false)
+    }
+    const nordic = ALL.find(e => e.n === 'nordic hamstring curl')
+    expect(EXTRA_SHADOWED.has(nordic.id)).toBe(true)
+    expect(searchExercises(allExercises({}), 'nordic hamstring curl').map(e => e.id)).not.toContain(nordic.id)
   })
 
   it('fill the gaps they were brought in for', () => {
@@ -114,19 +132,22 @@ describe('extra catalogue rows', () => {
 
   it('are known to the Coach’s copy of the catalogue', () => {
     const server = new Map(LIBRARY.map(e => [e.id, e]))
-    expect(LIBRARY).toHaveLength(CATALOGUE.length)
+    // every row, the ones left out of the picker too: the Coach has to resolve their ids
+    expect(LIBRARY).toHaveLength(EXDB.length + ALL.length)
     for (const e of ALL) expect(server.get(e.id), `${e.id} missing — run node scripts/build-coach-assets.mjs`).toMatchObject({ n: e.n, bp: e.bp, eq: e.eq, tg: e.tg })
   })
 
   it('can be matched by an import, without changing what an upstream name resolves to', () => {
     expect(matchExercise('Bench Press')).toBe('0025')
     expect(matchExercise('Face Pull')).toBe('0203')               // the curated alias still wins
-    const nordic = ALL.find(e => e.n === 'nordic hamstring curl')
-    expect(matchExercise('Nordic Hamstring Curl')).toBe(nordic.id)
+    const snatch = ALL.find(e => e.n === 'snatch')
+    expect(matchExercise('Snatch')).toBe(snatch.id)
+    // a name upstream has itself now goes to upstream's exercise, not to the extra row
+    expect(matchExercise('Nordic Hamstring Curl')).toBe(EXDB.find(e => e.n === 'nordic hamstring curl').id)
   })
 })
 
-describe('Russian pack for the extra rows', () => {
+describe('Russian pack for the extra rows (exercise-names-extra/, laid over the catalogue’s own)', () => {
   const ids = new Set(ALL.map(e => e.id))
   it('names only extra rows, and only in Cyrillic', () => {
     expect(Object.keys(ruNames).length).toBeGreaterThan(200)
@@ -149,15 +170,15 @@ describe('Russian, as the app uses it', () => {
   afterEach(() => _setLangState('en', {}, null, null))
 
   it('shows the Russian name with the English one beside it, and upstream rows as they were', () => {
-    _setLangState('ru', {}, ruSteps, ruNames, ALIASES)
+    _setLangState('ru', {}, ruSteps, ruNames, true, false, ALIASES)
     expect(exerciseNameFor(snatch)).toBe(`${ruNames[snatch.id]} (snatch)`)
     expect(exerciseNameFor(EXDB[0])).toBe(EXDB[0].n)             // a partial pack: no entry, no change
     expect(instrFor(snatch)).toBe(ruSteps[snatch.id])
-    expect(instrFor(EXDB[0])).toBe(EXDB[0].st)                   // the extra pack alone has no upstream steps
+    expect(instrTranslated(EXDB[0])).toBe(false)                 // the extra pack alone has no upstream steps
   })
 
   it('finds an extra row by its Russian name and by an alias, and by English as before', () => {
-    _setLangState('ru', {}, null, ruNames, ALIASES)
+    _setLangState('ru', {}, null, ruNames, true, false, ALIASES)
     const word = ruNames[snatch.id].toLowerCase().split(/\s+/)[0]
     expect(searchExercises(ALL, word).map(e => e.id)).toContain(snatch.id)
     const [aliasId, alias] = Object.entries(ALIASES).find(([id, a]) => !ruNames[id].toLowerCase().includes(a.split(' ')[0].toLowerCase()))
@@ -167,9 +188,9 @@ describe('Russian, as the app uses it', () => {
   })
 
   it('aliases are a search aid only — never shown, and gone with the language', () => {
-    _setLangState('ru', {}, null, ruNames, ALIASES)
+    _setLangState('ru', {}, null, ruNames, true, false, ALIASES)
     expect(exerciseNameFor(snatch)).not.toContain(ALIASES[snatch.id] || '\u0000')
-    _setLangState('en', {}, null, ruNames, ALIASES)
+    _setLangState('en', {}, null, ruNames, true, false, ALIASES)
     expect(exerciseNameSearchText(snatch)).toBe('snatch')
     // hu and pt-BR name every upstream row and none of the extra ones: those fall back to English.
     _setLangState('hu', {}, null, { [EXDB[0].id]: 'magyar név' }, null)
@@ -187,5 +208,13 @@ describe('wger attribution', () => {
       expect(a.licence).toMatch(/^CC/)
       expect(a.url).toMatch(/^https:\/\/wger\.de\//)
     }
+  })
+})
+
+describe('the Coach hides the same rows', () => {
+  it('marks hidden in its library exactly the extra rows the app leaves out of the catalogue', async () => {
+    const { EXERCISES } = await import('../../../api/coach/core/library-data.js')
+    expect(new Set(EXERCISES.filter(e => e.hidden).map(e => e.id))).toEqual(EXTRA_SHADOWED)
+    expect(EXERCISES.filter(e => !e.hidden).length).toBe(CATALOGUE.length)
   })
 })

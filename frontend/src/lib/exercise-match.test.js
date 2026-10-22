@@ -39,6 +39,13 @@ describe('candidatesFor', () => {
     expect(rows.map(e => e.id)).toEqual([a])
   })
 
+  it('adds the row whose whole name was typed even when the word is in a hundred names', () => {
+    const plank = idOf('plank')
+    const rows = candidatesFor({ said: 'Plank', matches: [] }, S())
+    expect(rows.map(e => e.id)).toEqual([plank])
+    expect(candidatesFor({ said: 'press', matches: [] }, S())).toEqual([])
+  })
+
   it('adds what the app’s own search finds for the words as typed, without repeating a row', () => {
     const a = idOf('barbell bench press')
     const rows = candidatesFor({ said: 'barbell bench press', matches: [{ id: a, score: 1 }] }, S())

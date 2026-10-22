@@ -9,9 +9,11 @@
 //
 // Like the demo build, MOBILE is replaced at build time, so all of this folds away in
 // web bundles; the Capacitor plugins are only ever imported behind it.
-import { t } from './i18n-core.js'
+import { t, tn } from './i18n-core.js'
 import { isoOf, todayISO } from './format.js'
 import { effectiveRoutineIds } from './history.js'
+import { NUDGE_COPY, lineIndex, nudgeFor, nudgeMinute, toneOf } from './nudge.js'
+import { excusedOn } from './day-notes.js'
 import { activeReminders, ringsOn, loggedOn, LINK_URL } from './reminders.js'
 
 export const MOBILE = import.meta.env.VITE_MOBILE === '1'
@@ -108,18 +110,21 @@ export function buildReminderNotifications(S, now = new Date()) {
     const day = new Date(date)
     day.setDate(date.getDate() + offset)
     const iso = isoOf(day)
-    if (completed.has(iso)) continue
-    // A weekday can hold several routines; name them all, or fall back to a count.
-    const dayRoutines = effectiveRoutineIds(state, iso).map(id => routines.find(x => x.id === id)).filter(Boolean)
+    // A day you noted as sick or away (lib/day-notes.js) is off the hook, reminder included.
+    if (completed.has(iso) || excusedOn(S, iso)) continue
+    // A weekday can hold several routines; name them all, or fall back to a count. Each day is
+    // asked as if it were today: a coach week's next session is due every day until it is done,
+    // so it is reminded every day (the app re-syncs these after every workout and on open).
+    const dayRoutines = effectiveRoutineIds(state, iso, iso).map(id => routines.find(x => x.id === id)).filter(Boolean)
     if (!dayRoutines.length) continue
-    const label = dayRoutines.length <= 2 ? dayRoutines.map(r => r.name).join(' + ') : t('{0} routines', dayRoutines.length)
+    const label = dayRoutines.length <= 2 ? dayRoutines.map(r => r.name).join(' + ') : tn('{0} routine', '{0} routines', dayRoutines.length)
     const at = new Date(day)
     at.setHours(hour, minute, 0, 0)
     if (at <= now) continue
     notifications.push({
       id: REMINDER_ID_BASE + offset,
       title: t('Workout day'),
-      body: t('{0} is on the plan today — let’s go!', label),
+      body: t('{0} is on the plan today. Let’s go!', label),
       schedule: { at, allowWhileIdle: true },
     })
   }
@@ -130,13 +135,16 @@ export function buildReminderNotifications(S, now = new Date()) {
 // notifications for the next two weeks, the nearest CUSTOM_REMINDER_MAX of them. One-off rather
 // than a weekly repeat, because "skip if already logged" is a fact about one particular day — a
 // repeat would ring regardless — and the whole batch is rebuilt after every change anyway.
-// Their own id range, apart from the workout reminder's 100–106 and 1000–1059.
+// Their own id range, apart from the workout reminder's 100–106 and 1000–1059 and the nudge's
+// 2000–2006. Before the nudge existed here they used 2000–2029 (LEGACY_CUSTOM_IDS), which a
+// sync still cancels, so an app updated with reminders queued does not ring them twice.
 export const CUSTOM_REMINDER_DAYS = 14
 export const CUSTOM_REMINDER_MAX = 30
-const CUSTOM_REMINDER_ID_BASE = 2000
-// iOS keeps at most 64 pending local notifications per app; the two kinds share that, the
-// person's own reminders first.
-const PENDING_BUDGET = 60
+export const CUSTOM_REMINDER_ID_BASE = 3000
+const LEGACY_CUSTOM_IDS = Array.from({ length: CUSTOM_REMINDER_MAX }, (_, i) => 2000 + i)
+// iOS keeps at most 64 pending local notifications per app; all three kinds share that, the
+// person's own reminders first, then the nudge, then the workout days nearest first.
+export const PENDING_BUDGET = 60
 
 export function buildCustomReminderNotifications(S, now = new Date()) {
   const list = activeReminders(S)
@@ -167,24 +175,73 @@ export function buildCustomReminderNotifications(S, now = new Date()) {
   }))
 }
 
-// (Re)schedule both kinds of reminder: the workout-day one — a one-off notification per future
-// calendar date in its window — and the person's own. Cheap enough to run after any state change
-// — the plan, a time or a reminder may just have been edited. `interactive` gates the OS
-// permission prompt to the Settings controls; a background resync never pops a dialog.
+// The missed-workout nudge (lib/nudge.js) as native notifications: one per future date that would
+// be a missed day if nothing gets logged before its evening. nudgeFor() reads only workouts up to
+// that date, so asking about tomorrow and the day after already applies the back-off of a break
+// that goes on — at most 3 of these are ever queued past the last workout. Logging a workout
+// resyncs (every persist does), which drops the day and resets the count.
+export const NUDGE_WINDOW_DAYS = 7
+const NUDGE_ID_BASE = 2000
+export function buildNudgeNotifications(S, now = new Date()) {
+  const r = S?.reminder
+  if (!r?.on || !r.nudge) return []
+  const at = nudgeMinute(r.time || '08:00')
+  if (at == null) return []
+  const routines = Array.isArray(S.routines) ? S.routines : []
+  const copy = NUDGE_COPY[toneOf(r)]
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12)
+  const notifications = []
+  for (let offset = 0; offset < NUDGE_WINDOW_DAYS; offset++) {
+    const day = new Date(date)
+    day.setDate(date.getDate() + offset)
+    const iso = isoOf(day)
+    // a session on screen right now is today's workout in the making, not a miss
+    if (offset === 0 && S.active) continue
+    const ids = nudgeFor(S, iso)
+    if (!ids) continue
+    const names = ids.map(id => routines.find(x => x.id === id)?.name).filter(Boolean)
+    const label = names.length && names.length <= 2 ? names.join(' + ') : tn('{0} routine', '{0} routines', ids.length)
+    const when = new Date(day)
+    when.setHours(Math.floor(at / 60), at % 60, 0, 0)
+    if (when <= now) continue
+    notifications.push({
+      id: NUDGE_ID_BASE + offset,
+      title: t(copy.title),
+      body: t(copy.lines[lineIndex(iso, copy.lines.length)], label),
+      schedule: { at: when, allowWhileIdle: true },
+    })
+  }
+  return notifications
+}
+
+// Everything syncReminder queues, within the budget: the person's own reminders, the nudge, and
+// the workout days, nearest first.
+export function pendingNotifications(S, now = new Date()) {
+  return [...buildCustomReminderNotifications(S, now), ...buildNudgeNotifications(S, now), ...buildReminderNotifications(S, now)]
+    .slice(0, PENDING_BUDGET)
+}
+
+// (Re)schedule every kind of reminder: the workout-day one — a one-off notification per future
+// calendar date in its window — its missed-workout nudge, and the person's own. Cheap enough to
+// run after any state change — the plan, a time or a reminder may just have been edited.
+// `interactive` gates the OS permission prompt to the Settings controls; a background resync
+// never pops a dialog.
 export async function syncReminder(S, interactive = false) {
   try {
     const { LocalNotifications } = await import('@capacitor/local-notifications')
-    await LocalNotifications.cancel({ notifications: [
-      ...LEGACY_REMINDER_IDS,
-      ...Array.from({ length: REMINDER_WINDOW_DAYS }, (_, d) => ({ id: REMINDER_ID_BASE + d })),
-      ...Array.from({ length: CUSTOM_REMINDER_MAX }, (_, i) => ({ id: CUSTOM_REMINDER_ID_BASE + i })),
-    ] }).catch(() => {})
-    const custom = buildCustomReminderNotifications(S)
-    if (!S.reminder?.on && !custom.length) return true
+    const ids = new Set([
+      ...LEGACY_REMINDER_IDS.map(x => x.id),
+      ...Array.from({ length: REMINDER_WINDOW_DAYS }, (_, d) => REMINDER_ID_BASE + d),
+      ...Array.from({ length: NUDGE_WINDOW_DAYS }, (_, d) => NUDGE_ID_BASE + d),
+      ...Array.from({ length: CUSTOM_REMINDER_MAX }, (_, i) => CUSTOM_REMINDER_ID_BASE + i),
+      ...LEGACY_CUSTOM_IDS,
+    ])
+    await LocalNotifications.cancel({ notifications: [...ids].map(id => ({ id })) }).catch(() => {})
+    if (!S?.reminder?.on && !activeReminders(S).length) return true
     let perm = await LocalNotifications.checkPermissions()
     if (perm.display !== 'granted' && interactive) perm = await LocalNotifications.requestPermissions()
     if (perm.display !== 'granted') return false
-    const notifications = [...custom, ...buildReminderNotifications(S).slice(0, PENDING_BUDGET - custom.length)]
+    const notifications = pendingNotifications(S)
     if (notifications.length) await LocalNotifications.schedule({ notifications })
     return true
   } catch (e) { return false }
@@ -201,17 +258,21 @@ export function initReminderSync(getState) {
     syncReminder(getState()).catch(() => {})
   }
   document.addEventListener('visibilitychange', resync)
-  import('@capacitor/app').then(({ App }) => {
+  // addListener is a promise of its own — it rejects when the App plugin is not behind the bridge
+  // (a native project cap sync never updated, a custom platform) — so it is returned into the
+  // catch below. Dropped inside a block, as it was before, that rejection went unhandled.
+  import('@capacitor/app').then(({ App }) =>
     App.addListener('appStateChange', ({ isActive }) => { if (isActive) resync() })
-  }).catch(() => {})
+  ).catch(() => {})
   // A tapped reminder that points at a section opens it: the address travels as the same event
   // the web build gets from its service worker, and App.jsx checks it before following it.
-  import('@capacitor/local-notifications').then(({ LocalNotifications }) => {
+  // The listener's promise is returned into the catch, as above.
+  import('@capacitor/local-notifications').then(({ LocalNotifications }) =>
     LocalNotifications.addListener('localNotificationActionPerformed', ({ notification }) => {
       const url = notification?.extra?.url
       if (url) window.dispatchEvent(new CustomEvent('opengym:navigate', { detail: { url } }))
     })
-  }).catch(() => {})
+  ).catch(() => {})
 }
 
 // Runs cb whenever the native shell returns to the foreground — the store pulls the account's
@@ -219,9 +280,10 @@ export function initReminderSync(getState) {
 // off mobile; the store's own visibility/focus listeners cover the browser.
 export function onAppActive(cb) {
   if (!MOBILE) return
-  import('@capacitor/app').then(({ App }) => {
+  // Returned, not dropped, for the same reason as in initReminderSync.
+  import('@capacitor/app').then(({ App }) =>
     App.addListener('appStateChange', ({ isActive }) => { if (isActive) cb() })
-  }).catch(() => {})
+  ).catch(() => {})
 }
 
 // WKWebView can't do blob-URL downloads, so the backup goes out through the OS share sheet
@@ -231,6 +293,24 @@ export async function shareExport(json, filename) {
   const { Share } = await import('@capacitor/share')
   const w = await Filesystem.writeFile({ path: filename, directory: Directory.Cache, data: json, encoding: Encoding.UTF8 })
   await Share.share({ title: filename, url: w.uri })
+}
+
+// The same for a binary export — the backup with photos and videos (lib/backup-media.js). The
+// file crosses the native bridge as base64 in 3 MB pieces, never as one string the size of the
+// whole zip, which could be a few hundred MB.
+export async function shareExportBlob(blob, filename) {
+  const { Filesystem, Directory } = await import('@capacitor/filesystem')
+  const { Share } = await import('@capacitor/share')
+  const { toBase64 } = await import('./media-store-fs.js')
+  const CHUNK = 3 * 1024 * 1024
+  for (let o = 0; o < blob.size || o === 0; o += CHUNK) {
+    const data = toBase64(new Uint8Array(await blob.slice(o, o + CHUNK).arrayBuffer()))
+    if (o === 0) await Filesystem.writeFile({ path: filename, directory: Directory.Cache, data })
+    else await Filesystem.appendFile({ path: filename, directory: Directory.Cache, data })
+    if (!blob.size) break
+  }
+  const { uri } = await Filesystem.getUri({ path: filename, directory: Directory.Cache })
+  await Share.share({ title: filename, url: uri })
 }
 
 // Hand a self-contained HTML document (lib/plan-share.js planPrintHTML) to the OS print flow.
@@ -245,19 +325,160 @@ export async function printHtml(html, name) {
   await Print.printHtml({ html, name })
 }
 
-// "Auto-backup on changes" (Settings): a dated snapshot dropped into the Documents folder —
+// "Auto-backup on changes" (Settings): a dated snapshot dropped into Documents/openGym/ —
 // visible in Files (iOS) / a file manager (Android), unlike the private mirror nativeSave keeps
 // — so whatever the user points at that folder (a sync app, a manual copy) always has something
 // recent. One file per day; later triggers the same day just overwrite it.
+//
+// The folder is ours alone (#161): until v1.3.9 the files landed in the Documents root, so a
+// sync app pointed at them had to carry the whole Documents folder along, and a year of daily
+// copies piled up there. Now each write keeps only the newest AUTO_BACKUP_KEEP in the folder.
+// The root is never pruned: a manual export saved there carries the same name, and nothing
+// tells it apart from an old automatic copy, so those stay for the person to clear (Import
+// backup still reads either kind).
+export const AUTO_BACKUP_DIR = 'openGym'
+export const AUTO_BACKUP_KEEP = 14
+// Only the exact names writeAutoBackup gives its files are ever pruned; anything else someone
+// keeps in the folder is theirs.
+const AUTO_BACKUP_NAME = /^opengym-backup-\d{4}-\d{2}-\d{2}(-[2-9])?\.json$/
+
+// Android's scoped storage lets an install write over, list and delete only the files it wrote
+// itself. After a reinstall, or with the test build beside the real one, today's name can belong
+// to the other install: writing it fails with EACCES, and that day went without a copy, silently.
+// The copy then goes under the day's next name (-2 up to -9), which this install owns after its first write.
+// The other install's files stay where they are; this one cannot see them to prune them.
 export async function writeAutoBackup(state) {
-  try {
-    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem')
-    await Filesystem.writeFile({
-      path: `opengym-backup-${todayISO()}.json`,
-      directory: Directory.Documents,
-      data: JSON.stringify(state),
-      encoding: Encoding.UTF8,
-      recursive: true,
-    })
-  } catch (e) { /* best effort — the private mirror in Directory.Data still has the data */ }
+  const day = todayISO()
+  // A folder the person chose (Android, #161) comes first. When it can no longer be written —
+  // the permission revoked, the folder deleted, the sync app gone — the copy goes to the default
+  // folder after all, and Settings says so: a backup that silently stops is the one thing this
+  // feature must not do.
+  if (await writeToChosenFolder(state, day)) return
+  let fs
+  try { fs = await import('@capacitor/filesystem') } catch (e) { return }
+  const write = name => fs.Filesystem.writeFile({
+    path: `${AUTO_BACKUP_DIR}/${name}`,
+    directory: fs.Directory.Documents,
+    data: JSON.stringify(state),
+    encoding: fs.Encoding.UTF8,
+    recursive: true,
+  })
+  // The day's names in turn: a second earlier install (or a third) can own the first two, and that
+  // day then went without a copy, silently, while the newest file there was another install's.
+  let name = null
+  for (const suffix of ['', '-2', '-3', '-4', '-5', '-6', '-7', '-8', '-9']) {
+    const n = `opengym-backup-${day}${suffix}.json`
+    try { await write(n); name = n; break } catch (e) { /* owned by another install, or the disk said no: the next name */ }
+  }
+  if (!name) return   // best effort — the private mirror in Directory.Data still has the data
+  // Pruning waits for a successful write: a full disk must never cost the copies already there.
+  await pruneAutoBackups(fs, name)
 }
+
+async function pruneAutoBackups({ Filesystem, Directory }, written) {
+  let files
+  try { files = (await Filesystem.readdir({ path: AUTO_BACKUP_DIR, directory: Directory.Documents })).files || [] } catch (e) { return }
+  const older = files
+    // Capacitor before 4 listed bare names; since then an object that also says what it is.
+    .filter(f => typeof f === 'string' || f?.type !== 'directory')
+    .map(f => (typeof f === 'string' ? f : f?.name))
+    // The copy just written is never a candidate, even if a clock set back makes it sort
+    // below the others: it is one of the AUTO_BACKUP_KEEP whatever its date says.
+    .filter(n => AUTO_BACKUP_NAME.test(n || '') && n !== written)
+    // Newest first by the date in the name, which a sync app or a copy cannot disturb the way
+    // it can a modification time.
+    .sort().reverse()
+  for (const n of older.slice(AUTO_BACKUP_KEEP - 1)) {
+    try { await Filesystem.deleteFile({ path: `${AUTO_BACKUP_DIR}/${n}`, directory: Directory.Documents }) } catch (e) { /* one stuck file does not stop the rest */ }
+  }
+}
+/* ------------------------------------------------- the backup folder (#161) --
+   Android only: the system folder picker (Storage Access Framework) through the local
+   BackupFolder plugin (android/.../BackupFolderPlugin.java), since @capacitor/filesystem cannot
+   write into a picked folder. The choice is a fact of this phone, kept in its own private file
+   and never in S: S syncs and exports, and a content:// address means nothing anywhere else.
+
+   { uri, label }       the chosen folder, and its name as the picker showed it
+   { lost, lostLabel }  the folder stopped accepting copies; they go to Documents/openGym again
+   {}                   the default, Documents/openGym */
+export const BACKUP_FOLDER_FILE = 'opengym-backup-folder.json'
+
+// The plugin proxy lives here and is never handed through a promise: a Capacitor plugin proxy
+// answers every property, `then` included, so a promise resolving to it never settles (#42/#58).
+let folderPlugin = null
+async function loadFolderPlugin() {
+  if (folderPlugin) return
+  const { registerPlugin } = await import('@capacitor/core')
+  folderPlugin = registerPlugin('BackupFolder')
+}
+
+let folderState = null   // the file's content once read; {} for the default
+const folderListeners = new Set()
+const setFolderState = async next => {
+  folderState = next
+  await writeJsonFile(BACKUP_FOLDER_FILE, next)
+  folderListeners.forEach(fn => { try { fn(next) } catch (e) { /* a listener's problem */ } })
+}
+
+/** Where auto-backup writes on this phone: { uri, label } | { lost, lostLabel } | {}. */
+export async function backupFolder() {
+  if (!folderState) {
+    const saved = await readJsonFile(BACKUP_FOLDER_FILE)
+    folderState = saved && typeof saved === 'object' ? saved : {}
+  }
+  return folderState
+}
+
+/** Settings listens, so a fallback in the middle of a backup shows without a reload. */
+export function onBackupFolderChange(fn) {
+  folderListeners.add(fn)
+  return () => folderListeners.delete(fn)
+}
+
+/** Opens the system folder picker. Resolves to the new state, or null when cancelled. */
+export async function chooseBackupFolder() {
+  await loadFolderPlugin()
+  const picked = await folderPlugin.pick()
+  if (!picked?.uri) return null
+  const before = await backupFolder()
+  if (before.uri && before.uri !== picked.uri) await releaseFolder(before.uri)
+  const next = { uri: picked.uri, label: picked.label || null }
+  await setFolderState(next)
+  return next
+}
+
+/** Back to Documents/openGym; also how the warning about a lost folder is put away. */
+export async function resetBackupFolder() {
+  const before = await backupFolder()
+  if (before.uri) await releaseFolder(before.uri)
+  await setFolderState({})
+  return folderState
+}
+
+async function releaseFolder(uri) {
+  try { await loadFolderPlugin(); await folderPlugin.release({ uri }) } catch (e) { /* already gone */ }
+}
+
+// True when today's copy is in the chosen folder. False with no folder chosen, and after a
+// failure, which is recorded so Settings can say the copies went to the default folder.
+async function writeToChosenFolder(state, day) {
+  const folder = await backupFolder()
+  if (!folder.uri) return false
+  const name = `opengym-backup-${day}.json`
+  try {
+    await loadFolderPlugin()
+    const { ok } = await folderPlugin.check({ uri: folder.uri })
+    if (!ok) throw new Error('permission lost')
+    await folderPlugin.write({ uri: folder.uri, name, data: JSON.stringify(state) })
+  } catch (e) {
+    await setFolderState({ lost: true, lostLabel: folder.label || null })
+    await releaseFolder(folder.uri)
+    return false
+  }
+  // Pruning waits for a successful write, and only ever touches the app's own dated names.
+  try { await folderPlugin.prune({ uri: folder.uri, keep: AUTO_BACKUP_KEEP, pattern: AUTO_BACKUP_NAME.source, written: name }) } catch (e) { /* housekeeping */ }
+  return true
+}
+
+// Tests only: forget the cached choice, as a fresh start of the app would.
+export function _resetBackupFolder() { folderState = null; folderPlugin = null; folderListeners.clear() }

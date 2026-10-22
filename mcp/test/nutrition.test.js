@@ -86,7 +86,7 @@ describe('get_nutrition', () => {
     const auto = call('get_nutrition').target
     expect(auto.basis).toBe('formula')
     expect(auto.kcal).toBe(auto.estimated_expenditure_kcal)
-    seed()
+    seed(S => { S.measurements = [] })                  // the demo now logs a body-fat reading, enough for Katch
     expect(call('get_nutrition').target).toBe(null)             // nothing to compute it from
   })
 })

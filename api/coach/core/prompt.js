@@ -21,7 +21,15 @@ export const taskOf = (kind, payload) =>
  */
 export function buildPromptParts(kind, payload, repair) {
   const task = taskOf(kind, payload);
-  const system = STANDALONE.includes(task) ? PROMPTS[task] : PROMPTS.common + '\n\n---\n\n' + PROMPTS[task];
+  // A revision answers in the plan's own format, and refine.md only says "the same schema as
+  // before". Without create.md's Output section in front of it a model that does not enforce
+  // the JSON schema (OpenAI's json_schema without `strict`, or a server that dropped it) had no
+  // plan format to follow at all, and a request like "swap the leverage machine" came back as
+  // a review-style change list the plan validator can only reject (#471).
+  const rules = task === 'refine' ? PROMPTS.create + '\n\n---\n\n' + PROMPTS.refine : PROMPTS[task];
+  // The standalone tasks (an exercise lookup, the food diary, a workout typed as text) get their
+  // own prompt and nothing of the coaching rules.
+  const system = STANDALONE.includes(task) ? rules : PROMPTS.common + '\n\n---\n\n' + rules;
   // Compact JSON, not pretty-printed: the indentation was ~30% of the payload's tokens and
   // a model reads either just as well.
   let user = '## Payload\n\n```json\n' + JSON.stringify(payload) + '\n```\n';

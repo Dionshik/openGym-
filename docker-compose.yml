@@ -1,41 +1,21 @@
 name: opengym
 
 services:
-  # One-time: download the exercise images + GIFs into ./media (skipped if already there).
-  # ~140 MB, from github.com/hasaneyldrm/exercises-dataset. That dataset is MIT for the
-  # metadata and instruction text, but the images and GIFs are © Gym visual
-  # (https://gymvisual.com/) and are used under the dataset's terms — openGym neither
-  # redistributes nor relicenses them. See NOTICE.md.
+  # One-time: the start/end photographs of the exercises this instance adds from
+  # free-exercise-db (frontend/src/lib/exercises-extra.js names them as img/fedb/<dir>/0.jpg and
+  # 1.jpg) into ./media/img/fedb, which the web service below serves as img/fedb/. Only those:
+  # the catalogue's own stills and animations (Gym visual) are inside the web image since v1.4.0,
+  # and nothing of theirs is downloaded. Its own marker file, so a download that was cut off is
+  # tried again; pinned to the commit the rows were generated from. A failure is not fatal: the
+  # exercises show the placeholder, and the next start tries again. An instance from before
+  # v1.4.0 can delete ./media/img/*.jpg and ./media/gif (the old dataset), but not ./media/img/fedb.
   media:
     image: alpine/git
     volumes:
-      - ./media/img:/out/img
-      - ./media/gif:/out/gif
+      - ./media/img/fedb:/out/img/fedb
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        if [ -z "$$(ls -A /out/img 2>/dev/null)" ]; then
-          echo "↓ Downloading exercise media (~140 MB, one time)…"
-          echo "  Source:  github.com/hasaneyldrm/exercises-dataset"
-          echo "  Metadata and instruction text: MIT."
-          echo "  Images and animations: © Gym visual — https://gymvisual.com/"
-          echo "  They are used under that dataset's terms, not openGym's AGPL, and are"
-          echo "  downloaded from upstream — openGym does not redistribute them."
-          echo "  Terms: https://gymvisual.com/content/3-terms-and-conditions-of-use"
-          echo "  Reusing this media yourself, commercially or not, needs your own licence"
-          echo "  from Gym visual. Details in NOTICE.md."
-          git clone --depth 1 https://github.com/hasaneyldrm/exercises-dataset /tmp/ds
-          cp /tmp/ds/images/*.jpg /out/img/ && cp /tmp/ds/videos/*.gif /out/gif/
-          echo "✓ Exercise media ready ($$(ls /out/img | wc -l) images)."
-        else
-          echo "✓ Exercise media already present — skipping download."
-        fi
-        # Start/end photographs for the catalogue rows that came from free-exercise-db
-        # (frontend/src/lib/exercises-extra.js names them as img/fedb/<id>/0.jpg and 1.jpg).
-        # Its own check, so an instance that already has the media above still gets these, and
-        # its own marker file, so a download that was cut off is tried again. Pinned to the
-        # commit the rows were generated from. A failure here is not fatal: the exercises simply
-        # show the placeholder, and the next start tries again.
         if [ ! -f /out/img/fedb/.complete ]; then
           echo "↓ Downloading exercise photographs (~90 MB, one time)…"
           echo "  Source:  github.com/yuhonas/free-exercise-db (data: The Unlicense)."
@@ -50,6 +30,8 @@ services:
             && touch /out/img/fedb/.complete \
             && echo "✓ Exercise photographs ready ($$(ls /out/img/fedb | wc -l) exercises)." ) \
             || echo "⚠ Could not download the exercise photographs — continuing without them."
+        else
+          echo "✓ Exercise photographs already present — skipping download."
         fi
     restart: "no"
 
@@ -72,15 +54,20 @@ services:
       # cannot drift — change it in .env and both follow.
       - PORT=${PORT:-3000}
       - DATA_DIR=/data
+      # The API is reachable only through the web container here, and that container overwrites
+      # X-Forwarded-For / X-Real-IP with the real peer — so the sign-in throttle may count
+      # requests by those headers instead of lumping everyone in as "the web container".
+      - TRUST_PROXY=${TRUST_PROXY:-1}
     volumes:
       - ./data:/data         # users, passkeys, per-user state, session secret — BACK THIS UP
+                             # (and uploads/: the photos and videos of custom exercises)
       # Provider credential cache (Codex). A sibling of ./data on purpose: the documented backup
       # is `tar czf … data/`, and a live refresh token must not end up inside it. Nothing here
       # needs backing up — if you lose it, sign the provider in again.
       - ./coach-auth:/coach-auth
 
   # Builds the React frontend (multi-stage) and serves it, proxying /api → api
-  # and the exercise media from the shared volume. Single origin for passkeys.
+  # and the exercise animations, which are part of the image. Single origin for passkeys.
   web:
     image: ghcr.io/duartesantos8/opengym-web:latest
     build:
@@ -88,8 +75,6 @@ services:
       dockerfile: web/Dockerfile
     restart: unless-stopped
     depends_on:
-      media:
-        condition: service_completed_successfully
       api:
         condition: service_started
     ports:
@@ -110,6 +95,11 @@ services:
       # slash). Empty serves the app at the site root, which is what it has always done; a proxy
       # that strips the prefix needs nothing set (docs/SELF_HOSTING.md §5).
       - BASE_PATH=${BASE_PATH:-}
+      # The largest photo or video upload nginx passes to the API. Keep it above
+      # MEDIA_VIDEO_MAX_MB (40 by default), which the api service reads from .env.
+      - MEDIA_UPLOAD_MAX=${MEDIA_UPLOAD_MAX:-48m}
     volumes:
-      - ./media/img:/usr/share/nginx/html/img:ro
-      - ./media/gif:/usr/share/nginx/html/gif:ro
+      # The free-exercise-db photographs the `media` service fetches (above), read-only, at
+      # img/fedb/ beside the app. Only that folder: the catalogue's media are in the image.
+      # No depends_on: the app works while they arrive, and shows a placeholder until then.
+      - ./media/img/fedb:/usr/share/nginx/html/img/fedb:ro

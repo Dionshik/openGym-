@@ -14,7 +14,7 @@ import { DEMO } from '../lib/demo.js'
 import { photosAvailable } from '../lib/photos.js'
 import { MealPhotoStrip, mealPhotoSheet } from '../components/MealPhotos.jsx'
 import MacroBars from '../components/MacroBars.jsx'
-import SwipeToDelete from '../components/SwipeToDelete.jsx'
+import SwipeRow from '../components/SwipeRow.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import '../nutrition.css'
@@ -92,13 +92,13 @@ export default function Nutrition() {
           </div>
           {photos && <MealPhotoStrip d={d} m={m} title={mealName(m)} />}
           <div className="nt-rows">
-            {rows.map(e => <SwipeToDelete key={e.id} className="nt-row" onDelete={() => deleteEntry(e.id)} onClick={() => entrySheet(e)}>
+            {rows.map(e => <SwipeRow key={e.id} className="nt-row" deleteLabel={t('Delete')} onDelete={() => deleteEntry(e.id)} onClick={() => entrySheet(e)}>
               <div className="grow">
                 <div className="tt">{e.n || t('Quick add')}</div>
-                <div className="ss">{e.g > 0 ? e.g + ' ' + t('g') + ' · ' : ''}{t('P')} {fmt1(e.p)} · {t('F')} {fmt1(e.f)} · {t('C')} {fmt1(e.c)}</div>
+                <div className="ss">{e.g > 0 ? e.g + ' ' + t('g') + ' · ' : ''}{t('P')} {fmt1(e.p)} · {t('Fat').charAt(0)} {fmt1(e.f)} · {t('C')} {fmt1(e.c)}</div>
               </div>
               <div className="kc">{e.k}</div>
-            </SwipeToDelete>)}
+            </SwipeRow>)}
             {!rows.length && m === mealNow() && d === today && <button className="nt-add" onClick={() => add(m)}><Icon name="plus" />{t('Add food')}</button>}
           </div>
         </div>

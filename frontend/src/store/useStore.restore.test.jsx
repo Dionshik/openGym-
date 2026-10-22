@@ -225,10 +225,12 @@ describe('signing in as a different profile', () => {
       useStore.getState().replaceState({ ...clone(DEF), _ts: 20, routines: [routine('A-routine')], active }, true)   // arms a push
       api.mockResolvedValue({})
 
-      // B's setUser in the other tab: it wiped the copy, wrote defaults, then recorded the owner.
-      // B's own data only lands there after its pull — this tab never re-reads it.
-      localStorage.setItem('gym_state_v1', JSON.stringify({ ...clone(DEF), _ts: 30 }))
+      // B's setUser in the other tab: it wiped the copy, recorded the owner, then wrote defaults
+      // under B. B's own data only lands there after its pull.
+      localStorage.removeItem('gym_state_v1')
       localStorage.setItem('gym_owner', 'B')
+      localStorage.setItem('gym_state_v1', JSON.stringify({ ...clone(DEF), _ts: 30 }))
+      localStorage.setItem('gym_state_owner', 'B')
       window.dispatchEvent(new StorageEvent('storage', { key: 'gym_owner', oldValue: 'A', newValue: 'B' }))
 
       expect(useStore.getState().user).toBeNull()
@@ -267,9 +269,10 @@ describe('signing in as a different profile', () => {
     expect(hasData(useStore.getState().S)).toBe(false)
   })
 
-  // The listener above reacts to the owner key alone, so the wiped copy has to be in storage
-  // before the owner is removed — the same order setUser uses when it records a new owner.
-  it('signing out removes the owner only after the wiped copy is written', async () => {
+  // The previous copy leaves storage first, then the owner, and only then is the wiped copy
+  // written: a tab that sees the wiped copy already knows it is nobody's, and does not join the
+  // account's copy it holds into it (QA 2026-10-06; the old order, owner last, leaked it).
+  it('signing out removes the old copy, then the owner, then writes the wiped copy', async () => {
     useStore.getState().setUser({ id: 'A', name: 'A' })
     useStore.getState().replaceState({ ...clone(DEF), _ts: 20, routines: [routine('A-routine')] })
     api.mockResolvedValue({})
@@ -290,9 +293,10 @@ describe('signing in as a different profile', () => {
 
     expect(globalThis.localStorage).toBe(real)
     expect(writes).toContain('removeItem gym_owner')
-    expect(writes.lastIndexOf('removeItem gym_owner')).toBeGreaterThan(writes.lastIndexOf('setItem gym_state_v1'))
+    expect(writes.lastIndexOf('removeItem gym_owner')).toBeLessThan(writes.lastIndexOf('setItem gym_state_v1'))
     expect(writes.lastIndexOf('removeItem gym_owner')).toBeGreaterThan(writes.lastIndexOf('removeItem gym_state_v1'))
     expect(localStorage.getItem('gym_owner')).toBeNull()
+    expect(localStorage.getItem('gym_state_owner')).toBe('')
     expect(JSON.parse(localStorage.getItem('gym_state_v1')).routines).toEqual([])
   })
 
@@ -353,5 +357,52 @@ describe('push failures', () => {
     api.mockRejectedValueOnce(httpError(413))
     await useStore.getState().pushState()
     await vi.waitFor(() => expect(toast).toHaveBeenCalledTimes(2))
+  })
+})
+
+describe('a save this device refuses', () => {
+  // localStorage throwing (a device genuinely full, a private window with next to no quota) used
+  // to take the change with it: persist wrote before it told the store, so Finish just did
+  // nothing at all and said nothing either.
+  const refusingStorage = () => {
+    const real = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+    const store = globalThis.localStorage
+    const guard = new Proxy(store, {
+      get(target, prop) {
+        const value = Reflect.get(target, prop)
+        if (prop === 'setItem') return (key, v) => { if (key === 'gym_state_v1') throw new DOMException('quota', 'QuotaExceededError'); return store.setItem(key, v) }
+        return typeof value === 'function' ? value.bind(target) : value
+      }
+    })
+    Object.defineProperty(globalThis, 'localStorage', { value: guard, configurable: true })
+    return () => Object.defineProperty(globalThis, 'localStorage', real)
+  }
+
+  it('keeps the change, marks it owed to the server, and says so once', async () => {
+    toast.mockClear()
+    useStore.setState({ S: clone(DEF), user: { id: 'user-1' }, ready: true })
+    api.mockResolvedValue({})
+    const undo = refusingStorage()
+    try {
+      useStore.getState().update(s => { s.workouts.push(workout('logged-with-no-room')) }, false)
+      expect(useStore.getState().S.workouts.map(w => w.id)).toEqual(['logged-with-no-room'])
+      expect(localStorage.getItem('gym_dirty')).toBe('1')
+      await vi.waitFor(() => expect(toast).toHaveBeenCalledTimes(1))
+      expect(toast.mock.calls[0][0]).toMatch(/out of storage/)
+
+      useStore.getState().update(s => { s.restSec = 120 }, false)   // still refused — said once
+      expect(useStore.getState().S.restSec).toBe(120)
+      await new Promise(r => setTimeout(r, 0))
+      expect(toast).toHaveBeenCalledTimes(1)
+    } finally { undo() }
+
+    // Room again: the next refusal is news once more.
+    useStore.getState().update(s => { s.restSec = 90 }, false)
+    expect(JSON.parse(localStorage.getItem('gym_state_v1')).restSec).toBe(90)
+    const undo2 = refusingStorage()
+    try {
+      useStore.getState().update(s => { s.restSec = 150 }, false)
+      await vi.waitFor(() => expect(toast).toHaveBeenCalledTimes(2))
+    } finally { undo2() }
   })
 })

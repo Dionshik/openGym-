@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { isoOf } from './format.js'
-import { buildReminderNotifications, buildCustomReminderNotifications, CUSTOM_REMINDER_MAX } from './mobile.js'
+import { buildReminderNotifications, buildCustomReminderNotifications, buildNudgeNotifications, pendingNotifications, CUSTOM_REMINDER_MAX, CUSTOM_REMINDER_ID_BASE, PENDING_BUDGET } from './mobile.js'
 
 const push = { id: 'push', name: 'Push' }
 const pull = { id: 'pull', name: 'Pull' }
@@ -74,6 +74,20 @@ describe('buildReminderNotifications', () => {
     const n = buildReminderNotifications(state({ week: { 1: ['push', 'pull', 'legs'] } }), now)[0]
     expect(n.body).toContain('3 routines')
   })
+
+  it("a coach week's next session is reminded every day until it is done, with no weekday behind it", () => {
+    const now = new Date(2026, 8, 7, 7, 0)   // Monday 07:00, before the 08:00 reminder
+    const queue = { ids: ['push', 'pull'], since: 0, startsOn: iso(now), label: 'US W1' }
+    const notifications = buildReminderNotifications(state({ week: {}, queue }), now)
+    expect(notifications.length).toBeGreaterThanOrEqual(3)
+    expect(notifications.every(n => n.body.includes('Push'))).toBe(true)
+    expect(notifications[0].schedule.at.getDate()).toBe(7)
+    expect(notifications[1].schedule.at.getDate()).toBe(8)
+    // …and nothing before the week starts; the weekday plan speaks for those days.
+    const waiting = buildReminderNotifications(state({ week: { 2: 'legs' }, queue: { ...queue, startsOn: iso(new Date(2026, 8, 9)) } }), now)
+    expect(waiting[0].body).toContain('Legs')            // Tue: weekday plan
+    expect(waiting[1].body).toContain('Push')            // Wed: startsOn — the queue takes over
+  })
 })
 
 describe('buildCustomReminderNotifications', () => {
@@ -87,7 +101,7 @@ describe('buildCustomReminderNotifications', () => {
     expect(n[0].schedule.at.getHours()).toBe(13)
     expect(n[0].schedule.allowWhileIdle).toBe(true)
     expect(n[0].title).toBe('Log food')
-    expect(n.map(x => x.id)).toEqual([2000, 2001, 2002, 2003])
+    expect(n.map(x => x.id)).toEqual([0, 1, 2, 3].map(i => CUSTOM_REMINDER_ID_BASE + i))
   })
 
   it('every day when no weekday is picked, and not at a time already past', () => {
@@ -117,12 +131,37 @@ describe('buildCustomReminderNotifications', () => {
     const n = buildCustomReminderNotifications(S(many), monday7)
     expect(n).toHaveLength(CUSTOM_REMINDER_MAX)
     expect(new Set(n.map(x => x.id)).size).toBe(CUSTOM_REMINDER_MAX)
-    expect(n.at(-1).id).toBe(2000 + CUSTOM_REMINDER_MAX - 1)
+    expect(n.at(-1).id).toBe(CUSTOM_REMINDER_ID_BASE + CUSTOM_REMINDER_MAX - 1)
     // the nearest are kept: nothing scheduled is later than something left out
     expect(iso(n.at(-1).schedule.at)).toBe(iso(new Date(2026, 5, 5)))
   })
 
   it('a reminder with no words of its own still has a title', () => {
     expect(buildCustomReminderNotifications(S([rem('a', '13:00', { text: '' })]), monday7)[0].title).toBe('Reminder')
+  })
+})
+
+describe('pendingNotifications', () => {
+  const rem = (id, time) => ({ id, text: 'Log food', time, days: [], on: true, link: null, skipIfLogged: false, t: 1 })
+  const now = new Date(2026, 5, 1, 7, 0)   // Monday 07:00
+
+  it('the three kinds never share an id', () => {
+    const S = state({ week: { 1: ['push'], 2: ['pull'], 3: ['legs'], 4: ['push'], 5: ['pull'] }, reminder: { on: true, time: '08:00', nudge: true },
+      reminders: [rem('a', '13:00'), rem('b', '14:00')], workouts: [{ id: 'w0', d: '2026-05-29', start: 1, entries: [] }] })
+    const nudges = buildNudgeNotifications(S, now)
+    expect(nudges.length).toBeGreaterThan(0)
+    const all = [...buildReminderNotifications(S, now), ...nudges, ...buildCustomReminderNotifications(S, now)]
+    expect(new Set(all.map(n => n.id)).size).toBe(all.length)
+  })
+
+  it('stays within the budget, the person\'s own reminders first and the nearest workout days kept', () => {
+    const S = state({ week: { 0: ['push'], 1: ['push'], 2: ['pull'], 3: ['legs'], 4: ['push'], 5: ['pull'], 6: ['legs'] },
+      reminders: Array.from({ length: 6 }, (_, i) => rem('r' + i, `1${i}:00`)) })
+    const n = pendingNotifications(S, now)
+    expect(n).toHaveLength(PENDING_BUDGET)
+    expect(n.slice(0, CUSTOM_REMINDER_MAX).every(x => x.id >= CUSTOM_REMINDER_ID_BASE)).toBe(true)
+    const days = n.filter(x => x.id < CUSTOM_REMINDER_ID_BASE)
+    expect(days[0].schedule.at.getDate()).toBe(1)
+    expect(days).toHaveLength(PENDING_BUDGET - CUSTOM_REMINDER_MAX)
   })
 })

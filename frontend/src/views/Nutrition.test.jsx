@@ -18,6 +18,7 @@ import { DEF, useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { todayISO } from '../lib/format.js'
 import { dayBefore } from '../lib/nutrition.js'
+import { CONSENT_VERSION } from '../lib/coach.js'
 import { logFood, logQuick, setTargets, saveBodyProfile, saveMeasurement, setMeasureGoal } from '../nutrition-actions.js'
 import Nutrition from './Nutrition.jsx'
 import Body from './Body.jsx'
@@ -148,7 +149,7 @@ describe('the Body screen', () => {
     let host = render(<Body />)
     expect(host.textContent).toContain('Apple Health')
     expect(host.textContent).not.toContain('Share with the Coach')
-    useStore.getState().update(s => { s.coach = { consent: { agreedAt: '2026-10-01T00:00:00Z', version: 1 } } })
+    useStore.getState().update(s => { s.coach = { consent: { agreedAt: '2026-10-01T00:00:00Z', version: CONSENT_VERSION } } })
     host = render(<Body />)
     expect(host.textContent).toContain('Share with the Coach')
     const sw = [...host.querySelectorAll('.sect [role="switch"]')].at(-1)

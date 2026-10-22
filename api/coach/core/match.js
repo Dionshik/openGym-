@@ -237,7 +237,8 @@ export function rankLibrary(item, { customs = [], max = MAX_MATCHES } = {}) {
       scored.push({ id: e.id, score: Math.min(1, +best.toFixed(3)), len: entryTokens.size, ...(custom ? { custom: true } : {}) });
     }
   };
-  for (const e of LIBRARY) consider(e, tokensOfEntry(e), false);
+  // A hidden row repeats an upstream row's name (core/library.js BROWSABLE): it would only tie.
+  for (const e of LIBRARY) if (!e.hidden) consider(e, tokensOfEntry(e), false);
   // The user's own exercises are matched on their own words too: their name is as likely to be
   // in the user's language as in English, and the model's English names would never find it.
   const saidTokens = tokens(item.said);
@@ -253,7 +254,8 @@ export function rankLibrary(item, { customs = [], max = MAX_MATCHES } = {}) {
     }
   }
   const chosen = m => (m.id === item.customId ? 1 : 0);
-  scored.sort((a, b) => chosen(b) - chosen(a) || b.score - a.score || a.len - b.len);
+  // On a tie the person's own exercise goes first: the catalogue has thousands of rows that tie.
+  scored.sort((a, b) => chosen(b) - chosen(a) || b.score - a.score || (b.custom ? 1 : 0) - (a.custom ? 1 : 0) || a.len - b.len);
   return scored.slice(0, max).map(({ len, ...m }) => m);
 }
 

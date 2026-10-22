@@ -225,7 +225,7 @@ export function Draft({ draft, setDraft, meal, setMeal, d, close, back, keep }) 
             <div style={{ minWidth: 0 }}>
               <div className="tt">{r.n}</div>
               <div className="ss">
-                {v.k} {t('kcal')} · {t('P')} {fmt1(v.p)} · {t('F')} {fmt1(v.f)} · {t('C')} {fmt1(v.c)}
+                {v.k} {t('kcal')} · {t('P')} {fmt1(v.p)} · {t('Fat').charAt(0)} {fmt1(v.f)} · {t('C')} {fmt1(v.c)}
                 {' · '}<span className={r.src === 'table' ? '' : 'nt-est'}>{r.src === 'table' ? t('values from the food table') : r.conf === 'low' ? t('AI guess') : t('AI estimate')}</span>
               </div>
             </div>

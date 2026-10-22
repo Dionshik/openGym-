@@ -60,7 +60,7 @@ async function startServer(t, env = {}) {
 
 test('both features are absent until an admin turns them on', async t => {
   const h = await startServer(t);
-  const cfg = (await h.req('GET', '/api/config')).body;
+  const cfg = (await h.req('GET', '/api/config', { uid: ANN })).body;
   assert.equal('food' in cfg, false);
   assert.equal('health' in cfg, false);
   assert.deepEqual((await h.req('POST', '/api/food/barcode', { uid: ANN, body: { code: '4602014004683' } })), { status: 403, body: { error: 'disabled' } });
@@ -83,7 +83,7 @@ test('only an admin can flip the switches, and every flip is audited', async t =
   assert.equal(after.status, 200);
   assert.equal(after.body.food.lookup, true);
   assert.equal(after.body.health.shortcutUrl, 'https://www.icloud.com/shortcuts/abc');
-  const cfg = (await h.req('GET', '/api/config')).body;
+  const cfg = (await h.req('GET', '/api/config', { uid: ANN })).body;
   assert.deepEqual(cfg.food, { lookup: true });
   assert.equal(cfg.health, true);
   const audit = fs.readFileSync(path.join(h.dataDir, 'audit.log'), 'utf8');
@@ -96,7 +96,7 @@ test('FOOD_LOOKUP_DISABLED=1 wins over the dashboard', async t => {
   const h = await startServer(t, { FOOD_LOOKUP_DISABLED: '1' });
   const r = await h.req('POST', '/api/admin/extras', { uid: ADMIN, body: { food: { lookup: true } } });
   assert.equal(r.body.food.forcedOff, true);
-  assert.equal('food' in (await h.req('GET', '/api/config')).body, false);
+  assert.equal('food' in (await h.req('GET', '/api/config', { uid: ANN })).body, false);
   assert.equal((await h.req('POST', '/api/food/search', { uid: ANN, body: { q: 'творог' } })).status, 403);
 });
 

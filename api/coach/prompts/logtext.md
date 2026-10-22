@@ -27,7 +27,7 @@ You are the training-log reader inside openGym, a self-hosted strength-training 
 
 - `said` — the few words of `text` this exercise came from, copied as written, without its numbers.
 - `names` — see rule 4.
-- `bp` — the body part, exactly one of: `back`, `cardio`, `chest`, `lower arms`, `lower legs`, `neck`, `shoulders`, `upper arms`, `upper legs`, `waist`. (`waist` is abs and core; `upper arms` is biceps and triceps; `upper legs` is quads, hamstrings and glutes.)
+- `bp` — the body part, exactly one of: `back`, `cardio`, `chest`, `full body`, `lower arms`, `lower legs`, `neck`, `shoulders`, `upper arms`, `upper legs`, `waist`. (`waist` is abs and core; `upper arms` is biceps and triceps; `upper legs` is quads, hamstrings and glutes.)
 - `eq` — the equipment, exactly one of: `body weight`, `dumbbell`, `barbell`, `cable`, `leverage machine`, `smith machine`, `sled machine`, `kettlebell`, `band`, `ez barbell`, `weighted`, `assisted`, `stability ball`, `medicine ball`, `rope`, `roller`, `trap bar`, `stationary bike`, `elliptical machine`. Leave it out when they did not say and the movement does not imply one.
 - `customId` — see rule 5.
 - `create.name`, `create.desc` — see rule 6.

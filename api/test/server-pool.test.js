@@ -79,7 +79,7 @@ const exercise = (over = {}) => ({
 
 test('a moderator is made by an admin, and the grant is what /api/me reports', async t => {
   const h = await startServer(t);
-  assert.deepEqual((await h.get(MOD, '/api/me')).body.user, { id: MOD, name: 'Modest', admin: false, mod: false });
+  assert.deepEqual((await h.get(MOD, '/api/me')).body.user, { id: MOD, name: 'Modest', admin: false });
   assert.deepEqual((await h.get(ADMIN, '/api/me')).body.user, { id: ADMIN, name: 'Adminna', admin: true, mod: true });
 
   // Only an admin grants it — not a member, and not the future moderator themselves.
@@ -142,7 +142,7 @@ test('suggest → approve: the exercise reaches everyone, the suggester\'s name 
   assert.deepEqual((await h.get(ANN, '/api/data/rev')).body, { rev: 0 });
   assert.deepEqual((await h.get(ANN, '/api/pool')).body, { rev: 0, items: [], mine: [] });
   assert.equal((await h.get(null, '/api/pool')).status, 401);
-  assert.equal((await h.get(null, '/api/config')).body.pool, true);
+  assert.equal((await h.get(ANN, '/api/config')).body.pool, true);
 
   let r = await h.post(ANN, '/api/pool/submit', { exercise: exercise() });
   assert.equal(r.status, 200, JSON.stringify(r.body));

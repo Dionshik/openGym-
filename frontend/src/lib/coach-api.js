@@ -9,7 +9,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { api } from './api.js'
 import { DEMO } from './demo.js'
 import { MOBILE } from './mobile.js'
-import { t } from './i18n.js'
+import { t, getLang } from './i18n.js'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 
@@ -23,6 +23,9 @@ const IDLE_MS = 60000       // a Coach screen is open but nothing is running
 let demoMod = null
 const demo = async () => (demoMod = demoMod || await import('./coach-demo.js'))
 const S = () => useStore.getState().S
+// Each request says which language the app is in: a profile that never picked one has no stored
+// `lang` worth trusting — it is worked out per device (#303, lib/default-lang.js) — and the
+// Coach should answer in what the person is reading.
 
 // The mobile build's third answer: a phone that brought its own API key runs the Coach itself
 // (lib/coach-local.js — the same core the server runs, imported lazily so the catalogue and the
@@ -44,11 +47,28 @@ const local = async () => {
   return localMod
 }
 
+// The job this app last started and has not written a reply for yet. A run that fails before
+// the first status poll — a provider refusing the connection answers in milliseconds — is never
+// seen running, so "running, then gone" cannot be the only way the chat learns a run ended: it
+// also compares the server's last outcome with the id the start request returned. Kept here,
+// at module level, because the plan the intake asks for is started on another screen.
+let awaited = null
+const track = r => {
+  if (r?.job?.id) awaited = r.job.id
+  return r
+}
+export const awaitedJob = () => awaited
+export const settleAwaited = id => { if (!id || awaited === id) awaited = null }
+
 export const coachStatus = async () => DEMO ? (await demo()).demoStatus() : LOCAL() ? (await local()).localStatus() : api('/api/coach/status')
-export const requestReview = async note => DEMO ? (await demo()).demoReview(S()) : LOCAL() ? (await local()).localReview(S(), note) : api('/api/coach/review', { method: 'POST', body: JSON.stringify({ note: note || '' }) })
-export const requestPlan = async intake => DEMO ? (await demo()).demoPlan(S(), intake) : LOCAL() ? (await local()).localPlan(S(), intake) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ intake }) })
-export const refinePlan = async text => DEMO ? (await demo()).demoRefine(S()) : LOCAL() ? (await local()).localRefine(S(), text) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ refine: text }) })
-export const requestDebrief = async workoutId => DEMO ? (await demo()).demoDebrief(S(), workoutId) : LOCAL() ? (await local()).localDebrief(S(), workoutId) : api('/api/coach/debrief', { method: 'POST', body: JSON.stringify({ workoutId: workoutId || null }) })
+const _requestReview = async note => DEMO ? (await demo()).demoReview(S()) : LOCAL() ? (await local()).localReview(S(), note) : api('/api/coach/review', { method: 'POST', body: JSON.stringify({ note: note || '', lang: getLang() }) })
+export const requestReview = (...a) => _requestReview(...a).then(track)
+const _requestPlan = async intake => DEMO ? (await demo()).demoPlan(S(), intake) : LOCAL() ? (await local()).localPlan(S(), intake) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ intake, lang: getLang() }) })
+export const requestPlan = (...a) => _requestPlan(...a).then(track)
+const _refinePlan = async text => DEMO ? (await demo()).demoRefine(S()) : LOCAL() ? (await local()).localRefine(S(), text) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ refine: text, lang: getLang() }) })
+export const refinePlan = (...a) => _refinePlan(...a).then(track)
+const _requestDebrief = async workoutId => DEMO ? (await demo()).demoDebrief(S(), workoutId) : LOCAL() ? (await local()).localDebrief(S(), workoutId) : api('/api/coach/debrief', { method: 'POST', body: JSON.stringify({ workoutId: workoutId || null, lang: getLang() }) })
+export const requestDebrief = (...a) => _requestDebrief(...a).then(track)
 // "Describe it in your own words": the text goes to the provider and comes back as catalogue
 // rows plus the draft of a new exercise (lib/exercise-match.js turns that into what the picker
 // shows). Awaited, not polled — it is a sentence, and the picker is open waiting for it. A
@@ -96,10 +116,16 @@ export function useCoachStatus(active = true) {
   const [state, setState] = useState({ job: null, pending: null, cap: null, loading: true })
   const timer = useRef(null)
   const loop = useRef(null)   // the running poll loop's `tick`, so a manual refresh can re-pace it
+  const seq = useRef(0)       // which status request is the newest one
 
   const refresh = useCallback(async () => {
+    const mine = ++seq.current
     try {
       const s = await coachStatus()
+      // An answer that arrives after a newer request was sent is older than what that request
+      // will bring: the idle poll in flight when a run is started must not land after the
+      // refresh that follows the start, putting back the run count and last outcome from before.
+      if (mine !== seq.current) return s
       setState({ ...s, loading: false })
       // A refresh that finds a job in flight — the one the caller just started — must not leave
       // the loop asleep on its idle cadence: without this the card shows up to a minute after
@@ -107,7 +133,7 @@ export function useCoachStatus(active = true) {
       if (s?.job && loop.current) { clearTimeout(timer.current); timer.current = setTimeout(loop.current, POLL_MS) }
       return s
     } catch {
-      setState(s => ({ ...s, loading: false }))
+      if (mine === seq.current) setState(s => ({ ...s, loading: false }))
       return null
     }
   }, [])
@@ -131,52 +157,59 @@ export function useCoachStatus(active = true) {
 
 // Server failure classes, in the app's voice. The provider's own words go to the admin card;
 // what a lifter needs is what it means for them and whether trying again will help.
+//
+// Each line is a getter, so it is translated when it is read, not when this module loads: the
+// module loads once, in English, before any locale pack has arrived, and a language picked later
+// would otherwise never reach these lines. The lookup is still JOB_ERRORS[cls].
 export const JOB_ERRORS = {
-  off: 'The Coach isn’t set up on this instance.',
-  busy: 'The Coach is already thinking about your training.',
-  cap: 'The Coach is resting — try again tomorrow.',
-  consent: 'The Coach needs your go-ahead first.',
-  timeout: 'The Coach took too long and gave up.',
-  auth: 'The Coach couldn’t sign in to its provider — the instance owner needs to check its setup.',
-  missing: 'The Coach isn’t installed properly on this instance.',
-  provider: 'The Coach couldn’t run — the instance owner needs to check its setup.',
-  unusable: 'The Coach answered with something the app couldn’t use.',
-  restart: 'The server restarted while the Coach was thinking.',
-  nostate: 'The Coach couldn’t read your training data.',
-  noworkout: 'There is no workout to look at yet — log one first.',
-  internal: 'Something went wrong on the server.',
-  // An exercise lookup only: the request never reached the server, or there was nothing in it.
-  network: 'No connection — describing an exercise needs the server.',
-  empty: 'Describe the exercise first.',
-  shared: 'The Coach on this instance is set up for one profile only — ask the instance owner.',
-  unprivileged: 'The Coach is switched off on this instance for safety reasons.'
+  get off() { return t('The Coach isn’t set up on this instance.') },
+  get busy() { return t('The Coach is already thinking about your training.') },
+  get cap() { return t('The Coach is taking a rest day. Try again tomorrow.') },
+  get consent() { return t('The Coach needs your go-ahead first.') },
+  get timeout() { return t('The Coach took too long and gave up.') },
+  get auth() { return t('The Coach couldn’t sign in to its provider. The instance owner needs to check its setup.') },
+  get missing() { return t('The Coach isn’t installed properly on this instance.') },
+  get provider() { return t('The Coach couldn’t run. The instance owner needs to check its setup.') },
+  get unusable() { return t('The Coach answered with something the app couldn’t use.') },
+  get restart() { return t('The server restarted while the Coach was thinking.') },
+  get nostate() { return t('The Coach couldn’t read your training data.') },
+  get noworkout() { return t('There’s no workout to look at yet. Log one first.') },
+  // The refusal at enqueue when the process cannot drop privileges (api/coach/jobs.js). The same
+  // words as api/coach/routes.js USER_ERROR.unprivileged; what to fix goes to the admin card.
+  get unprivileged() { return t('The Coach is switched off on this instance for safety reasons.') },
+  get internal() { return t('Something went wrong on the server.') }
 }
 
-// The same classes when the thing that failed was an exercise lookup rather than a job: the
-// wait is seconds, not minutes, and "thinking about your training" is not what it was doing.
+// The same classes when the thing that failed was an exercise lookup (or a typed-out workout,
+// lib/workout-text-api.js) rather than a job: the wait is seconds, not minutes, and "thinking
+// about your training" is not what it was doing. `network` and `empty` only happen here. `shared`
+// is the server's verbatim refusal for a Coach job (JOB_ERRORS leaves it out on purpose); a lookup
+// is refused with the code alone, so it gets the app's line. Getters, like JOB_ERRORS.
 const LOOKUP_ERRORS = {
-  busy: 'Still looking up the last one — give it a moment.',
-  cap: 'That is enough lookups for today — the search above still works.'
+  get busy() { return t('Still looking up the last one — give it a moment.') },
+  get cap() { return t('That is enough lookups for today — the search above still works.') },
+  get network() { return t('No connection — describing an exercise needs the server.') },
+  get empty() { return t('Describe the exercise first.') },
+  get shared() { return t('The Coach on this instance is set up for one profile only — ask the instance owner.') }
 }
 
 /** The line for a failed exercise lookup, in the app's language; a provider's own words (a
  *  phone with its own key) stay as the provider wrote them, on the line below. */
 export function lookupErrorText(e) {
   const cls = e?.code || 'internal'
-  if (LOOKUP_ERRORS[cls]) return t(LOOKUP_ERRORS[cls])
-  const [base, ...why] = jobErrorText(cls, e?.detail).split('\n')
-  return [t(base), ...why].join('\n')
+  if (Object.hasOwn(LOOKUP_ERRORS, cls)) return LOOKUP_ERRORS[cls]
+  return jobErrorText(cls, e?.detail)
 }
 
 // The same failures on a phone that brought its own key: there is no instance owner to
 // check anything, the person reading this is the operator, and the provider's own words
 // are the only thing that lets them fix it (a spent quota, a wrong model, a rejected key).
 export const BYOK_ERRORS = {
-  auth: 'Your AI provider rejected the key on this phone — check it under Settings → AI Coach.',
-  missing: 'The Coach isn’t set up on this phone — check Settings → AI Coach.',
-  provider: 'Your AI provider couldn’t answer.',
-  unusable: 'The Coach answered with something the app couldn’t use.',
-  internal: 'Something went wrong on this phone.'
+  get auth() { return t('Your AI provider rejected the key on this phone. Check it under Settings → AI Coach.') },
+  get missing() { return t('The Coach isn’t set up on this phone. Check Settings → AI Coach.') },
+  get provider() { return t('Your AI provider couldn’t answer.') },
+  get unusable() { return t('The Coach answered with something the app couldn’t use.') },
+  get internal() { return t('Something went wrong on this phone.') }
 }
 
 /** The line the person sees for a failed job — with the reason attached where they can act on it. */

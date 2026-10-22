@@ -12,14 +12,14 @@ import { computeCohort } from './cohort.js';
 import { adapterFor } from './adapters/index.js';
 import { canDropPrivileges } from './adapters/spawn.js';
 import { DATA_CATEGORIES, OPTIONAL_CATEGORIES } from './core/payload.js';
-import { validateBaseUrl, baseUrlFor, basicPair } from './core/providers.js';
+import { validateBaseUrl, validateHeaders, baseUrlFor, basicPair } from './core/providers.js';
 
 // Job failures the user sees, in the app's own voice. The raw provider detail never reaches
 // them — it goes to the admin card, which is where someone can act on it (FR-47).
 const USER_ERROR = {
   off: 'the Coach is not set up on this instance',
   busy: 'the Coach is already thinking about your training',
-  cap: 'the Coach is resting — try again tomorrow',
+  cap: 'the Coach is taking a rest day, try again tomorrow',
   consent: 'the Coach needs your go-ahead first',
   // Verbatim, because it tells the user the one thing that resolves it and names who resolves
   // it. A vaguer message here turns into a support question for the person running the box.
@@ -59,11 +59,13 @@ const LOGTEXT_ERROR = {
 };
 
 export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
-  /** Every user route starts the same way: signed in, feature on, feature reachable. */
+  /** Every user route starts the same way: signed in, feature on, feature reachable. The class
+   *  goes beside the words, as enqueue's refusal sends it: the app shows its own translated line
+   *  for the class, and these English words only where it has none. */
   const guard = (req, res) => {
     const user = readSession(req);
     if (!user) { json(res, 401, { error: 'not signed in' }); return null; }
-    if (!cfgStore.isEnabled() || !cfgStore.isConnected()) { json(res, 503, { error: USER_ERROR.off }); return null; }
+    if (!cfgStore.isEnabled() || !cfgStore.isConnected()) { json(res, 503, { error: USER_ERROR.off, code: 'off' }); return null; }
     return user;
   };
   const failEnqueue = (res, e) => {
@@ -93,17 +95,23 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
 
     'GET /api/coach/status': async (req, res) => {
       const user = guard(req, res); if (!user) return;
-      json(res, 200, jobs.status(user.id));
+      // The chat composer's maxLength rides on this poll rather than a one-off fetch, so an
+      // admin raising or lowering the limit reaches an open chat within one poll cycle.
+      json(res, 200, { ...jobs.status(user.id), maxMessageLen: cfgStore.load().maxMessageLen });
     },
 
     'POST /api/coach/plan': async (req, res) => {
       const user = guard(req, res); if (!user) return;
       const body = await readBody(req);
       try {
+        // The admin's configured length is the real limit; jobs.enqueue is where it is actually
+        // enforced (it is the one place that already loads config for every job). This slice is
+        // only a sanity ceiling so an oversized string is not carried further than it has to be.
         const job = jobs.enqueue(user.id, {
           kind: 'create',
           intake: body.intake || null,
-          refine: body.refine ? String(body.refine).slice(0, 1000) : null
+          lang: body.lang,
+          refine: body.refine ? String(body.refine).slice(0, cfgStore.MAX_MESSAGE_LEN_CEILING) : null
         });
         json(res, 202, { job });
       } catch (e) { failEnqueue(res, e); }
@@ -113,7 +121,11 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       const user = guard(req, res); if (!user) return;
       const body = await readBody(req);
       try {
-        const job = jobs.enqueue(user.id, { kind: 'review', note: body.note ? String(body.note).slice(0, 1000) : null });
+        const job = jobs.enqueue(user.id, {
+          kind: 'review',
+          lang: body.lang,
+          note: body.note ? String(body.note).slice(0, cfgStore.MAX_MESSAGE_LEN_CEILING) : null
+        });
         json(res, 202, { job });
       } catch (e) { failEnqueue(res, e); }
     },
@@ -123,7 +135,7 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       const user = guard(req, res); if (!user) return;
       const body = await readBody(req);
       try {
-        const job = jobs.enqueue(user.id, { kind: 'debrief', workoutId: body.workoutId ? String(body.workoutId).slice(0, 40) : null });
+        const job = jobs.enqueue(user.id, { kind: 'debrief', lang: body.lang, workoutId: body.workoutId ? String(body.workoutId).slice(0, 40) : null });
         json(res, 202, { job });
       } catch (e) { failEnqueue(res, e); }
     },
@@ -259,8 +271,14 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
         visionModel: (cfg.visionModels && cfg.visionModels[cfg.provider]) || null,
         vision: adapter?.images === true,
         baseUrl: cfgStore.providerMeta(cfg).http ? baseUrlFor(cfg.provider, cfg) : null,
+        // Extra static headers this endpoint is called with (compatible endpoints only).
+        // Values, not just names: the admin wrote them and needs to see them to edit them.
+        // Plaintext next to baseUrl — routing aids, not credentials (the key stays encrypted).
+        headers: cfgStore.providerMeta(cfg).http ? (cfgStore.optionsFor(cfg).headers || null) : null,
         knownModels: check.models || null,
         caps: cfg.caps,
+        maxMessageLen: cfg.maxMessageLen,
+        maxOutputTokens: cfg.maxOutputTokens,
         community: !!cfg.community,
         // needsLogin: the address answered with a login prompt (a reverse proxy's HTTP Basic),
         // so what is missing or wrong is the credential, not the endpoint.
@@ -319,7 +337,21 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
         if (!cfgStore.PROVIDERS[target].baseUrl) return json(res, 400, { error: `${target} has a fixed endpoint` });
         const v = validateBaseUrl(body.baseUrl);
         if (!v.ok) return json(res, 400, { error: v.error });
+        // An empty value passes the validator on purpose: for a provider with a default it means
+        // "back to the default". A provider with none (compatible) would be saved pointing at ''
+        // and baseUrlFor() would hand the adapter nothing to call. The phone's CoachSetup refuses
+        // the same case; the admin route has to as well or the hole just moves.
+        if (!v.value && !cfgStore.PROVIDERS[target].defaultBase) return json(res, 400, { error: `${target} has no default endpoint, enter one` });
         patch.providerOptions = { ...current.providerOptions, [target]: { ...(current.providerOptions[target] || {}), baseUrl: v.value } };
+      }
+      if (body.headers !== undefined) {
+        if (!cfgStore.PROVIDERS[target].baseUrl) return json(res, 400, { error: `${target} has a fixed endpoint` });
+        const h = validateHeaders(body.headers);
+        if (!h.ok) return json(res, 400, { error: h.error });
+        // Build on the patch, not on current: a body carrying baseUrl AND headers must keep both.
+        const next = { ...((patch.providerOptions && patch.providerOptions[target]) || current.providerOptions[target] || {}) };
+        if (h.value) next.headers = h.value; else delete next.headers;
+        patch.providerOptions = { ...current.providerOptions, ...(patch.providerOptions || {}), [target]: next };
       }
       if (body.community !== undefined) patch.community = !!body.community;
       if (body.caps) {
@@ -330,6 +362,18 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
           instanceDaily: Math.max(0, Math.min(5000, +body.caps.instanceDaily || 0)),
           ...(body.caps.foodPerProfileDaily !== undefined ? { foodPerProfileDaily: Math.max(0, Math.min(500, +body.caps.foodPerProfileDaily || 0)) } : {})
         };
+      }
+      if (body.maxMessageLen !== undefined) {
+        patch.maxMessageLen = Math.max(
+          cfgStore.MAX_MESSAGE_LEN_FLOOR,
+          Math.min(cfgStore.MAX_MESSAGE_LEN_CEILING, +body.maxMessageLen || current.maxMessageLen)
+        );
+      }
+      if (body.maxOutputTokens !== undefined) {
+        patch.maxOutputTokens = Math.max(
+          cfgStore.MAX_OUTPUT_TOKENS_FLOOR,
+          Math.min(cfgStore.MAX_OUTPUT_TOKENS_CEILING, +body.maxOutputTokens || current.maxOutputTokens)
+        );
       }
       cfgStore.save(patch);
       json(res, 200, { ok: true });

@@ -22,7 +22,7 @@
  *
  * A provider is described by a spec (see anthropic.js etc.); this file owns the transport.
  */
-import { HTTP_PROVIDERS, baseUrlFor, basicHeader } from '../providers.js';
+import { HTTP_PROVIDERS, baseUrlFor, basicHeader, extraHeadersFor } from '../providers.js';
 
 export const MAX_OUTPUT_TOKENS = 16000;
 const DEFAULT_TIMEOUT_MS = 5 * 60000;
@@ -38,7 +38,49 @@ const sleep = (ms, signal) => new Promise(resolve => {
 });
 
 const hostOf = url => { try { return new URL(url).host; } catch { return url; } };
+// What the admin card's Runtime line names: the scheme the endpoint is actually called with. An
+// OpenAI-compatible model on the LAN is usually plain http://, and calling that "HTTPS" told the
+// owner the traffic was encrypted when it was not.
+const schemeOf = url => { try { return new URL(url).protocol === 'http:' ? 'HTTP' : 'HTTPS'; } catch { return 'HTTPS'; } };
 const trim = (s, n = 300) => String(s == null ? '' : s).slice(0, n);
+
+// A base that already names its API version (OpenRouter's …/api/v1, Zhipu's …/paas/v4, Gemini's
+// …/v1beta/openai) is the whole prefix, so the spec's own leading version is dropped instead of
+// doubled into …/v4/v1/chat/completions (#437). A bare host still gets the spec's version.
+const VERSION_SEGMENT = /\/v\d+(?:(?:alpha|beta)\d*)?(?=\/|$)/i;
+export function endpointUrl(base, path) {
+  const basePath = base.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]*/i, '');
+  if (!VERSION_SEGMENT.test(basePath)) return base + path;
+  return base + path.replace(LEADING_VERSION, '');
+}
+const LEADING_VERSION = new RegExp('^' + VERSION_SEGMENT.source, 'i');
+
+// The third shape (#508): a prefix but no version at all, like Open WebUI's /openai mount, which
+// answers {base}/chat/completions and 404s anything with /v1 in it. A spec that opts in
+// (`versionlessFallback`) tries the other form once on a 404, and the base that answered
+// without the version is remembered so the next request goes there first. A bare host and every
+// base that works today still gets exactly the request it got before.
+const versionlessBases = new Set();
+function candidateUrls(spec, base, path) {
+  const url = endpointUrl(base, path);
+  if (!spec.versionlessFallback) return [url];
+  const bare = base + path.replace(LEADING_VERSION, '');
+  if (bare === url) return [url];
+  return versionlessBases.has(base) ? [bare, url] : [url, bare];
+}
+
+/** `send(url)` with the fallback above. When the other form fails as well, the first answer is
+ *  the one returned, so Ollama's "model not found" 404 still reaches the person unchanged. */
+async function reach(spec, base, path, send) {
+  const urls = candidateUrls(spec, base, path);
+  const first = await send(urls[0]);
+  if (first.status !== 404 || urls.length < 2) return first;
+  const second = await send(urls[1]);
+  if (!second.ok) { try { await second.text(); } catch { /* drained or gone */ } return first; }
+  if (urls[1] === endpointUrl(base, path)) versionlessBases.delete(base);
+  else versionlessBases.add(base);
+  return second;
+}
 
 /** A fetch, bounded by AbortController. Never throws for HTTP status; throws for transport. */
 async function call(fetchImpl, url, init, timeoutMs, signal) {
@@ -75,6 +117,15 @@ export function httpAdapter(spec) {
     const basic = basicOf(env);
     return basic ? { authorization: basicHeader(basic) } : spec.headers(keyOf(env));
   };
+  // Every request's headers, in one order: the admin's extra headers first (extraHeadersFor
+  // already drops authorization, content-type and the other framing names), then the body's
+  // type, then the one Authorization header — the login or the key — last, so nothing stored
+  // in the extras can replace or shadow it.
+  const headersFor = (cfg, env, withBody) => ({
+    ...extraHeadersFor(id, cfg),
+    ...(withBody ? { 'content-type': 'application/json' } : {}),
+    ...authHeaders(env)
+  });
   // A proxy's 401 is an HTML page, which says nothing useful in a card. What it asks for is in
   // the header — and "this address wants a login" is the one thing the admin can act on.
   const wantsLogin = res => {
@@ -122,10 +173,10 @@ export function httpAdapter(spec) {
     async check(cfg, env, opts = {}) {
       const base = adapter.baseUrl(cfg);
       if (!base) return { ok: false, error: 'no endpoint configured' };
-      if (!signedIn(env) && !meta.keyOptional) return { ok: true, version: `HTTPS · ${hostOf(base)}`, needsKey: true };
+      if (!signedIn(env) && !meta.keyOptional) return { ok: true, version: `${schemeOf(base)} · ${hostOf(base)}`, needsKey: true };
       const r = await adapter.models(cfg, env, opts);
       if (!r.ok) return { ok: false, error: r.error, ...(r.needsLogin ? { needsLogin: true } : {}) };
-      return { ok: true, version: `HTTPS · ${hostOf(base)} · ${r.models.length} models`, models: r.models };
+      return { ok: true, version: `${schemeOf(base)} · ${hostOf(base)} · ${r.models.length} models`, models: r.models };
     },
 
     /** The models this endpoint serves, so a UI can offer a list instead of a text field. */
@@ -135,7 +186,7 @@ export function httpAdapter(spec) {
       if (!signedIn(env) && !meta.keyOptional) return { ok: false, error: 'no API key configured', models: [] };
       let res;
       try {
-        res = await call(fetchImpl, base + spec.modelsPath, { method: 'GET', headers: authHeaders(env) }, timeoutMs, signal);
+        res = await reach(spec, base, spec.modelsPath, url => call(fetchImpl, url, { method: 'GET', headers: headersFor(cfg, env, false) }, timeoutMs, signal));
       } catch (e) {
         return { ok: false, error: e.name === 'AbortError' ? 'timed out' : `could not reach ${hostOf(base)}: ${trim(e.message, 120)}`, models: [] };
       }
@@ -160,16 +211,19 @@ export function httpAdapter(spec) {
      * native HTTP and a test can hand in a fake.
      */
     async invoke(opts = {}) {
-      const { cfg, prompt, system, schema, images, maxTokens, env, model, timeoutMs = DEFAULT_TIMEOUT_MS, fetch: fetchImpl = globalThis.fetch, signal } = opts;
+      const { cfg, prompt, system, schema, images, env, model, timeoutMs = DEFAULT_TIMEOUT_MS, maxTokens, fetch: fetchImpl = globalThis.fetch, signal } = opts;
       const base = adapter.baseUrl(cfg);
       if (!base) return { code: -1, text: '', stderr: `no endpoint configured for ${id}`, spawnError: true };
       if (!signedIn(env) && !meta.keyOptional) return { code: -1, text: '', stderr: `no API key configured for ${id}`, spawnError: true };
       const chosen = model || meta.defaultModel;
-      if (!chosen) return { code: 1, text: '', stderr: `no model chosen for ${id} — pick one from the list the endpoint serves` };
+      if (!chosen) return { code: 1, text: '', stderr: `no model chosen for ${id} (pick one from the list the endpoint serves)` };
 
       let body = spec.body({
         model: chosen, prompt, system: system || null, schema: schema || null,
-        maxTokens: maxTokens > 0 ? Math.min(MAX_OUTPUT_TOKENS, maxTokens) : MAX_OUTPUT_TOKENS,
+        // The caller's ceiling when it names one — the admin's maxOutputTokens for a plan (already
+        // clamped by the admin route), a small one for a food or log-text answer — else the
+        // adapter's default for callers that configure nothing (the phone, warmup).
+        maxTokens: maxTokens > 0 ? Math.floor(maxTokens) : MAX_OUTPUT_TOKENS,
         // [{ mime, data }] — base64 without a data: prefix. Absent means the request is the
         // text-only one every provider has always been sent, byte for byte.
         images: Array.isArray(images) && images.length ? images : null
@@ -179,11 +233,11 @@ export function httpAdapter(spec) {
       for (;;) {
         let res;
         try {
-          res = await call(fetchImpl, base + spec.path(chosen), {
+          res = await reach(spec, base, spec.path(chosen), url => call(fetchImpl, url, {
             method: 'POST',
-            headers: { 'content-type': 'application/json', ...authHeaders(env) },
+            headers: headersFor(cfg, env, true),
             body: JSON.stringify(body)
-          }, timeoutMs, signal);
+          }, timeoutMs, signal));
         } catch (e) {
           if (e.name === 'AbortError') return { code: -1, text: '', stderr: 'timed out', timedOut: true };
           return { code: 1, text: '', stderr: `could not reach ${hostOf(base)}: ${trim(e.message, 200)}` };
@@ -208,7 +262,7 @@ export function httpAdapter(spec) {
         let out;
         try { out = spec.readText(data); } catch (e) { out = { error: `unexpected response shape: ${trim(e.message, 100)}` }; }
         if (out.error) return { code: 1, text: '', stderr: out.error };
-        if (out.truncated) return { code: 1, text: '', stderr: 'the answer was cut off at the output limit — try a smaller plan or a bigger model' };
+        if (out.truncated) return { code: 1, text: '', stderr: 'the answer was cut off at the output limit; try a smaller plan or a bigger model' };
         return { code: 0, text: String(out.text || '').trim(), stderr: '' };
       }
     }

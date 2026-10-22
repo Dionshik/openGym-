@@ -14,7 +14,16 @@
  * model verbatim for the one repair round (FR-48) — and a list of six problems produces a
  * better second attempt than the first of them does.
  */
-import { libraryHas, libraryName } from './library.js';
+import { libraryHas, libraryName, equipmentAllows } from './library.js';
+
+// A catalogue exercise the person's equipment does not reach, and that was not in the library
+// slice they were offered (which already pins what they train). The prompt says "their
+// equipment"; a model that names a leverage machine anyway is told so on the repair round
+// instead of the plan arriving with a machine they do not own.
+const offEquipment = (ctx, id) => !!ctx.equipment?.length && libraryHas(id)
+  && !(ctx.offered && ctx.offered.has(id)) && !equipmentAllows(ctx.equipment, id);
+const OFF_EQUIPMENT = (where, id) => `${where} "${id}" needs equipment the user does not have — use an exercise from the library provided in the payload`;
+import { glyphStr } from './glyphs.js';
 
 // The closed list (FR-23 / C3). Adding a member here is a deliberate act with an apply
 // implementation on the client to match; there is no default case anywhere.
@@ -26,7 +35,7 @@ export const CHANGE_TYPES = [
   'add-routine', 'remove-routine', 'rename-routine',
   'week'
 ];
-const POLICIES = ['off', 'linear', 'greyskull', 'double', 'time'];
+const POLICIES = ['off', 'linear', 'greyskull', 'double', 'triple', 'time'];
 const MODES = ['reps', 'time', 'cardio'];
 const MAX_INC = 50;
 // A prescription, not a world record. Anything past this is a model slip or a hostile answer,
@@ -46,6 +55,8 @@ const isStr = v => typeof v === 'string' && v.trim().length > 0;
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const isInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
 const clampStr = (v, n) => String(v == null ? '' : v).slice(0, n);
+// Routine icons: an icon key the app knows or a legacy emoji, never free text (#311).
+export { ROUTINE_GLYPHS } from './glyphs.js';
 
 /* ---------- the two v1.2.4 flags, enforced rather than merely accepted ----------
    `prompts/common.md` tells the model that unilateral work is prescribed as the total across
@@ -53,6 +64,14 @@ const clampStr = (v, n) => String(v == null ? '' : v).slice(0, n);
    forever" into "add a set". A prompt that asks is not a guarantee; these are the two rules
    from it that have a single right answer, so they are checked here and the repair round gets
    a chance to fix them. Everything else in that file is coaching judgement and stays advisory. */
+// #313: the review prompt now states this rule, and the message names it, the offending id and
+// what to do instead — a bare "is already in routine" left a temperature-0 model nothing to
+// act on, and it replayed the same answer in its one repair round.
+const ALREADY_IN = (where, c, routine) =>
+  `${where} (${c.type}) brings in after.id "${(c.after || {}).id}", which is already in routine "${routine.name}" `
+  + `(routineId "${routine.id}") — a swap-exercise or add-exercise must bring in an exercise that routine does not have yet. `
+  + `Its exercises now are: ${exIdsOf(routine)}. Pick a different library id, or leave this change out`;
+const exIdsOf = routine => (routine.ex || []).map(e => `"${e.id}"`).join(', ') || '(none)';
 const ODD_PER_SIDE = where =>
   `${where} is a per-side exercise, so reps are the total across both sides and must be an even number`;
 const INVERTED_RANGE = where =>
@@ -68,7 +87,13 @@ export function validatePlan(data, ctx = {}) {
   const errors = [];
   if (!data || typeof data !== 'object') return fail(['the answer was not an object']);
   if (data.nochange) return fail(['a plan was requested but the answer said "no change"']);
-  if (!Array.isArray(data.routines) || !data.routines.length) errors.push('routines must be a non-empty array');
+  if (!Array.isArray(data.routines) || !data.routines.length) {
+    // A review-style change list where a plan was asked for (#471): say what the task wants,
+    // so the repair round sends the plan rather than the same list again.
+    errors.push(Array.isArray(data.changes)
+      ? 'this task needs the complete plan (week and every routine with its ex), not a list of changes — start from refine.previous when revising, apply what was asked, and send the whole plan'
+      : 'routines must be a non-empty array');
+  }
 
   // A custom id that shadows a library id is the one case where the screen and the plan
   // disagree: the approval card resolves the id against the catalogue and shows that exercise,
@@ -98,6 +123,7 @@ export function validatePlan(data, ctx = {}) {
         errors.push(`${where}.id "${e.id}" is not in the exercise library and is not one of your own customEx entries — use an id from the library provided in the payload`);
         return;
       }
+      if (offEquipment(ctx, e.id)) { errors.push(OFF_EQUIPMENT(`${where}.id`, e.id)); return; }
       const clean = { id: e.id, sets: isInt(e.sets, 1, 10) ? e.sets : 3 };
       const mode = MODES.includes(e.mode) ? e.mode : 'reps';
       const perSide = !!e.side;
@@ -124,6 +150,8 @@ export function validatePlan(data, ctx = {}) {
       // adds a set and restarts the reps. Without it the Coach can neither see nor prescribe
       // how a push-up is meant to get harder.
       if (isInt(e.repsMax, 1, 100)) clean.repsMax = e.repsMax;
+      // Triple progression's set ceiling (frontend/src/lib/progression.js tripleSetsOf).
+      if (isInt(e.setsMax, 1, 10)) clean.setsMax = e.setsMax;
       if (clean.repsMax != null && clean.repsMin != null && clean.repsMax < clean.repsMin) {
         errors.push(INVERTED_RANGE(where)); return;
       }
@@ -154,7 +182,7 @@ export function validatePlan(data, ctx = {}) {
     routines.push({
       id: rid,
       name: clampStr(r.name || 'Routine', 40),
-      emoji: clampStr(r.emoji || '🏋️', 8),
+      emoji: glyphStr(r.emoji),
       ...(POLICIES.includes(r.prog) ? { prog: r.prog } : {}),
       ...(isStr(r.why) ? { why: clampStr(r.why, 400) } : {}),
       ex
@@ -227,6 +255,23 @@ export function validateReview(data, plan, ctx = {}) {
   const list = Array.isArray(data.changes) ? data.changes : null;
   if (!list) return fail(['changes must be an array (or set "nochange": true with a "reading")']);
 
+  // A swap-exercise or add-exercise that brings in an exercise the routine already has (#313)
+  // is the one refusal that is dropped rather than fatal when the rest of the answer is sound:
+  // like a change that restates the plan, it is self-contained — nothing else in the set can
+  // depend on an exercise that never arrives — and costing a whole review over it, when the
+  // lifter can simply not be shown it, helps nobody. When it is the only thing proposed, or
+  // something else is also wrong, it is reported with the rest so the repair round fixes both.
+  // Self-contained is checked, not assumed: another change in the same routine that names the
+  // exercise it swapped out or brought in was written with it in mind — "swap 0001 for 0007"
+  // next to "remove 0007" means something else once the swap is gone — so then it is fatal.
+  const dropped = [];
+  const droppedRefs = [];
+  const dropDuplicate = (msg, where, c) => {
+    errors.push(msg); dropped.push(msg);
+    const t = c.target || {};
+    droppedRefs.push({ where, rid: t.routineId, ids: [t.exId, (c.after || {}).id].filter(isStr) });
+  };
+
   list.slice(0, MAX_CHANGES).forEach((c, i) => {
     const where = `changes[${i}]`;
     if (!c || typeof c !== 'object') { errors.push(`${where} is not an object`); return; }
@@ -249,7 +294,8 @@ export function validateReview(data, plan, ctx = {}) {
       if (!target.exId) { errors.push(`${where}.target.exId is required for type "${c.type}"`); return; }
       planned = (routine.ex || []).find(e => e.id === target.exId) || null;
       if (!planned) {
-        errors.push(`${where}.target.exId "${target.exId}" is not in routine "${routine.name}"`); return;
+        errors.push(`${where}.target.exId "${target.exId}" is not in routine "${routine.name}" (routineId "${routine.id}") — `
+          + `a change's target.exId must be one of that routine's own exercises: ${exIdsOf(routine)}`); return;
       }
     }
 
@@ -285,10 +331,11 @@ export function validateReview(data, plan, ctx = {}) {
         // duplicate makes every later reorder unsatisfiable, makes each targeted change resolve
         // to whichever copy comes first, and makes one "drop it" delete both.
         if ((routine.ex || []).some(e => e.id === (c.after || {}).id)) {
-          errors.push(`${where}.after.id "${(c.after || {}).id}" is already in routine "${routine.name}"`); return;
+          dropDuplicate(ALREADY_IN(where, c, routine), where, c); return;
         }
         const a = c.after || {};
         if (!isStr(a.id) || !knownEx(a.id)) { errors.push(`${where}.after.id must be an exercise id from the library`); return; }
+        if (offEquipment(ctx, a.id)) { errors.push(OFF_EQUIPMENT(`${where}.after.id`, a.id)); return; }
         const perSide = !!a.side;
         if (perSide && isInt(a.reps, 1, 100) && a.reps % 2) { errors.push(ODD_PER_SIDE(`${where}.after.reps`)); return; }
         if (isInt(a.repsMax, 1, 100) && isInt(a.repsMin, 1, 100) && a.repsMax < a.repsMin) { errors.push(INVERTED_RANGE(`${where}.after`)); return; }
@@ -302,6 +349,7 @@ export function validateReview(data, plan, ctx = {}) {
           ...(POLICIES.includes(a.prog) ? { prog: a.prog } : {}),
           ...(isInt(a.repsMin, 1, 100) ? { repsMin: a.repsMin } : {}),
           ...(isInt(a.repsMax, 1, 100) ? { repsMax: a.repsMax } : {}),
+          ...(isInt(a.setsMax, 1, 10) ? { setsMax: a.setsMax } : {}),
           ...(a.bodyweight != null ? { bodyweight: !!a.bodyweight } : {}),
           ...(perSide ? { side: true } : {}),
           ...(isInt(a.position, 0, MAX_EX_PER_ROUTINE) ? { position: a.position } : {})
@@ -312,10 +360,11 @@ export function validateReview(data, plan, ctx = {}) {
         // Same rule, minus the exercise being swapped out — replacing A with B when B is
         // already there is a duplicate, not a swap.
         if ((routine.ex || []).some(e => e.id === (c.after || {}).id && e.id !== target.exId)) {
-          errors.push(`${where}.after.id "${(c.after || {}).id}" is already in routine "${routine.name}"`); return;
+          dropDuplicate(ALREADY_IN(where, c, routine), where, c); return;
         }
         const a = c.after || {};
         if (!isStr(a.id) || !knownEx(a.id)) { errors.push(`${where}.after.id must be an exercise id from the library`); return; }
+        if (offEquipment(ctx, a.id)) { errors.push(OFF_EQUIPMENT(`${where}.after.id`, a.id)); return; }
         if (a.id === target.exId) { errors.push(`${where} swaps an exercise for itself`); return; }
         out.after = {
           id: a.id, name: libraryName(a.id),
@@ -390,12 +439,14 @@ export function validateReview(data, plan, ctx = {}) {
         const listed = Array.isArray(a.ex) ? a.ex : [];
         const bad = listed.find(e => !e || !isStr(e.id) || !knownEx(e.id));
         if (bad) { errors.push(`${where}.after.ex "${bad.id}" is not in the exercise library — use an id from the library provided in the payload`); return; }
+        const offEq = listed.find(e => offEquipment(ctx, e.id));
+        if (offEq) { errors.push(OFF_EQUIPMENT(`${where}.after.ex`, offEq.id)); return; }
         const ex = listed.slice(0, MAX_EX_PER_ROUTINE);
         if (!ex.length) { errors.push(`${where}.after.ex must list at least one exercise from the library`); return; }
         const odd = ex.find(e => e.side && isInt(e.reps, 1, 100) && e.reps % 2);
         if (odd) { errors.push(ODD_PER_SIDE(`${where}.after.ex "${odd.id}"`)); return; }
         out.after = {
-          name: clampStr(a.name, 40), emoji: clampStr(a.emoji || '🏋️', 8),
+          name: clampStr(a.name, 40), emoji: glyphStr(a.emoji),
           ...(POLICIES.includes(a.prog) ? { prog: a.prog } : {}),
           ex: ex.map(e => ({
             id: e.id, name: libraryName(e.id),
@@ -405,6 +456,7 @@ export function validateReview(data, plan, ctx = {}) {
             ...(isInt(e.sec, 5, 3600) ? { sec: e.sec } : {}),
             ...(isInt(e.repsMin, 1, 100) ? { repsMin: e.repsMin } : {}),
             ...(isInt(e.repsMax, 1, 100) ? { repsMax: e.repsMax } : {}),
+            ...(isInt(e.setsMax, 1, 10) ? { setsMax: e.setsMax } : {}),
             ...(POLICIES.includes(e.prog) ? { prog: e.prog } : {}),
             ...(isNum(e.inc) && e.inc > 0 && e.inc <= MAX_INC ? { inc: e.inc } : {}),
             ...(e.bodyweight != null ? { bodyweight: !!e.bodyweight } : {}),
@@ -430,7 +482,21 @@ export function validateReview(data, plan, ctx = {}) {
     changes.push(out);
   });
 
-  if (errors.length) return fail(errors);
+  const namesOf = ch => {
+    const a = ch.after && typeof ch.after === 'object' && !Array.isArray(ch.after) ? ch.after : {};
+    return [ch.target.exId, a.id, a.with].filter(isStr);
+  };
+  droppedRefs.forEach(d => {
+    const dep = changes.find(ch => ch.target.routineId === d.rid && namesOf(ch).some(id => d.ids.includes(id)));
+    if (dep) {
+      const id = namesOf(dep).find(x => d.ids.includes(x));
+      errors.push(`${d.where} cannot just be left out: change "${dep.id}" (${dep.type}) in the same routine also names exercise "${id}", `
+        + `and without ${d.where} it would do something other than what was meant — propose these changes again as one set that holds together`);
+    }
+  });
+  if (errors.length > dropped.length) return fail(errors);
+  if (dropped.length && !changes.length) return fail(errors);
+  errors.length = 0;
   // Everything above validates one change against the ORIGINAL plan. These are the things that
   // are only wrong in company — each one validates alone, and together they are incoherent or
   // destructive. The user approves a screen, not a change, so the screen has to be coherent.
@@ -448,8 +514,17 @@ export function validateReview(data, plan, ctx = {}) {
   // "no change" and is reported as such below.
   const kept = changes.filter(ch => !(SCALAR.includes(ch.type) && sameValue(ch.before, ch.after)));
 
+  // Checked per change above against the plan as it stands; two changes that each bring the
+  // same exercise into one routine pass that alone and duplicate it together.
+  const incoming = new Map();
   kept.forEach(ch => {
     const rid = ch.target.routineId;
+    if (['add-exercise', 'swap-exercise'].includes(ch.type)) {
+      const key = rid + '\u0000' + ch.after.id;
+      if (incoming.has(key)) {
+        errors.push(`changes "${incoming.get(key)}" and "${ch.id}" both bring exercise "${ch.after.id}" into routine "${routines.get(rid)?.name || rid}" — an exercise can appear in a routine only once, so keep one of them`);
+      } else incoming.set(key, ch.id);
+    }
     if (rid) {
       if (!byRoutine.has(rid)) byRoutine.set(rid, []);
       byRoutine.get(rid).push(ch.type);
@@ -485,8 +560,12 @@ export function validateReview(data, plan, ctx = {}) {
     errors.push(`the plan would end up with more than the ${MAX_ROUTINES} routines allowed`);
   }
 
-  if (errors.length) return fail(errors);
+  if (errors.length) return fail([...errors, ...dropped]);
 
+  // Everything that was proposed turned out to duplicate an exercise or restate the plan. With
+  // a duplicate among them this is not an honest "no change" — the summary still describes the
+  // swap — so it goes back for repair rather than out as a reading.
+  if (!kept.length && dropped.length) return fail(dropped);
   if (!kept.length) {
     // An empty change list and "no changes" are the same outcome; treat it as the latter
     // rather than showing someone an empty proposal screen (FR-25).

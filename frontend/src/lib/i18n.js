@@ -5,14 +5,14 @@
 
 import { useSyncExternalStore } from 'react'
 import {
-  LANGS, INSTR_LANGS, EXERCISE_NAME_LANGS, DATE_LOCALES, DERIVED_LOCALES,
-  getLang, dateLocale, t, instrFor, exerciseNameFor, exerciseNameSearchText, getVersion,
-  baseLang, derivePack, _setLangState
+  LANGS, INSTR_LANGS, EXERCISE_NAME_LANGS, DATE_LOCALES, DERIVED_LOCALES, RTL_LANGS,
+  getLang, dateLocale, t, tn, instrFor, exerciseNameFor, exerciseNameSearchText, getVersion,
+  baseLang, derivePack, _setLangState, exerciseNameClass, descFor, instrTranslated, _setDetailsLoader, _setDetails, _detailsFailed
 } from './i18n-core.js'
 
 export {
-  LANGS, INSTR_LANGS, EXERCISE_NAME_LANGS, DATE_LOCALES, DERIVED_LOCALES,
-  getLang, dateLocale, t, instrFor, exerciseNameFor, exerciseNameSearchText
+  LANGS, INSTR_LANGS, EXERCISE_NAME_LANGS, DATE_LOCALES, DERIVED_LOCALES, RTL_LANGS,
+  getLang, dateLocale, t, tn, instrFor, instrTranslated, descFor, exerciseNameFor, exerciseNameSearchText, exerciseNameClass, baseLang
 }
 
 // Vite code-splits locale, instruction and exercise-name packs via import.meta.glob. They are
@@ -20,20 +20,57 @@ export {
 const localePacks = import.meta.glob('../locales/*.js')
 const instrPacks = import.meta.glob('../instr/*.js')
 const exerciseNamePacks = import.meta.glob('../exercise-names/*.js')
-// Steps for the catalogue rows that are not in the upstream dataset. Their own packs, because
-// the ones in ../instr are regenerated from upstream and would lose anything added to them.
+// Steps and names for the catalogue rows this instance adds (lib/exercises-extra*.js, generated
+// by scripts/build-extra-exercises.mjs). Packs of their own, because the ones in ../instr and
+// ../exercise-names are generated from catalogue/ (scripts/catalogue/build.mjs, checked by
+// exercise-names.test.js) and would lose anything added to them. A name pack here may also carry
+// ALIASES: other names for an exercise, for the search box only.
 const instrExtraPacks = import.meta.glob('../instr-extra/*.js')
+const exerciseNameExtraPacks = import.meta.glob('../exercise-names-extra/*.js')
+const descPacks = import.meta.glob('../exercise-desc/*.js')
+
+// English steps and descriptions, plus the language's own descriptions where it has some: fetched
+// the first time any screen asks for an exercise's details (i18n-core askDetails), and again for
+// the descriptions whenever the language changes after that.
+let detailsLoaded = false
+async function loadDetails() {
+  const l = getLang()
+  const base = baseLang(l)
+  const load = async (packs, key) => { try { return packs[key] ? (await packs[key]()).default : null } catch (e) { return null } }
+  const [en, enDesc, desc] = await Promise.all([
+    load(instrPacks, '../instr/en.js'),
+    load(descPacks, '../exercise-desc/en.js'),
+    base === 'en' ? null : load(descPacks, '../exercise-desc/' + base + '.js'),
+  ])
+  // Either English pack missing is a failed load (both always exist): core asks again later.
+  if (en && enDesc) detailsLoaded = true
+  // The language changed while this loaded (setLang only reloads once a load has finished): the
+  // descriptions are the old language's, so the new one's are loaded instead.
+  const current = _setDetails(en, enDesc, derivePack(l, desc), l)
+  if (!en || !enDesc) _detailsFailed()
+  notify()
+  if (!current) return loadDetails()
+}
+_setDetailsLoader(loadDetails)
 
 // React subscription bookkeeping — kept here, not in core, so core has zero React coupling.
 const subs = new Set()
 const notify = () => { subs.forEach(f => f()) }
+let lastShowEn = undefined
+let lastEnOnly = undefined
 
-export async function setLang(l) {
+export async function setLang(l, showEn, enOnly) {
   if (!LANGS[l]) l = 'en'
-  if (l === getLang() && getVersion() > 0) return
+  const show = showEn !== false
+  const only = enOnly === true
+  // Both display switches participate in the early-exit, so toggling the parens or the
+  // English-only switch re-applies state even when l did not change.
+  if (l === getLang() && getVersion() > 0 && show === lastShowEn && only === lastEnOnly) return
   // A derived locale (de-CH) ships no packs of its own: it loads its base language's and
   // transforms the strings on the way through. `l` stays the selected language throughout, so
   // dateLocale() still reports de-CH and formats numbers Swiss-style.
+  lastShowEn = show
+  lastEnOnly = only
   const base = baseLang(l)
   let dict = {}, instr = null, exerciseNames = null, exerciseAliases = null
   try { dict = base === 'en' ? {} : (await localePacks['../locales/' + base + '.js']()).default } catch (e) { dict = {} }
@@ -45,13 +82,24 @@ export async function setLang(l) {
     if (extra && base !== 'en' && INSTR_LANGS.includes(base)) instr = { ...(instr || {}), ...(await extra()).default }
   } catch (e) { /* the upstream pack alone */ }
   try {
-    const pack = base === 'en' || !EXERCISE_NAME_LANGS.includes(base)
+    exerciseNames = base === 'en' || !EXERCISE_NAME_LANGS.includes(base)
       ? null
-      : await exerciseNamePacks['../exercise-names/' + base + '.js']()
-    exerciseNames = pack ? pack.default : null
-    exerciseAliases = pack ? (pack.ALIASES || null) : null
-  } catch (e) { exerciseNames = null; exerciseAliases = null }
-  _setLangState(l, derivePack(l, dict), derivePack(l, instr), derivePack(l, exerciseNames), derivePack(l, exerciseAliases))
+      : (await exerciseNamePacks['../exercise-names/' + base + '.js']()).default
+  } catch (e) { exerciseNames = null }
+  // The extra rows' names on top of the catalogue's (they never share an id), with their aliases.
+  // Either pack alone is a complete answer for the rows it covers.
+  try {
+    const extra = exerciseNameExtraPacks['../exercise-names-extra/' + base + '.js']
+    if (extra && base !== 'en' && EXERCISE_NAME_LANGS.includes(base)) {
+      const pack = await extra()
+      exerciseNames = { ...(exerciseNames || {}), ...(pack.default || {}) }
+      exerciseAliases = pack.ALIASES || null
+    }
+  } catch (e) { exerciseAliases = null }
+  _setLangState(l, derivePack(l, dict), derivePack(l, instr), derivePack(l, exerciseNames), show, only, derivePack(l, exerciseAliases))
+  if (detailsLoaded) loadDetails()
+  document.documentElement.lang = l
+  document.documentElement.dir = RTL_LANGS.has(l) ? 'rtl' : 'ltr'
   notify()
 }
 

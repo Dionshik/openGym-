@@ -5,7 +5,7 @@ import { Window } from 'happy-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EXIDX } from '../lib/exercises.js'
 import { MUSCLES, levelsOf } from '../lib/muscles.js'
-import { FATIGUE_STATES, STRENGTH_FLOOR } from '../lib/recovery.js'
+import { FATIGUE_STATES, STRENGTH_FLOOR, fatigueHalfLifeOf, FATIGUE_SETS_PER_UNIT } from '../lib/recovery.js'
 import { fatigueStateOf } from '../lib/recovery-view.js'
 import Stats from './Stats.jsx'
 import Modals from '../components/Modals.jsx'
@@ -19,6 +19,7 @@ const LEGACY_SNAPSHOT_ID = 'legacy-snapshot-only'
 
 const mocks = vi.hoisted(() => ({
   maps: [],
+  charts: [],
   mapMounts: 0,
   exerciseHistorySheet: vi.fn(),
   S: {
@@ -34,9 +35,12 @@ vi.mock('react-router-dom', () => ({ useNavigate: () => () => {} }))
 vi.mock('../sheets.jsx', () => ({
   bwSheet: () => {}, goalSheet: () => {}, calendarSheet: () => {}, workoutDetailSheet: () => {},
   exerciseHistorySheet: mocks.exerciseHistorySheet,
-  WorkoutRow: () => React.createElement('div'), bwDeltaColor: () => 'inherit',
+  WorkoutRow: () => React.createElement('div'), bwDeltaColor: () => 'inherit', weighInsSheet: () => {},
 }))
-vi.mock('../components/LineChart.jsx', () => ({ default: () => React.createElement('div') }))
+vi.mock('../components/LineChart.jsx', () => ({ default: props => {
+  mocks.charts.push(props)
+  return React.createElement('div')
+} }))
 vi.mock('../components/Heatmap.jsx', () => ({ default: () => React.createElement('div') }))
 vi.mock('../components/Icon.jsx', () => ({ default: props => React.createElement('span', props) }))
 vi.mock('../components/BodyMap.jsx', () => ({
@@ -81,12 +85,13 @@ function entry(id, sets) {
 }
 
 function lifecycleWorkouts(now = BASE_NOW) {
-  // The old one-set session lowers the causal reference seen by the six-set session. Position
-  // that newer stimulus 30 seconds before its .5 crossing so the real interval update flips it.
-  const weightedSet = 640 * (30 / 38) ** 1.5
-  const referenceAfterOldSession = 2000 + (weightedSet - 2000) / 3
+  // Six same-load sets on the chest score 6/8 of a full session, amplified by the
+  // acute:chronic gain of a lone recent session ((6+4)/(1.5+4)). Position that
+  // stimulus 30 seconds before its .5 crossing so the real interval update flips it.
+  // (The 30-day-old balance session sits outside the 28-day chronic window.)
+  const loneGain = (6 + 4) / (6 / 4 + 4)
   const fatigueEdge = now - (
-    36 * Math.log2((6 * weightedSet / referenceAfterOldSession) / Math.LN2) * HOUR - 30000
+    fatigueHalfLifeOf('chest') * Math.log2(6 / FATIGUE_SETS_PER_UNIT * loneGain / Math.LN2) - 30000
   )
   const balanceEdge = now - (30 * DAY - 30000)
   const strengthEdge = now - (14 * DAY - 30000)
@@ -140,6 +145,7 @@ function resetFixture(workouts = lifecycleWorkouts()) {
   mocks.S.bodyweight = []
   mocks.S.workouts = workouts
   mocks.maps.length = 0
+  mocks.charts.length = 0
   mocks.mapMounts = 0
   mocks.exerciseHistorySheet.mockClear()
   useUI.setState({ sheets: [] })
@@ -284,13 +290,17 @@ describe('Stats muscle recovery view runtime', () => {
     await mountStats()
     await click(viewButton('Fatigue'))
 
-    // 220.462262 lb ~= 100 kg; ten reps score 1000 kg against the initial 2000 kg reference.
-    expect(lastMap().load.abs).toBeCloseTo(1 - Math.exp(-0.5), 6)
+    // One unloaded set is one effective set whatever the profile unit or body mass:
+    // intensity is session-local and relative, so the 220 lb bodyweight only travels
+    // through opts while the score stays 1 - exp(-1/8 x novice gain of 5/4.25).
+    expect(lastMap().load.abs).toBeCloseTo(1 - Math.exp(-5 / 34), 6)
     expect(lastMap().thresholds).toBeTruthy()
   })
 
   it('renders fixed absolute bands through the actual Fatigue and Strength views', async () => {
-    resetFixture([allFatiguedWorkout()])
+    // Two back-to-back full sessions: even 0.4-weighted secondary movers accumulate
+    // 2 x 12 x 0.4 / 8 = 1.2 raw units, clearing the top band everywhere.
+    resetFixture([allFatiguedWorkout(), allFatiguedWorkout()])
     await mountStats()
     await click(viewButton('Fatigue'))
     const fatigueMap = lastMap()
@@ -306,6 +316,55 @@ describe('Stats muscle recovery view runtime', () => {
     expect(Object.values(strengthMap.load).every(value => value < 1)).toBe(true)
     expect(Math.min(...Object.values(strengthMap.load))).toBe(STRENGTH_FLOOR)
     expect(strengthMap.thresholds.at(-1)).toEqual({ at: 1, level: 4 })
+  })
+
+  it('keeps zero-weight snapshots out of recovery maps and last-trained recency', async () => {
+    resetFixture([workout('zero-mapped', BASE_NOW, [{
+      id: 'deleted-zero-mapped',
+      muscleSnapshot: { n: 'Zero mapped', muscleWeights: { chest: 1, biceps: 0 } },
+      sets: [set(true)],
+    }])])
+    await mountStats()
+
+    expect(lastMap().load).toEqual({ chest: 1 })
+    await click(viewButton('Fatigue'))
+    expect(lastMap().load.chest).toBeGreaterThan(0)
+    expect(lastMap().load.biceps).toBe(0)
+    expect(levelsOf(lastMap().load, lastMap().thresholds).biceps).toBe(0)
+
+    await click(viewButton('Strength'))
+    expect(lastMap().load.chest).toBe(1)
+    expect(lastMap().load.biceps).toBe(STRENGTH_FLOOR)
+    const bicepsRow = [...muscleCard().querySelectorAll('.mrow')]
+      .find(row => row.querySelector('.nm')?.textContent === 'Biceps')
+    expect(bicepsRow.querySelector('.v').textContent).toContain('not trained')
+  })
+})
+
+describe('Stats estimated effort', () => {
+  const effortHead = () => [...container.querySelectorAll('.card h2')]
+    .find(h => h.textContent.trim().startsWith('Effort'))
+
+  it('badges estimated numbers on unrated import history', async () => {
+    resetFixture([workout('unrated', BASE_NOW, [
+      entry('0025', Array.from({ length: 6 }, () => set(true, { w: 80, r: 8 }))),
+    ])])
+    await mountStats()
+    const head = effortHead()
+    expect(head, 'expected an Effort card for estimable history').toBeTruthy()
+    // Six self-anchored sets estimate RIR 0: a real average with an honest badge.
+    expect(head.textContent).toContain('estimated')
+    expect(container.textContent).toContain('0 rated')
+  })
+
+  it('keeps the logged view badge-free on rated history', async () => {
+    resetFixture([workout('rated', BASE_NOW, [
+      entry('0025', Array.from({ length: 6 }, () => set(true, { w: 80, r: 8, rir: 2 }))),
+    ])])
+    await mountStats()
+    const head = effortHead()
+    expect(head, 'expected an Effort card for rated history').toBeTruthy()
+    expect(head.textContent).not.toContain('estimated')
   })
 })
 
@@ -337,9 +396,95 @@ describe('Stats strength exercise rows', () => {
     expect(thrown).toEqual([])
     expect(mocks.exerciseHistorySheet).toHaveBeenCalledTimes(2)
   })
+
+  // The retained-strength bar used a 'to right' gradient, which fills from the left in Arabic too.
+  // A width fills from the inline start, the way the detrained rows' bars already did.
+  it('fills the retained-strength bar by width, so it follows the text direction', async () => {
+    resetFixture([workout('bench-old', BASE_NOW - 20 * DAY, [entry('0025', [set(true, { w: 80 })])])])
+    await mountStats()
+    await click(viewButton('Strength'))
+    await click(muscleCard().querySelector('[data-muscle="chest"]'))
+    const row = [...muscleCard().querySelectorAll('.mrow[role="button"]')].find(el => el.textContent.includes('Est. 1RM'))
+    expect(row).toBeTruthy()
+    const pct = row.querySelector('.v').textContent.match(/(\d+)%/)[1]
+    expect(Number(pct)).toBeLessThan(100)
+    const fill = row.querySelector('.bar i')
+    expect(fill.style.width).toBe(pct + '%')
+    expect(fill.getAttribute('style')).not.toMatch(/to right|gradient/)
+  })
 })
 
 describe('Stats exercise progress picker', () => {
+  it('keeps a legacy reps record whose load is stored only in topW', async () => {
+    resetFixture([workout('legacy-topw', BASE_NOW, [
+      { id: '0025', target: { mode: 'reps' }, topW: 70, sets: [] },
+    ])])
+    await mountStats()
+
+    const card = [...container.querySelectorAll('.card')].find(el => el.querySelector('h2')?.textContent.trim() === 'Exercise progress')
+    expect(card.textContent).toContain('70 kg')
+    const progressChart = mocks.charts.find(chart => chart.points?.some(point => point.y === 70))
+    expect(progressChart?.points).toHaveLength(1)
+    expect(progressChart.points[0].y).toBe(70)
+  })
+
+  it('keeps the strongest topW across repeated legacy records', async () => {
+    resetFixture([workout('legacy-topw-duplicates', BASE_NOW, [
+      { id: '0025', target: { mode: 'reps' }, topW: 70, sets: [] },
+      { id: '0025', target: { mode: 'reps' }, topW: 60, sets: [] },
+    ])])
+    await mountStats()
+
+    const card = [...container.querySelectorAll('.card')].find(el => el.querySelector('h2')?.textContent.trim() === 'Exercise progress')
+    expect(card.textContent).toContain('70 kg')
+    const progressChart = mocks.charts.find(chart => chart.points?.some(point => point.y === 70))
+    expect(progressChart?.points).toHaveLength(1)
+    expect(progressChart.points[0].y).toBe(70)
+  })
+
+  it('keeps a legacy topW when a modern occurrence shares the workout', async () => {
+    resetFixture([workout('modern-and-legacy', BASE_NOW, [
+      entry('0025', [set(true, { w: 50, r: 5 })]),
+      { id: '0025', target: { mode: 'reps' }, topW: 70, sets: [] },
+    ])])
+    await mountStats()
+
+    const card = [...container.querySelectorAll('.card')].find(el => el.querySelector('h2')?.textContent.trim() === 'Exercise progress')
+    expect(card.textContent).toContain('70 kg')
+    const progressChart = mocks.charts.find(chart => chart.points?.some(point => point.y === 70))
+    expect(progressChart?.points).toHaveLength(1)
+    expect(progressChart.points[0].y).toBe(70)
+  })
+
+  it('aggregates duplicate exercise occurrences into one progress point', async () => {
+    resetFixture([workout('duplicate', BASE_NOW, [
+      entry('0025', [set(true, { w: 60, r: 5 })]),
+      entry('0025', [set(true, { w: 80, r: 5 })]),
+    ])])
+    await mountStats()
+
+    const card = [...container.querySelectorAll('.card')].find(el => el.querySelector('h2')?.textContent.trim() === 'Exercise progress')
+    expect(card.textContent).toContain('80 kg')
+    const progressChart = mocks.charts.find(chart => chart.points?.some(point => point.y === 80))
+    expect(progressChart?.points).toHaveLength(1)
+    expect(progressChart.points[0].y).toBe(80)
+    expect(card.textContent).toContain('60×5  80×5')
+  })
+
+  it('aggregates repeated assisted occurrences by the lightest load', async () => {
+    resetFixture([workout('assisted-duplicate', BASE_NOW, [
+      entry('0017', [set(true, { w: 30, r: 8 })]),
+      entry('0017', [set(true, { w: 20, r: 8 })]),
+    ])])
+    await mountStats()
+
+    const card = [...container.querySelectorAll('.card')].find(el => el.querySelector('h2')?.textContent.trim() === 'Exercise progress')
+    expect(card.textContent).toContain('20 kg')
+    const progressChart = mocks.charts.find(chart => chart.points?.some(point => point.y === 20))
+    expect(progressChart?.points).toHaveLength(1)
+    expect(progressChart.points[0].y).toBe(20)
+  })
+
   it('filters with the shared exercise matcher and still selects from the mounted sheet', async () => {
     resetFixture(exercisePickerWorkouts())
     await mountStats()
@@ -402,13 +547,15 @@ describe('Stats exercise progress picker', () => {
     await click(modal.querySelector('button[aria-label="Clear"]'))
     await setSearch('squat full bárbell')
 
-    expect(modal.textContent).toContain('barbell full squat')
-    expect(modal.textContent).not.toContain('barbell bench press')
+    // A catalogue name is title-cased like it is in every list (exerciseNameText); the legacy
+    // snapshot above keeps the name as it was typed.
+    expect(modal.textContent).toContain('Barbell Full Squat')
+    expect(modal.textContent).not.toContain('Barbell Bench Press')
 
-    const matching = [...modal.querySelectorAll('button')].find(button => button.textContent.includes('barbell full squat'))
+    const matching = [...modal.querySelectorAll('button')].find(button => button.textContent.includes('Barbell Full Squat'))
     await click(matching)
 
     expect(useUI.getState().sheets).toHaveLength(0)
-    expect(card.querySelector('.lrow-v').textContent).toContain('barbell full squat')
+    expect(card.querySelector('.lrow-v').textContent).toContain('Barbell Full Squat')
   })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { parseWorkoutCSV, mergeImport } from './import-csv.js'
 import { workoutVolume } from './history.js'
+import { parseWhen, parseWorkoutCSV, parseBodyweight, mergeImport } from './import-csv.js'
 
 const CSV = [
   'Date,Exercise,Weight,Reps,Set Type',
@@ -103,5 +103,158 @@ describe('mergeImport and custom exercises', () => {
     mergeImport(S, parseWorkoutCSV(EXPORT_A, { unit: 'kg' }))
     expect(S.customEx).toHaveLength(1)
     expect(S.workouts[0].entries.map(e => e.id)).toEqual(['mine', '0025'])
+  })
+})
+
+// Hevy (and Strong) localize the date on every CSV row to the language the app was set to.
+// A French history imported as five months out of twelve: janv./mars/sept./oct./nov. happen
+// to look English, while `févr.`/`août`/`déc.` carry an accent inside the first three letters
+// and `avr.`/`mai`/`juin`/`juil.` are simply other words. Every rejected row was dropped as
+// `skipped`, so 778 Hevy workouts came in as 323.
+const FR_MONTHS = [
+  ['20 janv. 2024, 18:00', '2024-01-20'],
+  ['12 févr. 2024, 18:00', '2024-02-12'],
+  ['3 mars 2024, 18:00', '2024-03-03'],
+  ['8 avr. 2024, 18:00', '2024-04-08'],
+  ['14 mai 2024, 18:00', '2024-05-14'],
+  ['2 juin 2024, 18:00', '2024-06-02'],
+  ['9 juil. 2024, 18:00', '2024-07-09'],
+  ['21 août 2024, 18:00', '2024-08-21'],
+  ['5 sept. 2024, 18:00', '2024-09-05'],
+  ['7 oct. 2024, 18:00', '2024-10-07'],
+  ['11 nov. 2024, 18:00', '2024-11-11'],
+  ['23 déc. 2024, 18:00', '2024-12-23'],
+]
+
+describe('localized month names', () => {
+  it('reads all twelve French months', () => {
+    for (const [input, day] of FR_MONTHS) {
+      expect(parseWhen(input), input).toMatchObject({ d: day })
+    }
+  })
+
+  // juin and juil. share their first three letters, so a 3-letter key cannot tell them apart.
+  it('tells June from July past the third letter', () => {
+    expect(parseWhen('2 juin 2024').d).toBe('2024-06-02')
+    expect(parseWhen('2 juillet 2024').d).toBe('2024-07-02')
+    expect(parseWhen('2 giugno 2024').d).toBe('2024-06-02')
+    expect(parseWhen('2 luglio 2024').d).toBe('2024-07-02')
+  })
+
+  // Dutch writes March as "maart" (short "mrt."), which none of the prefixes above reach: every
+  // March row of a Dutch export was skipped. The rest of the Dutch year shares its keys with others.
+  it('reads all twelve Dutch months, written out and shortened', () => {
+    const long = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december']
+    const short = ['jan.', 'feb.', 'mrt.', 'apr.', 'mei', 'jun.', 'jul.', 'aug.', 'sep.', 'okt.', 'nov.', 'dec.']
+    for (const names of [long, short]) {
+      names.forEach((name, i) => {
+        const input = `4 ${name} 2024, 18:00`
+        expect(parseWhen(input), input).toMatchObject({ d: `2024-${String(i + 1).padStart(2, '0')}-04` })
+      })
+    }
+    // a word that only starts like it is still no month
+    expect(parseWhen('4 maar 2024')).toBe(null)
+  })
+
+  it('still reads English, month-first and numeric dates', () => {
+    expect(parseWhen('18 Sep 2022, 10:30')).toMatchObject({ d: '2022-09-18' })
+    expect(parseWhen('22 Dec 2025, 08:00')).toMatchObject({ d: '2025-12-22' })
+    expect(parseWhen('Aug 8, 2026')).toMatchObject({ d: '2026-08-08' })
+    expect(parseWhen('2026-08-08')).toMatchObject({ d: '2026-08-08' })
+    expect(parseWhen('07/03/2024')).toMatchObject({ d: '2024-03-07' })
+  })
+
+  // A word that is not a month must not be read as one: the row falls through and is skipped
+  // rather than landing on an invented date.
+  it('rejects a word that names no month', () => {
+    expect(parseWhen('1 blah 2024')).toBe(null)
+    expect(parseWhen('')).toBe(null)
+  })
+
+  it('imports a French Hevy export whole', () => {
+    const csv = [
+      'title,start_time,end_time,exercise_title,set_index,set_type,weight_kg,reps',
+      ...FR_MONTHS.map(([when], i) =>
+        `Séance,"${when}","${when}",Bench Press,${i + 1},normal,80,5`),
+    ].join('\n')
+    const parsed = parseWorkoutCSV(csv, { unit: 'kg' })
+
+    expect(parsed.source).toBe('Hevy')
+    expect(parsed.skipped).toBe(0)
+    expect(parsed.sets).toBe(12)
+    expect(parsed.workouts).toHaveLength(12)   // one per month, none dropped
+    expect(parsed.from).toBe('2024-01-20')
+    expect(parsed.to).toBe('2024-12-23')
+  })
+})
+
+// Strong's current export (GitHub #394): ';'-separated, "Workout #" in front of the name, the
+// workout's length in seconds and distances in meters.
+const STRONG_NEW = [
+  '"Workout #";"Date";"Workout Name";"Duration (sec)";"Exercise Name";"Set Order";"Weight (kg)";"Reps";"RPE";"Distance (meters)";"Seconds";"Notes";"Workout Notes"',
+  '1;"2026-09-01 18:00:00";"Push";3720;"Bench Press (Barbell)";1;60;10;;;0;"";""',
+  '1;"2026-09-01 18:00:00";"Push";3720;"Bench Press (Barbell)";2;62,5;8;8;;0;"";""',
+  '1;"2026-09-01 18:00:00";"Push";3720;"Plank";1;0;0;;;60;"";""',
+  '2;"2026-09-03 07:30:00";"Legs";1800;"Running";1;0;0;;5000;1500;"";""',
+].join('\n')
+
+describe('Strong semicolon export', () => {
+  it('reads the columns, the duration in seconds and meters as meters', () => {
+    const parsed = parseWorkoutCSV(STRONG_NEW, { unit: 'kg' })
+    expect(parsed.error).toBeUndefined()
+    expect(parsed.source).toBe('Strong')
+    const [push, legs] = parsed.workouts
+    expect(push.name).toBe('Push')
+    expect((push.end - push.start) / 60000).toBe(62)
+    expect(push.entries[0].sets.map(s => s.w)).toEqual([60, 62.5])
+    expect(push.entries[1].sets[0].sec).toBe(60)
+    expect(legs.name).toBe('Legs')
+    expect((legs.end - legs.start) / 60000).toBe(30)
+    // 5000 m in 25 min is 12 km/h, not 12,000.
+    expect(legs.entries[0].sets[0]).toMatchObject({ min: 25, speed: 12 })
+  })
+})
+
+describe('session past midnight', () => {
+  it('Hevy CSV: 23:30 to 00:20 the next day is 50 minutes on the start day', () => {
+    const csv = [
+      '"title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"',
+      '"Run","6 Sep 2026, 23:30","7 Sep 2026, 00:20","","Running",,"",0,"normal",,,8.2,2900,',
+    ].join('\n')
+    const [w] = parseWorkoutCSV(csv, { unit: 'kg' }).workouts
+    expect(w.d).toBe('2026-09-06')
+    expect((w.end - w.start) / 60000).toBe(50)
+  })
+})
+
+describe('impossible dates and numbers', () => {
+  it('parseWhen refuses days that do not exist, are ancient or in the future', () => {
+    for (const s of ['0001-01-01', '9999-12-31', '2026-02-31', '2026-13-45', '31/02/2024', '2024-03-07 25:00']) {
+      expect(parseWhen(s), s).toBeNull()
+    }
+    expect(parseWhen('2024-02-29')).toEqual({ d: '2024-02-29', t: null })
+  })
+
+  it('skips broken rows instead of filing them', () => {
+    const csv = [
+      'Date,Exercise,Category,Weight,Weight Unit,Reps',
+      '2026-09-10,Squat,Legs,100,kgs,5',
+      '2026-09-10,Leg Press,Legs,1e308,kgs,10',
+      '2026-09-10,Leg Press,Legs,-50,kgs,-5',
+      '2026-09-10,Leg Press,Legs,99999999,kgs,999999',
+      '2026-09-10,Leg Press,Legs,200,kgs,1001',
+      '0001-01-01,Ancient Lift,Legs,50,kgs,5',
+      '9999-12-31,Future Lift,Legs,50,kgs,5',
+      '2026-02-31,Bad Date Lift,Legs,50,kgs,5',
+    ].join('\n')
+    const parsed = parseWorkoutCSV(csv, { unit: 'kg' })
+    expect(parsed.skipped).toBe(7)
+    expect(parsed.workouts).toHaveLength(1)
+    expect(parsed.workouts[0].entries.flatMap(e => e.sets)).toEqual([{ w: 100, r: 5, done: true }])
+  })
+
+  it('body weight drops future days and impossible weights', () => {
+    const parsed = parseBodyweight('Date,Weight (kg)\n2026-01-01,70\n2026-01-02,-70\n2026-01-03,9000\n2099-01-01,70', { unit: 'kg' })
+    expect(parsed.bodyweight.map(b => b.d)).toEqual(['2026-01-01'])
   })
 })

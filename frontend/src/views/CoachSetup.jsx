@@ -23,7 +23,17 @@ import { ConnectSheet } from './MobileOnboarding.jsx'
 import Icon from '../components/Icon.jsx'
 import { Section, Row, Button, TextField } from '../components/ui.jsx'
 
-const STEPS = ['Loading the exercise catalogue…', 'Checking the endpoint…', 'Ready']
+// Literal t() calls, so check-source-strings sees the three lines; t(s) over a list of keys hid them.
+const STEPS = () => [t('Loading the exercise catalogue…'), t('Checking the endpoint…'), t('Ready')]
+
+// The phone calls the provider through CapacitorHttp, native networking that obeys the
+// platform's cleartext rule, and Android refuses unencrypted http:// from apps
+// (network_security_config.xml leaves it at the default, off). An http:// endpoint on the LAN
+// therefore failed as a bare "could not reach the provider", with nothing to say why. It is
+// refused up front with the two ways that work: HTTPS in front of the model, or the server's
+// Coach, which has no such rule and reaches http:// on its own network.
+const isCleartext = url => /^http:\/\//i.test(String(url || '').trim())
+const cleartextRefused = () => t('Android blocks unencrypted http:// connections from apps, so this phone can only reach an https:// endpoint. Put HTTPS in front of it (Tailscale or a reverse proxy), or choose “Use my self-hosted openGym”: your server can reach an http:// model on its own network.')
 
 export default function CoachSetup() {
   const nav = useNavigate()
@@ -66,6 +76,10 @@ export default function CoachSetup() {
   const prepare = async () => {
     const v = validateBaseUrl(meta.baseUrl ? baseUrl : '')
     if (!v.ok) return toast(v.error)
+    // An empty field passes the validator on purpose: for a provider with a fixed endpoint,
+    // empty means the default. This one has no default, so empty is nowhere to call.
+    if (meta.baseUrl && !meta.defaultBase && !v.value) return toast(t('Enter the endpoint URL'))
+    if (isCleartext(v.value)) return toast(cleartextRefused())
     if (!meta.keyOptional && !key.trim() && !hasKey) return toast(t('Enter your API key'))
     setBusy(true); setStep(0)
     try {
@@ -83,14 +97,22 @@ export default function CoachSetup() {
   }
 
   const save = async () => {
+    // The same check "List models" makes. The endpoint field stays editable after a successful
+    // listing, and taking `.value` off an unchecked result turned a typo into `baseUrl: null` —
+    // saved, "The Coach is on", and the phone pointed at nothing.
+    const v = validateBaseUrl(meta.baseUrl ? baseUrl : '')
+    if (!v.ok) return toast(v.error)
+    if (meta.baseUrl && !meta.defaultBase && !v.value) return toast(t('Enter the endpoint URL'))
     const chosen = model || meta.defaultModel
     if (!chosen) return toast(t('Pick a model'))
+    // The endpoint can still be edited after the models were listed.
+    if (isCleartext(v.value)) return toast(cleartextRefused())
     setBusy(true)
     try {
       // The mode first, the key second: the settings file is the cheap, reliable write, the
       // key goes through the platform's secure store, which is the step that can misbehave.
       // Either way the user hears what happened instead of watching a greyed-out button (#42).
-      await setCoachLocal({ mode: 'byok', provider, model: chosen, baseUrl: meta.baseUrl ? (validateBaseUrl(baseUrl).value || null) : null })
+      await setCoachLocal({ mode: 'byok', provider, model: chosen, baseUrl: meta.baseUrl ? v.value : null })
       if (key.trim()) { await setApiKey(key.trim()); setHasKey(true); setKey('') }
       toast(t('The Coach is on'))
       nav('/coach')
@@ -110,17 +132,17 @@ export default function CoachSetup() {
 
   const current = coachLocal?.mode === 'server' ? t('Runs on your openGym server')
     : coachLocal?.mode === 'byok' ? t('Runs on this phone with your own API key')
-    : t('Off — choose how the Coach should run.')
+    : t('Off. Choose how the Coach should run.')
 
   return <div className="narrow">
     <div className="hdr">
       <button className="iconbtn" onClick={() => nav('/settings')} aria-label={t('Back')}><Icon name="chevronLeft" /></button>
-      <div style={{ flex: 1, marginLeft: 10 }}><h1>{t('AI Coach')}</h1></div>
+      <div style={{ flex: 1, marginInlineStart: 10 }}><h1>{t('AI Coach')}</h1></div>
     </div>
 
     <Section title={t('How should the Coach run?')} footer={current}>
       <Row icon="rocket" iconTint="var(--indigo)" title={t('Use my self-hosted openGym')}
-        subtitle={user ? (serverHasCoach ? t('Your server runs the Coach with whatever provider its admin set up. Nothing new leaves this phone beyond what already syncs.') : config == null ? t('Loading…') : t('Your server has no Coach enabled — ask its admin, or bring your own key below.')) : t('Connect to my server')}
+        subtitle={user ? (serverHasCoach ? t('Your server runs the Coach with whatever provider its admin set up. Nothing new leaves this phone beyond what already syncs.') : config == null ? t('Loading…') : t('Your server has no Coach enabled. Ask its admin, or bring your own key below.')) : t('Connect to my server')}
         accessory="chevron" onClick={() => { if (!user || serverHasCoach) useServer(); else setChoice('server') }} />
       <Row icon="key" iconTint="var(--acc)" title={t('Bring my own API key')}
         subtitle={t('This phone calls the provider directly with your key. Every request is charged to your account.')}
@@ -128,7 +150,7 @@ export default function CoachSetup() {
     </Section>
 
     {choice === 'server' && !serverHasCoach && <div className="card">
-      <div className="muted small">{t('Your server has no Coach enabled — ask its admin, or bring your own key below.')}</div>
+      <div className="muted small">{t('Your server has no Coach enabled. Ask its admin, or bring your own key below.')}</div>
     </div>}
 
     {choice === 'byok' && <>
@@ -139,9 +161,10 @@ export default function CoachSetup() {
         </div>
       </Section>
 
-      {meta.baseUrl && <Section title={t('Endpoint')}>
+      {meta.baseUrl && <Section title={t('Endpoint')}
+        footer={isCleartext(baseUrl) ? <span style={{ color: 'var(--red)' }}>{cleartextRefused()}</span> : null}>
         <div style={{ padding: '8px 12px' }}>
-          <TextField value={baseUrl} placeholder="http://ollama.lan:11434" inputMode="url" autoCapitalize="none" autoCorrect="off"
+          <TextField value={baseUrl} placeholder="https://ollama.example.com" inputMode="url" autoCapitalize="none" autoCorrect="off"
             onChange={e => setBaseUrl(e.target.value)} />
         </div>
       </Section>}
@@ -155,18 +178,18 @@ export default function CoachSetup() {
 
       <Section title={t('What leaves this phone')}>
         {DATA_CATEGORIES.map(k => {
-          const [title, sub] = CATEGORY_TEXT[k] || [k, '']
-          return <Row key={k} icon="check" iconTint="var(--acc)" title={t(title)} subtitle={t(sub)} />
+          const [title, sub] = CATEGORY_TEXT[k]?.() || [k, '']
+          return <Row key={k} icon="check" iconTint="var(--acc)" title={title} subtitle={sub} />
         })}
       </Section>
       <p className="sect-f" style={{ marginTop: -18, marginBottom: 22, lineHeight: 1.5 }}>
-        {t('Each request goes straight to {0} with your key — nobody else sees it, and you pay for it.', host || meta.label)}
+        {t('Each request goes straight to {0} with your key. Nobody else sees it, and you pay for it.', host || meta.label)}
       </p>
 
       {step >= 0 && <div className="card">
-        {STEPS.map((s, i) => <div key={s} className="row" style={{ gap: 8, padding: '3px 0', opacity: i > step ? .4 : 1 }}>
-          <span style={{ color: i < step || step === 2 ? 'var(--green)' : i === step ? 'var(--acc)' : 'var(--dim)' }}><Icon name={i < step || step === 2 ? 'check' : 'timer'} /></span>
-          <span className="small">{t(s)}</span>
+        {STEPS().map((s, i) => <div key={s} className="row" style={{ gap: 8, padding: '3px 0', opacity: i > step ? .4 : 1 }}>
+          <span style={{ color: i < step || step === 2 ? 'var(--green)' : i === step ? 'var(--acc)' : 'var(--dim)' }}><Icon name={i < step || step === 2 ? 'check' : 'hourglass'} /></span>
+          <span className="small">{s}</span>
         </div>)}
       </div>}
 
