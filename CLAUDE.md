@@ -153,7 +153,7 @@ must stay separate code paths: `test/food-ai.test.js` walks the data directory f
 A past workout typed out in words is read the same way: `coach/core/logtext.js` (pure: payload,
 validator, the date arithmetic — the model names a weekday, it never computes a date) and
 `coach/logtext-jobs.js` (a job lane like the food one, under the exercise lookup's consent and
-daily count); the client half is `frontend/src/lib/workout-text.js` and
+daily count); the client half is `frontend/src/lib/workout-draft.js` (upstream's `workout-text.js` is another thing) and
 `components/WorkoutFromText.jsx`, which only ever opens a draft on the "log a past workout" screen.
 
 ### MCP server (`mcp/src`)
